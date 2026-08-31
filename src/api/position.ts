@@ -1,0 +1,76 @@
+import { http } from '@/http/http'
+
+export interface PositionFilterOption {
+  value: string
+  label: string
+}
+
+export interface PositionFilterOptions {
+  kinds: PositionFilterOption[]
+  educationInfos: PositionFilterOption[]
+  workExperiences: PositionFilterOption[]
+  locations: PositionFilterOption[]
+}
+
+export interface PositionListQuery {
+  pageNum: number
+  pageSize: number
+  kinds?: number[]
+  educationInfos?: string[]
+  workExperiences?: string[]
+  locIds?: string[]
+}
+
+export interface PositionListItem {
+  positionId: string
+  positionName: string
+  jobType: string
+  recruitmentTargetType: string
+  availableCityList: string[]
+  edu: string
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit: string
+  status: string
+  location: string
+  experience: string
+  tags: string[]
+}
+
+export interface PositionListPage {
+  list: PositionListItem[]
+  total: number
+}
+
+export interface PositionRecruiter {
+  name: string
+  role: string
+  avatar: string
+  activeText: string
+}
+
+export interface PositionDetail extends PositionListItem {
+  company: string
+  companyIndustry: string
+  companyStage: string
+  companySize: string
+  companyLogo: string
+  address: string
+  longitude?: number
+  latitude?: number
+  recruiter: PositionRecruiter
+  responsibilities: string[]
+  requirements: string[]
+}
+
+export function getPositionFilterOptions() {
+  return http.get<PositionFilterOptions>('/miniapp/positions/filter-options')
+}
+
+export function getPositions(query: PositionListQuery) {
+  return http.get<PositionListPage>('/miniapp/positions', query)
+}
+
+export function getPositionDetail(positionId: string) {
+  return http.get<PositionDetail>(`/miniapp/positions/${encodeURIComponent(positionId)}`)
+}

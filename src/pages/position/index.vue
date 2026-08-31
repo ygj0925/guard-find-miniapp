@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { getPositionFilterOptions, getPositions, type PositionFilterOptions, type PositionListItem } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { tabbarStore } from '@/tabbar/store'
-import { positions } from './data'
 import PositionSearchBar from './components/PositionSearchBar.vue'
 
 defineOptions({
@@ -28,13 +28,18 @@ const BACK_TO_TOP_EXIT_THRESHOLD = uni.upx2px(32)
 
 const headerScrolled = ref(false)
 const currentScrollTop = ref(0)
-const activeCategory = ref('推荐')
-const categories = ['推荐', '研发', '医学', '市场', '销售', '职能']
+const activeKind = ref('')
+const filterOptions = ref<PositionFilterOptions>({ kinds: [], educationInfos: [], workExperiences: [], locations: [] })
+const selectedFilters = reactive({ educationInfos: [] as string[], workExperiences: [] as string[], locIds: [] as string[] })
+const jobs = ref<PositionListItem[]>([])
+const total = ref(0)
+const loading = ref(false)
+const showFilter = ref(false)
+const categories = computed(() => [{ value: '', label: '推荐' }, ...filterOptions.value.kinds])
 const quickLinks = [
   { label: '附近机会', description: '发现身边好工作', icon: 'i-carbon-location-company', colorClass: 'text-[#26b8bd]' },
   { label: '热门职位', description: '精选高匹配岗位', icon: 'i-carbon-fire', colorClass: 'text-[#ff805c]' },
 ]
-const jobs = positions
 
 let statusBarHeight = 0
 try {
@@ -71,22 +76,54 @@ function showJobDetail(positionId: string) {
   })
 }
 
-function handleQuickLink(label: string) {
-  uni.showToast({
-    title: `${label}功能即将开放`,
-    icon: 'none',
-  })
+function formatSalary(job: PositionListItem) {
+  if (job.salaryMin == null && job.salaryMax == null) return job.salaryUnit || '面议'
+  const toK = (salary?: number) => salary == null ? '' : `${Math.round(salary / 1000)}K`
+  return job.salaryMin != null && job.salaryMax != null ? `${toK(job.salaryMin)}-${toK(job.salaryMax)}` : toK(job.salaryMin ?? job.salaryMax)
 }
 
-function handleSearch() {
-  uni.showToast({
-    title: '职位搜索即将开放',
-    icon: 'none',
-  })
+async function loadPositions() {
+  loading.value = true
+  try {
+    const page = await getPositions({
+      pageNum: 1,
+      pageSize: 50,
+      kinds: activeKind.value ? [Number(activeKind.value)] : undefined,
+      educationInfos: selectedFilters.educationInfos.length ? selectedFilters.educationInfos : undefined,
+      workExperiences: selectedFilters.workExperiences.length ? selectedFilters.workExperiences : undefined,
+      locIds: selectedFilters.locIds.length ? selectedFilters.locIds : undefined,
+    })
+    jobs.value = page.list
+    total.value = page.total
+  }
+  finally {
+    loading.value = false
+  }
 }
 
-function handleCategoryTap(category: string) {
-  activeCategory.value = category
+async function loadFilterOptions() {
+  filterOptions.value = await getPositionFilterOptions()
+}
+
+function handleCategoryTap(kind: string) {
+  activeKind.value = kind
+  loadPositions()
+}
+
+function toggleFilter(type: 'educationInfos' | 'workExperiences' | 'locIds', value: string) {
+  const selected = selectedFilters[type]
+  selectedFilters[type] = selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]
+}
+
+function resetFilters() {
+  selectedFilters.educationInfos = []
+  selectedFilters.workExperiences = []
+  selectedFilters.locIds = []
+}
+
+function applyFilters() {
+  showFilter.value = false
+  loadPositions()
 }
 
 onPageScroll(({ scrollTop }) => {
@@ -95,6 +132,15 @@ onPageScroll(({ scrollTop }) => {
 
 onShow(() => {
   syncScrollState(currentScrollTop.value)
+})
+
+onLoad(async () => {
+  try {
+    await loadFilterOptions()
+  }
+  finally {
+    loadPositions()
+  }
 })
 
 onHide(() => {
@@ -118,13 +164,13 @@ onUnload(() => {
         scrolled-background="var(--app-header-surface, rgba(255,255,255,0.98))"
       >
         <template #center>
-          <PositionSearchBar v-if="headerScrolled" compact @tap="handleSearch" />
+          <PositionSearchBar v-if="headerScrolled" compact @tap="showFilter = true" />
           <text v-else class="block text-center text-lg text-white font-700 leading-none tracking-1rpx">职位</text>
         </template>
       </AppPageHeader>
 
       <view class="relative z-1 px-4 pb-5 pt-3">
-        <PositionSearchBar @tap="handleSearch" />
+        <PositionSearchBar @tap="showFilter = true" />
 
         <view class="grid grid-cols-2 mt-4 overflow-hidden border-1rpx border-white/60 rounded-3xl border-solid bg-white/72 shadow-[0_12rpx_32rpx_rgba(39,105,180,0.08)] backdrop-blur-8rpx">
           <view
@@ -133,7 +179,7 @@ onUnload(() => {
             class="min-h-28 flex cursor-pointer items-center px-4 active:bg-white/72"
             :class="index === 0 ? 'border-r-1rpx border-r-white/76 border-r-solid' : ''"
             role="button"
-            @tap="handleQuickLink(link.label)"
+            @tap="showFilter = true"
           >
             <view class="mr-3 text-3xl leading-none" :class="[link.icon, link.colorClass]" />
             <view class="min-w-0 flex flex-1 flex-col">
@@ -144,7 +190,7 @@ onUnload(() => {
         </view>
 
         <view class="mt-5 flex items-end">
-          <text class="text-xl text-[#17233d] font-700 leading-none">上海</text>
+          <text class="text-xl text-[#17233d] font-700 leading-none">{{ total ? `${total} 个职位` : '职位推荐' }}</text>
           <view class="mb-1 ml-2 h-2 w-2 rotate-45 border-b-3rpx border-r-3rpx border-[#4b5c70] border-solid" />
         </view>
       </view>
@@ -154,20 +200,20 @@ onUnload(() => {
       <view class="inline-flex items-center px-3 py-3">
         <view
           v-for="category in categories"
-          :key="category"
+          :key="category.value || 'recommended'"
           class="relative min-w-120rpx flex flex-col cursor-pointer items-center px-3 pb-2 pt-1 text-sm text-[#667085] font-600 active:opacity-72"
-          :class="activeCategory === category ? 'text-brand-blue' : ''"
+          :class="activeKind === category.value ? 'text-brand-blue' : ''"
           role="button"
-          @tap="handleCategoryTap(category)"
+          @tap="handleCategoryTap(category.value)"
         >
           <view
             class="mb-2 h-68rpx w-68rpx flex items-center justify-center rounded-2xl text-xl leading-none"
-            :class="activeCategory === category ? 'bg-[#e3f3ff] text-brand-blue' : 'bg-[#f0f2f5] text-[#687386]'"
+            :class="activeKind === category.value ? 'bg-[#e3f3ff] text-brand-blue' : 'bg-[#f0f2f5] text-[#687386]'"
           >
-            <view :class="category === '推荐' ? 'i-carbon-recommend' : category === '研发' ? 'i-carbon-code' : category === '医学' ? 'i-carbon-medication-alert' : category === '市场' ? 'i-carbon-chart-line' : category === '销售' ? 'i-carbon-store' : 'i-carbon-user-role'" />
+            <view class="i-carbon-portfolio" />
           </view>
-          <text>{{ category }}</text>
-          <view v-if="activeCategory === category" class="absolute bottom-0 h-5rpx w-34rpx rounded-full bg-brand-blue" />
+          <text>{{ category.label }}</text>
+          <view v-if="activeKind === category.value" class="absolute bottom-0 h-5rpx w-34rpx rounded-full bg-brand-blue" />
         </view>
       </view>
     </scroll-view>
@@ -186,16 +232,16 @@ onUnload(() => {
       <view class="flex flex-col gap-3">
         <view
           v-for="job in jobs"
-          :key="job.id"
+          :key="job.positionId"
           class="cursor-pointer rounded-2xl bg-white px-4 py-4 shadow-[0_8rpx_24rpx_rgba(38,64,105,0.05)] active:opacity-74"
           role="button"
-          @tap="showJobDetail(job.id)"
+          @tap="showJobDetail(job.positionId)"
         >
           <view class="flex items-start justify-between gap-3">
-            <text class="min-w-0 flex-1 text-base text-[#1d2939] font-700 leading-[1.35]">{{ job.title }}</text>
-            <text class="flex-none text-sm text-brand-blue font-700">{{ job.salary }}</text>
+            <text class="min-w-0 flex-1 text-base text-[#1d2939] font-700 leading-[1.35]">{{ job.positionName }}</text>
+            <text class="flex-none text-sm text-brand-blue font-700">{{ formatSalary(job) }}</text>
           </view>
-          <text class="mt-2 block text-xs text-[#667085]">{{ job.company }} · {{ job.education }} · {{ job.experience }}</text>
+          <text class="mt-2 block text-xs text-[#667085]">{{ job.location }} · {{ job.edu }} · {{ job.experience }}</text>
           <view class="mt-3 flex flex-wrap gap-2">
             <text v-for="tag in job.tags" :key="tag" class="rounded-lg bg-[#f2f4f7] px-2 py-1 text-xs text-[#667085]">{{ tag }}</text>
           </view>
@@ -209,6 +255,19 @@ onUnload(() => {
             <text class="ml-3 text-xs text-[#98a2b3]">{{ job.location }}</text>
           </view>
         </view>
+      </view>
+      <view v-if="!loading && !jobs.length" class="py-16 text-center text-sm text-[#98a2b3]">暂无符合条件的职位</view>
+      <view v-if="loading" class="py-16 text-center text-sm text-[#98a2b3]">职位加载中...</view>
+    </view>
+
+    <view v-if="showFilter" class="fixed inset-0 z-200 flex items-end bg-black/45" @tap.self="showFilter = false">
+      <view class="max-h-[80vh] w-full overflow-y-auto rounded-t-3xl bg-white px-4 pb-safe pt-5">
+        <view class="mb-5 flex items-center justify-between"><text class="text-lg text-[#17233d] font-700">筛选职位</text><text class="text-sm text-[#667085]" @tap="showFilter = false">关闭</text></view>
+        <view v-for="section in [{ key: 'educationInfos', label: '学历要求', options: filterOptions.educationInfos }, { key: 'workExperiences', label: '工作经验', options: filterOptions.workExperiences }, { key: 'locIds', label: '工作地点', options: filterOptions.locations }]" :key="section.key" class="mb-5">
+          <text class="mb-3 block text-sm text-[#344054] font-700">{{ section.label }}</text>
+          <view class="flex flex-wrap gap-2"><text v-for="option in section.options" :key="option.value" class="rounded-lg px-3 py-2 text-xs" :class="selectedFilters[section.key as 'educationInfos' | 'workExperiences' | 'locIds'].includes(option.value) ? 'bg-[#e3f3ff] text-brand-blue' : 'bg-[#f2f4f7] text-[#667085]'" @tap="toggleFilter(section.key as 'educationInfos' | 'workExperiences' | 'locIds', option.value)">{{ option.label }}</text></view>
+        </view>
+        <view class="flex gap-3 border-t-1rpx border-[#edf0f4] border-solid py-3"><button class="flex-1 border-0 bg-[#f2f4f7] text-sm text-[#475467]" @tap="resetFilters">重置</button><button class="flex-1 border-0 bg-brand-blue text-sm text-white" @tap="applyFilters">确定</button></view>
       </view>
     </view>
   </view>

@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { PositionDetail } from './data'
 import { computed, ref } from 'vue'
+import { getPositionDetail, type PositionDetail as PositionDetailResponse } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
-import { getPositionById, positions } from './data'
 
 defineOptions({
   name: 'PositionDetail',
@@ -27,12 +26,35 @@ definePage({
 
 const POSITION_LIST_PATH = '/pages/position/index'
 const DETAIL_PATH = '/pages/position/detail'
+interface PositionDetailView {
+  id: string
+  title: string
+  company: string
+  companyIndustry: string
+  companyStage: string
+  companySize: string
+  companyLogo: string
+  salary: string
+  location: string
+  address: string
+  longitude: number
+  latitude: number
+  education: string
+  experience: string
+  tags: string[]
+  recruiter: { name: string, role: string, avatar: string, activeText: string }
+  responsibilities: string[]
+  requirements: string[]
+}
+
+const EMPTY_POSITION: PositionDetailView = {
+  id: '', title: '', company: '', companyIndustry: '', companyStage: '', companySize: '', companyLogo: '/static/logo.svg', salary: '', location: '', address: '', longitude: 0, latitude: 0, education: '', experience: '', tags: [], recruiter: { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' }, responsibilities: [], requirements: [],
+}
 const positionStore = usePositionStore()
 const tokenStore = useTokenStore()
-const position = ref<PositionDetail>(positions[0])
+const position = ref<PositionDetailView>(EMPTY_POSITION)
 const isLoading = ref(true)
 const isApplying = ref(false)
-let loadingTimer: ReturnType<typeof setTimeout> | undefined
 let applyingTimer: ReturnType<typeof setTimeout> | undefined
 
 const isFavorite = computed(() => positionStore.isFavorite(position.value.id))
@@ -40,23 +62,46 @@ const isApplied = computed(() => positionStore.isApplied(position.value.id))
 const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
 const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
 
-onLoad((options) => {
-  const matchedPosition = getPositionById(options?.id)
-  if (matchedPosition) {
-    position.value = matchedPosition
+function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
+  return {
+    id: source.positionId,
+    title: source.positionName,
+    company: source.company,
+    companyIndustry: source.companyIndustry,
+    companyStage: source.companyStage,
+    companySize: source.companySize,
+    companyLogo: source.companyLogo || '/static/logo.svg',
+    salary: source.salaryMin != null && source.salaryMax != null ? `${Math.round(source.salaryMin / 1000)}K-${Math.round(source.salaryMax / 1000)}K` : source.salaryUnit || '面议',
+    location: source.location,
+    address: source.address,
+    longitude: Number(source.longitude || 0),
+    latitude: Number(source.latitude || 0),
+    education: source.edu,
+    experience: source.experience,
+    tags: source.tags || [],
+    recruiter: source.recruiter || { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
+    responsibilities: source.responsibilities || [],
+    requirements: source.requirements || [],
   }
-  else if (options?.id) {
-    uni.showToast({ title: '该职位暂不可用', icon: 'none' })
-  }
+}
 
-  loadingTimer = setTimeout(() => {
+onLoad(async (options) => {
+  if (!options?.id) {
     isLoading.value = false
-  }, 420)
+    return
+  }
+  try {
+    position.value = toPositionDetail(await getPositionDetail(options.id))
+  }
+  catch {
+    uni.showToast({ title: '职位加载失败，请稍后重试', icon: 'none' })
+  }
+  finally {
+    isLoading.value = false
+  }
 })
 
 onUnload(() => {
-  if (loadingTimer)
-    clearTimeout(loadingTimer)
   if (applyingTimer)
     clearTimeout(applyingTimer)
 })
