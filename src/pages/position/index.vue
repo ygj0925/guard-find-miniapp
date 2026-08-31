@@ -35,7 +35,10 @@ const jobs = ref<PositionListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const showFilter = ref(false)
+const pageNum = ref(0)
+const PAGE_SIZE = 20
 const categories = computed(() => [{ value: '', label: '推荐' }, ...filterOptions.value.kinds])
+const hasMore = computed(() => jobs.value.length < total.value)
 const quickLinks = [
   { label: '附近机会', description: '发现身边好工作', icon: 'i-carbon-location-company', colorClass: 'text-[#26b8bd]' },
   { label: '热门职位', description: '精选高匹配岗位', icon: 'i-carbon-fire', colorClass: 'text-[#ff805c]' },
@@ -82,19 +85,22 @@ function formatSalary(job: PositionListItem) {
   return job.salaryMin != null && job.salaryMax != null ? `${toK(job.salaryMin)}-${toK(job.salaryMax)}` : toK(job.salaryMin ?? job.salaryMax)
 }
 
-async function loadPositions() {
+async function loadPositions(reset = false) {
+  if (loading.value || (!reset && !hasMore.value)) return
   loading.value = true
+  const nextPageNum = reset ? 1 : pageNum.value + 1
   try {
     const page = await getPositions({
-      pageNum: 1,
-      pageSize: 50,
+      pageNum: nextPageNum,
+      pageSize: PAGE_SIZE,
       kinds: activeKind.value ? [Number(activeKind.value)] : undefined,
       educationInfos: selectedFilters.educationInfos.length ? selectedFilters.educationInfos : undefined,
       workExperiences: selectedFilters.workExperiences.length ? selectedFilters.workExperiences : undefined,
       locIds: selectedFilters.locIds.length ? selectedFilters.locIds : undefined,
     })
-    jobs.value = page.list
+    jobs.value = reset ? page.list : [...jobs.value, ...page.list]
     total.value = page.total
+    pageNum.value = nextPageNum
   }
   finally {
     loading.value = false
@@ -107,7 +113,7 @@ async function loadFilterOptions() {
 
 function handleCategoryTap(kind: string) {
   activeKind.value = kind
-  loadPositions()
+  loadPositions(true)
 }
 
 function toggleFilter(type: 'educationInfos' | 'workExperiences' | 'locIds', value: string) {
@@ -123,7 +129,7 @@ function resetFilters() {
 
 function applyFilters() {
   showFilter.value = false
-  loadPositions()
+  loadPositions(true)
 }
 
 onPageScroll(({ scrollTop }) => {
@@ -139,8 +145,12 @@ onLoad(async () => {
     await loadFilterOptions()
   }
   finally {
-    loadPositions()
+    loadPositions(true)
   }
+})
+
+onReachBottom(() => {
+  loadPositions()
 })
 
 onHide(() => {
@@ -257,7 +267,8 @@ onUnload(() => {
         </view>
       </view>
       <view v-if="!loading && !jobs.length" class="py-16 text-center text-sm text-[#98a2b3]">暂无符合条件的职位</view>
-      <view v-if="loading" class="py-16 text-center text-sm text-[#98a2b3]">职位加载中...</view>
+      <view v-if="loading" class="py-8 text-center text-sm text-[#98a2b3]">职位加载中...</view>
+      <view v-else-if="jobs.length && !hasMore" class="py-8 text-center text-xs text-[#98a2b3]">没有更多职位了</view>
     </view>
 
     <view v-if="showFilter" class="fixed inset-0 z-200 flex items-end bg-black/45" @tap.self="showFilter = false">
