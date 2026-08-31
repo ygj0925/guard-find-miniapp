@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref } from 'vue'
-import { wxLogin } from '@/api/login'
+import { phoneLogin, sendSmsCaptcha } from '@/api/login'
 import { AGREEMENT_PAGE, BIND_PHONE_PAGE, PRIVACY_PAGE } from '@/router/config'
-import { startWechatAuthorization } from '@/service/auth/wechat-auth'
 import { useTokenStore } from '@/store/token'
-import { normalizePhone, validatePhone, validateVerificationCode } from './auth'
 import { navigateAfterAuthenticated } from './navigation'
+import AuthBehaviorCaptchaModal from './components/AuthBehaviorCaptchaModal.vue'
+import { normalizePhone, validatePhone, validateVerificationCode } from './auth'
 
 definePage({
   excludeLoginPath: true,
@@ -21,7 +21,6 @@ definePage({
 type LoginMode = 'phone' | 'wechat'
 interface PhoneNumberEvent { detail: { code?: string, errMsg?: string } }
 
-const tokenStore = useTokenStore()
 const mode = ref<LoginMode>('phone')
 const agreed = ref(false)
 const showAgreement = ref(false)
@@ -29,11 +28,14 @@ const loading = ref(false)
 const seconds = ref(0)
 const redirectUrl = ref('')
 const feedback = ref('')
+const showCaptcha = ref(false)
 const form = reactive({ phone: '', code: '' })
 const errors = reactive({ phone: '', code: '' })
 let timer: ReturnType<typeof setInterval> | undefined
+const authClientId = import.meta.env.VITE_AUTH_CLIENT_ID || 'ef51c9a3e9046c4f2ea45142c8a8344a'
+const tokenStore = useTokenStore()
 
-const phoneLoginEnabled = computed(() => !validatePhone(form.phone) && !validateVerificationCode(form.code) && agreed.value)
+const phoneLoginEnabled = computed(() => !loading.value && !validatePhone(form.phone) && !validateVerificationCode(form.code) && agreed.value)
 
 onLoad((options) => { redirectUrl.value = typeof options?.redirect === 'string' ? options.redirect : '' })
 onUnmounted(() => { if (timer) clearInterval(timer) })
@@ -47,39 +49,66 @@ function confirmAgreement() { agreed.value = true; showAgreement.value = false }
 
 function requestCode() {
   checkPhone()
-  if (errors.phone || seconds.value) return
-  // 当前项目未定义短信接口契约，保留真实页面交互，避免伪造服务端请求。
+  if (errors.phone || seconds.value || loading.value) return
+  showCaptcha.value = true
+}
+
+function startCountdown() {
   seconds.value = 60
-  feedback.value = '验证码发送服务待接入，当前为交互演示。'
   timer = setInterval(() => {
     seconds.value -= 1
     if (seconds.value <= 0 && timer) { clearInterval(timer); timer = undefined }
   }, 1000)
 }
 
-function submitPhoneLogin() {
-  checkPhone(); checkCode()
-  if (!requireAgreement() || errors.phone || errors.code) return
-  feedback.value = '手机号验证码登录服务待接入，当前不会创建登录态。'
+async function sendCodeAfterCaptcha(captchaVerification: string) {
+  showCaptcha.value = false
+  loading.value = true
+  feedback.value = ''
+  try {
+    await sendSmsCaptcha(form.phone, { captchaType: 'blockPuzzle', captchaVerification })
+    startCountdown()
+    feedback.value = '验证码已发送，请注意查收。'
+  }
+  catch (error) {
+    feedback.value = error instanceof Error ? error.message : '验证码发送失败，请稍后重试。'
+  }
+  finally {
+    loading.value = false
+  }
 }
 
-async function startWechatLogin(phoneCode = '') {
-  if (!requireAgreement()) return
-  loading.value = true; feedback.value = ''
-  const result = await startWechatAuthorization({ authenticate: code => wxLogin({ code }) })
-  loading.value = false
-  if (result.status === 'binding_required') {
-    const phoneQuery = phoneCode ? `&wechatPhoneCode=${encodeURIComponent(phoneCode)}` : ''
-    const redirectQuery = redirectUrl.value ? `&redirect=${encodeURIComponent(redirectUrl.value)}` : ''
-    uni.navigateTo({ url: `${BIND_PHONE_PAGE}?wechatCode=${encodeURIComponent(result.code)}&mock=${result.isMock ? '1' : '0'}${phoneQuery}${redirectQuery}` })
-    return
-  }
-  if (result.status === 'authenticated') {
-    await tokenStore.completeExternalLogin(result.token)
+async function submitPhoneLogin() {
+  checkPhone(); checkCode()
+  if (loading.value || !requireAgreement() || errors.phone || errors.code) return
+  loading.value = true
+  feedback.value = ''
+  try {
+    const token = await phoneLogin({
+      clientId: authClientId,
+      authType: 'PHONE',
+      phone: form.phone,
+      captcha: form.code,
+    })
+    await tokenStore.completeExternalLogin(token)
     navigateAfterAuthenticated(redirectUrl.value)
-    return
   }
-  feedback.value = result.message
+  catch (error) {
+    feedback.value = error instanceof Error ? error.message : '登录失败，请稍后重试。'
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function startWechatLogin() {
+  if (!requireAgreement()) return
+  // #ifdef MP-WEIXIN
+  uni.navigateTo({ url: `${BIND_PHONE_PAGE}?wechat=1&redirect=${encodeURIComponent(redirectUrl.value)}` })
+  // #endif
+  // #ifndef MP-WEIXIN
+  feedback.value = '请在微信小程序中使用微信登录'
+  // #endif
 }
 
 function onWechatPhoneNumber(event: PhoneNumberEvent) {
@@ -88,8 +117,8 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
     feedback.value = event.detail.errMsg?.includes('deny') ? '你已取消手机号授权。' : '未获取到微信手机号授权凭证，请重试。'
     return
   }
-  // 微信手机号凭证只能交由后端解密；先取得同一会话的微信身份并进入绑定分支。
-  startWechatLogin(event.detail.code)
+  // 短信验证码提交时再获取 wx.login() code，避免临时凭证在输入期间过期。
+  startWechatLogin()
 }
 </script>
 
@@ -123,6 +152,7 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
       <view class="agreement" @tap="agreed = !agreed"><view class="agreement-check" :class="{ checked: agreed }">{{ agreed ? '✓' : '' }}</view><text>我已阅读并同意</text><text class="agreement-link" @tap.stop="goTo(AGREEMENT_PAGE)">《服务使用协议》</text><text>和</text><text class="agreement-link" @tap.stop="goTo(PRIVACY_PAGE)">《隐私政策》</text><text>，未注册手机号登录后自动生成会员账号</text></view>
       <text v-if="feedback" class="feedback">{{ feedback }}</text><text class="switch-mode" @tap="mode = mode === 'phone' ? 'wechat' : 'phone'">{{ mode === 'phone' ? '切换为一键登录' : '切换为手机号登录' }}</text><text class="skip" @tap="uni.reLaunch({ url: '/pages/index/index' })">暂不登录</text>
     </view>
+    <AuthBehaviorCaptchaModal v-if="showCaptcha" @cancel="showCaptcha = false" @success="sendCodeAfterCaptcha" />
     <view v-if="showAgreement" class="agreement-mask" @tap="showAgreement = false"><view class="agreement-dialog" @tap.stop><text class="dialog-copy">请您认真阅读以下协议的全部条款，接受后可开始使用我们的服务，未注册手机号登录后自动生成会员账号。</text><view class="dialog-links"><text class="dialog-link" @tap="goTo(AGREEMENT_PAGE)">《服务使用协议》</text><text class="dialog-link" @tap="goTo(PRIVACY_PAGE)">《隐私政策》</text></view><view class="dialog-actions"><button class="dialog-button reject" @tap="showAgreement = false">不同意</button><button class="dialog-button accept" @tap="confirmAgreement">同意并登录</button></view></view></view>
   </view>
 </template>

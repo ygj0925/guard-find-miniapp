@@ -23,9 +23,11 @@ export function http<T>(options: CustomRequestOptions) {
       success: async (res) => {
         const responseData = res.data as Partial<IResponse<T>>
         const code = responseData?.code
+        // 后端部分接口（如行为验证码）将业务码序列化为字符串 "0"。
+        const normalizedCode = typeof code === 'string' ? Number(code) : code
 
         // 检查是否是401错误（包括HTTP状态码401或业务码401）
-        const isTokenExpired = res.statusCode === 401 || code === ResultEnum.Unauthorized
+        const isTokenExpired = res.statusCode === 401 || normalizedCode === ResultEnum.Unauthorized
 
         if (isTokenExpired) {
           const tokenStore = useTokenStore()
@@ -109,7 +111,7 @@ export function http<T>(options: CustomRequestOptions) {
         // 处理其他成功状态（HTTP状态码200-299）
         if (res.statusCode >= 200 && res.statusCode < 300) {
           // 处理业务逻辑错误
-          if (!isSuccessResultCode(code as number)) {
+          if (!isSuccessResultCode(normalizedCode as number)) {
             const httpError = createHttpError({
               type: HttpErrorType.Business,
               code,

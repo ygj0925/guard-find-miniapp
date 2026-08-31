@@ -33,6 +33,8 @@ interface ImportMetaEnv {
   readonly VITE_DELETE_CONSOLE: string
   /** 微信授权运行模式。mock 仅返回绑定手机号分支，api 需要显式接入服务端适配器。 */
   readonly VITE_WECHAT_AUTH_MODE?: 'mock' | 'api'
+  /** 登录接口使用的后端客户端 ID。 */
+  readonly VITE_AUTH_CLIENT_ID?: string
   // 更多环境变量...
 }
 

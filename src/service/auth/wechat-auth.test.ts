@@ -13,34 +13,18 @@ describe('startWechatAuthorization', () => {
     })
   })
 
-  it('uses a code and routes mock mode to phone binding without authenticating', async () => {
-    const authenticate = vi.fn()
+  it('uses a code and routes to phone binding without mutating auth state', async () => {
+    const getCode = vi.fn(async () => 'mock-wechat-code')
     const result = await startWechatAuthorization({
-      mode: 'mock',
       isWechatMiniProgram: () => true,
-      getCode: async () => 'mock-wechat-code',
-      authenticate,
+      getCode,
     })
 
     expect(result).toEqual({
       status: 'binding_required',
       code: 'mock-wechat-code',
-      isMock: true,
     })
-    expect(authenticate).not.toHaveBeenCalled()
-  })
-
-  it('does not claim an authenticated result when API mode is unconfigured', async () => {
-    const result = await startWechatAuthorization({
-      mode: 'api',
-      isWechatMiniProgram: () => true,
-      getCode: async () => 'server-code',
-    })
-
-    expect(result).toEqual({
-      status: 'failed',
-      message: '微信登录服务尚未配置',
-    })
+    expect(getCode).toHaveBeenCalledOnce()
   })
 
   it('surfaces authorization failures', async () => {

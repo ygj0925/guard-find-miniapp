@@ -1,6 +1,34 @@
 // 认证模式类型
 export type AuthMode = 'single' | 'double'
 
+export interface PhoneLoginForm {
+  /** 后端 sys_client.client_id；可通过 VITE_AUTH_CLIENT_ID 覆盖默认开发客户端。 */
+  clientId: string
+  authType: 'PHONE'
+  phone: string
+  captcha: string
+  /** wx.login() 返回的临时凭证，用于关联微信身份。 */
+  wxLoginCode?: string
+}
+
+export interface BehaviorCaptcha {
+  originalImageBase64: string
+  jigsawImageBase64: string
+  point: { x: number, y: number }
+  token: string
+  secretKey?: string
+}
+
+export interface BehaviorCaptchaCheckResult {
+  repCode: string
+  repMsg?: string
+}
+
+export interface BehaviorCaptchaRequest {
+  captchaType: 'blockPuzzle'
+  captchaVerification?: string
+}
+
 // 单Token响应类型
 export interface ISingleTokenRes {
   token: string

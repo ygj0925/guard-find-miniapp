@@ -1,4 +1,4 @@
-import type { IAuthLoginRes, ICaptcha, IDoubleTokenRes, IUpdateInfo, IUpdatePassword, IUserInfoRes } from './types/login'
+import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, IDoubleTokenRes, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm } from './types/login'
 import { http } from '@/http/http'
 
 /**
@@ -23,6 +23,25 @@ export function getCode() {
  */
 export function login(loginForm: ILoginForm) {
   return http.post<IAuthLoginRes>('/auth/login', loginForm)
+}
+
+/**
+ * 手机号验证码登录；传入 wxLoginCode 时，后端会在登录成功后关联微信身份。
+ */
+export function phoneLogin(loginForm: PhoneLoginForm) {
+  return http.post<IAuthLoginRes>('/auth/login', loginForm)
+}
+
+export function getBehaviorCaptcha() {
+  return http.get<BehaviorCaptcha>('/captcha/behavior', { captchaType: 'blockPuzzle' })
+}
+
+export function checkBehaviorCaptcha(data: { captchaType: 'blockPuzzle', pointJson: string, token: string }) {
+  return http.post<BehaviorCaptchaCheckResult>('/captcha/behavior', data)
+}
+
+export function sendSmsCaptcha(phone: string, captcha: BehaviorCaptchaRequest) {
+  return http.get<void>('/captcha/sms', { phone, ...captcha })
 }
 
 /**
@@ -80,6 +99,3 @@ export function getWxCode() {
  * @param params 微信登录参数，包含code
  * @returns Promise 包含登录结果
  */
-export function wxLogin(data: { code: string }) {
-  return http.post<IAuthLoginRes>('/auth/wxLogin', data)
-}
