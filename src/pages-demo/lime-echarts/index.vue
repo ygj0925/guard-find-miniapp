@@ -1,6 +1,6 @@
 <template>
-  <view class="chart-page">
-    <view class="chart-box">
+  <view class="flex flex-1 flex-col">
+    <view class="h-600rpx w-full">
       <l-echart ref="chartRef" @finished="draw" />
     </view>
   </view>
@@ -72,16 +72,3 @@ const options = ref<EChartsOption>({
 
 const [chartRef, , draw] = useEcharts(options)
 </script>
-
-<style>
-.chart-page {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-}
-
-.chart-box {
-  width: 100%;
-  height: 600rpx;
-}
-</style>

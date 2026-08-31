@@ -38,7 +38,7 @@ function updateValue(event: { detail: { value: string } }) {
 <template>
   <view class="mb-3">
     <view
-      class="transition-[background,border-color,box-shadow] box-border min-h-96rpx flex items-center border-2rpx border-[#e1e9f5] rounded-26rpx bg-white/76 px-3 shadow-[inset_0_1rpx_0_rgba(255,255,255,0.9)] duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] focus-within:border-brand-blue focus-within:bg-white motion-reduce:transition-none"
+      class="box-border min-h-96rpx flex items-center border-2rpx border-[#e1e9f5] rounded-26rpx bg-white/76 px-3 shadow-[inset_0_1rpx_0_rgba(255,255,255,0.9)] transition-[background-color,border-color,box-shadow] duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] focus-within:border-brand-blue focus-within:bg-white motion-reduce:transition-none"
       :class="{
         'border-[#e95d63] bg-[#fff8f8]': error,
         'bg-[#f1f4fa] text-[#aeb9ca]': disabled,

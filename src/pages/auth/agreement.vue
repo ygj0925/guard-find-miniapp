@@ -13,7 +13,7 @@ function goBack() {
 
 <template>
   <AuthLayout title="服务使用协议" subtitle="请仔细阅读以下内容" @back="goBack">
-    <view class="flex flex-col gap-2.5 text-xs text-#475467 leading-1.85">
+    <view class="flex flex-col gap-2.5 text-xs text-#475467 leading-[1.85]">
       <text class="text-2xs text-#98a2b3">更新日期：2026 年 8 月 26 日</text>
       <text class="mt-2.5 block text-sm text-#1f2937 font-700">一、服务说明</text>
       <text>本协议用于说明本应用向你提供账号登录、职位浏览、职位收藏、简历投递和消息通知等服务时的基本规则。使用服务前，请确认你已理解并同意本协议。</text>

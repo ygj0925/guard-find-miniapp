@@ -50,16 +50,16 @@ const scrolledBackgroundStyle = computed(() => ({
 <template>
   <view class="box-content h-96rpx" :style="safeAreaStyle">
     <view
-      class="app-page-header fixed inset-x-0 top-0 z-100 box-content h-96rpx overflow-hidden transition-[box-shadow,color] duration-180 ease-out"
+      class="fixed inset-x-0 top-0 z-100 box-content h-96rpx overflow-hidden border-b-1rpx border-b-transparent border-b-solid transition-[box-shadow,color] duration-180 ease-out"
       :class="[
-        scrolled ? 'app-page-header--scrolled' : '',
+        scrolled ? 'border-b-[rgba(107,139,204,0.14)] shadow-[0_8rpx_24rpx_rgba(55,94,174,0.1)]' : '',
         scrolled ? (scrolledLight ? 'text-white' : 'text-[#121c39]') : (light ? 'text-white' : 'text-[#121c39]'),
       ]"
       :style="safeAreaStyle"
     >
-      <view class="app-page-header__surface pointer-events-none absolute inset-0" :style="baseBackgroundStyle" />
+      <view class="pointer-events-none absolute inset-0 transition-opacity duration-[var(--app-motion-duration-fast,180ms)] ease-[var(--app-motion-easing-standard,ease-out)] motion-reduce:transition-none" :style="baseBackgroundStyle" />
       <view
-        class="app-page-header__surface pointer-events-none absolute inset-0"
+        class="pointer-events-none absolute inset-0 transition-opacity duration-[var(--app-motion-duration-fast,180ms)] ease-[var(--app-motion-easing-standard,ease-out)] motion-reduce:transition-none"
         :class="scrolled ? 'opacity-100' : 'opacity-0'"
         :style="scrolledBackgroundStyle"
       />
@@ -99,24 +99,3 @@ const scrolledBackgroundStyle = computed(() => ({
     </view>
   </view>
 </template>
-
-<style scoped>
-.app-page-header {
-  border-bottom: 1rpx solid transparent;
-}
-
-.app-page-header__surface {
-  transition: opacity var(--app-motion-duration-fast, 180ms) var(--app-motion-easing-standard, ease-out);
-}
-
-.app-page-header--scrolled {
-  border-bottom-color: rgba(107, 139, 204, 0.14);
-  box-shadow: 0 8rpx 24rpx rgba(55, 94, 174, 0.1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-page-header__surface {
-    transition: none;
-  }
-}
-</style>

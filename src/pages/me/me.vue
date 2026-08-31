@@ -109,9 +109,9 @@ function handleLogout() {
         </view>
       </view>
 
-      <view class="grid grid-cols-4 mt-8">
+      <view class="grid grid-cols-4 mt-7 border-t-1rpx border-t-[rgba(255,255,255,0.24)] border-t-solid pt-5">
         <view v-for="stat in profileStats" :key="stat.label" class="min-w-0 flex flex-col items-center text-center">
-          <text class="text-lg font-700 leading-[1.3]">{{ stat.value }}</text>
+          <text class="text-xl font-700 leading-[1.3]">{{ stat.value }}</text>
           <text class="mt-1.5 block text-sm leading-[1.35] opacity-75">{{ stat.label }}</text>
         </view>
       </view>
@@ -135,7 +135,7 @@ function handleLogout() {
 
       <view class="mt-4">
         <text class="mx-1 mb-2 block text-base text-app-ink font-700">求职服务</text>
-        <view class="rounded-28rpx bg-white px-3.5">
+        <view class="rounded-28rpx bg-white px-3.5 shadow-[0_10rpx_28rpx_rgba(42,92,178,0.08)]">
           <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
             <view class="i-carbon-location mr-2 w-48rpx flex flex-[0_0_48rpx] items-center justify-center text-lg text-brand-blue leading-none" />
             <view class="min-w-0 flex flex-1 flex-col">
@@ -187,12 +187,12 @@ function handleLogout() {
         </view>
       </view>
 
-      <view v-if="!tokenStore.hasLogin" class="mt-3 flex flex-col items-center rounded-28rpx bg-white px-3.5 py-4 text-center">
+      <view v-if="!tokenStore.hasLogin" class="mt-3 flex flex-col items-center rounded-28rpx bg-white px-3.5 py-4 text-center shadow-[0_10rpx_28rpx_rgba(42,92,178,0.08)]">
         <text class="text-sm text-[#263249] font-600">登录后使用完整求职服务</text>
         <text class="mt-1 block text-xs text-[#9aa5b5]">同步简历、投递记录与面试消息</text>
         <view
-          @tap="handleLogin"
           class="mt-3 box-border min-h-84rpx w-full flex cursor-pointer items-center justify-center rounded-14rpx bg-brand-blue text-base text-white font-600 transition-[opacity,transform] duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-99 active:opacity-88 motion-reduce:transition-none"
+          @tap="handleLogin"
         >
           前往登录
         </view>
@@ -200,7 +200,7 @@ function handleLogout() {
 
       <view
         v-else
-        class="mt-3 min-h-92rpx flex cursor-pointer items-center justify-center gap-1.5 rounded-28rpx bg-white text-sm text-[#df555b] font-600 active:bg-[#fff7f7]"
+        class="mt-3 min-h-92rpx flex cursor-pointer items-center justify-center gap-1.5 rounded-28rpx bg-white text-sm text-[#df555b] font-600 shadow-[0_10rpx_28rpx_rgba(42,92,178,0.08)] active:bg-[#fff7f7]"
         role="button"
         @tap="handleLogout"
       >

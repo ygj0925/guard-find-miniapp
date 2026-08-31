@@ -99,10 +99,10 @@ onUnmounted(() => {
     <AuthInput v-model="form.phone" icon="⌕" placeholder="请输入手机号" input-type="number" :maxlength="11" :error="errors.phone" @blur="checkPhone" @update:model-value="updatePhone" />
     <AuthInput v-model="form.code" icon="◇" placeholder="请输入验证码" input-type="number" :maxlength="6" :error="errors.code" :action-text="seconds ? `${seconds}s` : '发送验证码'" @blur="checkCode" @action="requestCode" />
     <AuthAgreement v-model="form.agreed" @agreement="goTo(AGREEMENT_PAGE)" @privacy="goTo(PRIVACY_PAGE)" />
-    <text v-if="errors.agreement" class="mb-3 block text-center text-2xs text-#e95d63 leading-1.5 -mt-2">{{ errors.agreement }}</text>
+    <text v-if="errors.agreement" class="mb-3 block text-center text-2xs text-#e95d63 leading-[1.5] -mt-2">{{ errors.agreement }}</text>
     <AuthButton label="登录 / 注册" @tap="submit" />
     <text class="mt-3 block min-h-74rpx cursor-pointer text-center text-xs text-#467bff font-600 leading-74rpx" role="link" @tap="goTo('/pages/auth/login')">使用账号密码登录</text>
-    <text v-if="feedback" class="mb-3 block text-center text-2xs text-#467bff leading-1.5 -mt-2">{{ feedback }}</text>
+    <text v-if="feedback" class="mb-3 block text-center text-2xs text-#467bff leading-[1.5] -mt-2">{{ feedback }}</text>
     <AuthCaptchaModal v-if="showCaptcha" @cancel="showCaptcha = false" @confirm="confirmCaptcha" />
   </AuthLayout>
 </template>

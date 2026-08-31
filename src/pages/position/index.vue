@@ -163,8 +163,8 @@ onUnload(() => {
 </script>
 
 <template>
-  <view class="position-page app-tab-page font-[Noto_Sans_SC,Microsoft_YaHei,sans-serif]" :style="pageStyle">
-    <view class="position-hero">
+  <view class="app-tab-page bg-[#f5f7fa] font-[Noto_Sans_SC,Microsoft_YaHei,sans-serif]" :style="pageStyle">
+    <view class="relative overflow-hidden bg-position-hero">
       <AppPageHeader
         title="职位"
         light
@@ -206,7 +206,7 @@ onUnload(() => {
       </view>
     </view>
 
-    <scroll-view class="position-category-bar whitespace-nowrap" scroll-x :show-scrollbar="false">
+    <scroll-view class="sticky top-[var(--position-header-offset)] z-90 w-full whitespace-nowrap bg-[rgba(255,255,255,0.98)] shadow-[0_8rpx_24rpx_rgba(38,64,105,0.06)]" scroll-x :show-scrollbar="false">
       <view class="inline-flex items-center px-3 py-3">
         <view
           v-for="category in categories"
@@ -272,7 +272,7 @@ onUnload(() => {
     </view>
 
     <view v-if="showFilter" class="fixed inset-0 z-200 flex items-end bg-black/45" @tap.self="showFilter = false">
-      <view class="max-h-[80vh] w-full overflow-y-auto rounded-t-3xl bg-white px-4 pb-safe pt-5">
+      <view class="max-h-[80vh] w-full overflow-y-auto rounded-t-3xl bg-white px-4 pt-5 pb-safe">
         <view class="mb-5 flex items-center justify-between"><text class="text-lg text-[#17233d] font-700">筛选职位</text><text class="text-sm text-[#667085]" @tap="showFilter = false">关闭</text></view>
         <view v-for="section in [{ key: 'educationInfos', label: '学历要求', options: filterOptions.educationInfos }, { key: 'workExperiences', label: '工作经验', options: filterOptions.workExperiences }, { key: 'locIds', label: '工作地点', options: filterOptions.locations }]" :key="section.key" class="mb-5">
           <text class="mb-3 block text-sm text-[#344054] font-700">{{ section.label }}</text>
@@ -283,24 +283,3 @@ onUnload(() => {
     </view>
   </view>
 </template>
-
-<style scoped>
-.position-page {
-  background: #f5f7fa;
-}
-
-.position-hero {
-  position: relative;
-  overflow: hidden;
-  background: var(--app-position-hero-gradient);
-}
-
-.position-category-bar {
-  position: sticky;
-  top: var(--position-header-offset);
-  z-index: 90;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 8rpx 24rpx rgba(38, 64, 105, 0.06);
-}
-</style>

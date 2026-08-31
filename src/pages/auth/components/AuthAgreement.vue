@@ -11,7 +11,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <view class="my-0.5 mb-4 min-h-54rpx flex flex-wrap items-center text-xs text-[#7f8ca1] leading-1.6">
+  <view class="my-0.5 mb-4 min-h-54rpx flex flex-wrap items-center text-xs text-[#7f8ca1] leading-[1.6]">
     <wd-checkbox
       :model-value="modelValue"
       type="square"

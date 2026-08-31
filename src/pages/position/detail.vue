@@ -194,7 +194,7 @@ function openCompanyLocation() {
 </script>
 
 <template>
-  <view class="position-detail min-h-[var(--app-viewport-height)] bg-[#f5f7fa] text-app-ink font-[Noto_Sans_SC,Microsoft_YaHei,sans-serif]">
+  <view class="min-h-[var(--app-viewport-height)] bg-[#f5f7fa] text-app-ink font-[Noto_Sans_SC,Microsoft_YaHei,sans-serif]">
     <AppPageHeader title="职位详情" background="#ffffff" scrolled-background="#ffffff">
       <template #left>
         <button
@@ -319,7 +319,7 @@ function openCompanyLocation() {
       <view class="h-36" />
     </template>
 
-    <view class="detail-action-bar fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-3 pt-2 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
+    <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-3 pt-2 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
       <view class="flex items-center gap-2">
         <!-- #ifdef MP-WEIXIN -->
         <button class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs text-[#586579] leading-none active:opacity-65" open-type="share" aria-label="分享职位">
@@ -345,7 +345,7 @@ function openCompanyLocation() {
         </button>
 
         <button
-          class="plain-button transition-[opacity,background] ml-1 h-14 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_10rpx_24rpx_rgba(45,111,230,0.22)] duration-180 ease-out disabled:cursor-not-allowed disabled:bg-[#8fb4ef] active:opacity-86 motion-reduce:transition-none"
+          class="plain-button ml-1 h-14 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_10rpx_24rpx_rgba(45,111,230,0.22)] transition-[opacity,background-color] duration-180 ease-out disabled:cursor-not-allowed disabled:bg-[#8fb4ef] active:opacity-86 motion-reduce:transition-none"
           :disabled="isApplying || isApplied"
           :aria-label="isApplied ? '简历已投递' : '一键投递简历'"
           @tap="handleApply"
@@ -359,10 +359,6 @@ function openCompanyLocation() {
 </template>
 
 <style scoped>
-.position-detail {
-  --detail-blue: var(--app-brand-blue, #2d6fe6);
-}
-
 .plain-button::after {
   border: 0;
 }

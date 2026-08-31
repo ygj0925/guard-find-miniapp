@@ -116,6 +116,7 @@
     "type-check": "vue-tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
+    "audit:css": "node scripts/audit-classes.cjs",
     "test": "vitest",
     "test:run": "vitest run"
   },

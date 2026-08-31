@@ -22,9 +22,13 @@ export interface PhoneCodeForm {
 const PHONE_PATTERN = /^1\d{10}$/
 const PASSWORD_MIN_LENGTH = 6
 const PASSWORD_MAX_LENGTH = 20
+const MAINLAND_AREA_CODE = '86'
+const MAINLAND_PHONE_LENGTH = 11
+const OVERSEAS_PHONE_MAX_LENGTH = 15
+const OVERSEAS_PHONE_MIN_LENGTH = 5
 
-export function normalizePhone(value: string) {
-  return value.replace(/\s/g, '').slice(0, 11)
+export function normalizePhone(value: string, maxLength: number = MAINLAND_PHONE_LENGTH) {
+  return value.replace(/\D/g, '').slice(0, maxLength)
 }
 
 export function validatePhone(phone: string): string {
@@ -33,6 +37,24 @@ export function validatePhone(phone: string): string {
   }
   if (!PHONE_PATTERN.test(normalizePhone(phone))) {
     return '请输入正确的 11 位手机号'
+  }
+  return ''
+}
+
+export function getPhoneMaxLength(areaCode: string): number {
+  return areaCode === MAINLAND_AREA_CODE ? MAINLAND_PHONE_LENGTH : OVERSEAS_PHONE_MAX_LENGTH
+}
+
+export function validatePhoneByAreaCode(phone: string, areaCode: string): string {
+  if (areaCode === MAINLAND_AREA_CODE) {
+    return validatePhone(phone)
+  }
+  const digits = phone.replace(/\D/g, '')
+  if (!digits) {
+    return '请输入手机号'
+  }
+  if (digits.length < OVERSEAS_PHONE_MIN_LENGTH || digits.length > OVERSEAS_PHONE_MAX_LENGTH) {
+    return '请输入正确的手机号'
   }
   return ''
 }

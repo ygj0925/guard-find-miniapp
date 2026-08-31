@@ -30,6 +30,10 @@ page {
     radial-gradient(circle at 86% 12%, rgba(77, 227, 186, 0.2), transparent 30%),
     radial-gradient(circle at 8% 44%, rgba(19, 184, 237, 0.16), transparent 34%),
     linear-gradient(180deg, #edf6ff 0%, #f5f9ff 100%);
+  --app-home-hero-background:
+    radial-gradient(circle at 88% 6%, rgba(77, 227, 186, 0.22), transparent 42%),
+    radial-gradient(circle at 4% 18%, rgba(19, 184, 237, 0.2), transparent 46%),
+    linear-gradient(180deg, #d8ecff 0%, #e6f3ff 46%, #edf6ff 100%);
 }
 
 /* #ifdef H5 */

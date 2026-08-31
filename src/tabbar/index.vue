@@ -99,7 +99,7 @@ onMounted(syncTabbarVisibility)
 
 <template>
   <view v-if="customTabbarEnable && shouldShowTabbar">
-    <view class="border-and-fixed bg-white" @touchmove.stop.prevent>
+    <view class="fixed inset-x-0 bottom-0 z-1000 box-border border-t-1px border-t-[#eee] border-t-solid bg-white" @touchmove.stop.prevent>
       <view class="h-50px flex items-center">
         <view
           v-for="(item, index) in tabbarList"
@@ -109,7 +109,7 @@ onMounted(syncTabbarVisibility)
           @click="handleClick(index)"
         >
           <view v-if="item.isBulge" class="relative">
-            <view class="bulge">
+            <view class="[transform:translateX(-50%)_scale(0.5)_translateY(-33%)] absolute left-1/2 top--20px h-250rpx w-250rpx flex origin-top items-center justify-center rounded-full bg-white shadow-[inset_0_0_0_1px_#fefefe]">
               <TabbarItem :item="item" :index="index" class="text-center" is-bulge />
             </view>
           </view>
@@ -121,31 +121,3 @@ onMounted(syncTabbarVisibility)
     </view>
   </view>
 </template>
-
-<style scoped lang="scss">
-.border-and-fixed {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 1000;
-  box-sizing: border-box;
-  border-top: 1px solid #eee;
-}
-
-.bulge {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  width: 250rpx;
-  height: 250rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background-color: #fff;
-  box-shadow: inset 0 0 0 1px #fefefe;
-  transform: translateX(-50%) scale(0.5) translateY(-33%);
-  transform-origin: top center;
-}
-</style>

@@ -138,7 +138,7 @@ onUnmounted(() => {
     <AuthInput v-model="form.phone" icon="⌕" placeholder="请输入手机号" input-type="number" :maxlength="11" :error="errors.phone" @blur="checkPhone" @update:model-value="updatePhone" />
     <AuthInput v-model="form.code" icon="◇" placeholder="请输入验证码" input-type="number" :maxlength="6" :error="errors.code" :action-text="seconds ? `${seconds}s` : '发送验证码'" @blur="checkCode" @action="requestCode" />
     <AuthButton label="登录并关联微信" :disabled="!canBind || loading" :loading="loading" @tap="submit" />
-    <text v-if="feedback" class="mt-3 block text-center text-2xs text-#3b82f6 leading-1.5">{{ feedback }}</text>
+    <text v-if="feedback" class="mt-3 block text-center text-2xs text-#3b82f6 leading-[1.5]">{{ feedback }}</text>
     <AuthBehaviorCaptchaModal v-if="showCaptcha" @cancel="showCaptcha = false" @success="confirmCaptcha" />
   </AuthLayout>
 </template>

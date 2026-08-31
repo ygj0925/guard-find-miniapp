@@ -294,17 +294,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <view class="ai-page" :class="{ 'is-chatting': currentConversation }">
+  <view class="ai-page">
     <view class="ai-header-fixed">
       <AiBrandHeader :show-history="hasStarted" @history="openHistory" />
     </view>
 
-    <view v-if="!hasStarted" class="page-scroll splash-scroll" :style="splashScrollStyle">
+    <view v-if="!hasStarted" class="page-scroll" :style="splashScrollStyle">
       <view class="splash-page">
         <view class="splash-copy">
-          <text class="splash-line">你好！</text>
-          <text class="splash-line">我是麟才寻你招聘助手，</text>
-          <text class="splash-line">陪你发现更适合的职业机会！</text>
+          <text>你好！</text>
+          <text>我是麟才寻你招聘助手，</text>
+          <text>陪你发现更适合的职业机会！</text>
         </view>
 
         <image class="splash-hero" src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/第一页_01.png" mode="widthFix" />

@@ -97,6 +97,16 @@ export default defineConfig({
     'i-carbon-send-alt',
     'i-carbon-attachment',
     'i-carbon-favorite',
+    'i-carbon-portfolio',
+    'i-carbon-share-knowledge',
+    'i-carbon-dashboard',
+    'i-carbon-calendar',
+    'i-carbon-user-profile',
+    'i-carbon-ai-status',
+    'i-carbon-wallet',
+    'i-carbon-building',
+    'i-carbon-help',
+    'i-carbon-apps',
     'i-carbon-template',
     'i-carbon-ibm-watson-language-translator',
     'i-carbon-menu',
@@ -104,6 +114,9 @@ export default defineConfig({
   rules: [
     ['bg-brand-hero', { background: 'var(--app-brand-hero)' }],
     ['bg-brand-header', { background: 'var(--app-brand-header)' }],
+    ['bg-blue-white-gradient', { background: 'var(--app-blue-white-gradient)' }],
+    ['bg-position-hero', { background: 'var(--app-position-hero-gradient)' }],
+    ['bg-home-hero', { background: 'var(--app-home-hero-background)' }],
     [
       'p-safe',
       {
