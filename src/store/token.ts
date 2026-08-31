@@ -16,6 +16,7 @@ import { useUserStore } from './user'
  * 是否是双token模式
  */
 export const isDoubleTokenMode = import.meta.env.VITE_AUTH_MODE === 'double'
+export const AUTH_TOKEN_STORAGE_KEY = 'auth-access-token'
 // 初始化状态
 const tokenInfoState = isDoubleTokenMode
   ? {
@@ -56,11 +57,17 @@ export const useTokenStore = defineStore(
       // 计算并存储过期时间
       const now = Date.now()
       if (isSingleTokenRes(val)) {
+        uni.setStorageSync(AUTH_TOKEN_STORAGE_KEY, val.token)
         // 单token模式
-        const expireTime = now + val.expiresIn * 1000
-        uni.setStorageSync('accessTokenExpireTime', expireTime)
+        if (typeof val.expiresIn === 'number' && val.expiresIn > 0) {
+          uni.setStorageSync('accessTokenExpireTime', now + val.expiresIn * 1000)
+        }
+        else {
+          uni.removeStorageSync('accessTokenExpireTime')
+        }
       }
       else if (isDoubleTokenRes(val)) {
+        uni.setStorageSync(AUTH_TOKEN_STORAGE_KEY, val.accessToken)
         // 双token模式
         const accessExpireTime = now + val.accessExpiresIn * 1000
         const refreshExpireTime = now + val.refreshExpiresIn * 1000
@@ -75,6 +82,17 @@ export const useTokenStore = defineStore(
     const isTokenExpired = computed(() => {
       if (!tokenInfo.value) {
         return true
+      }
+
+      if (!isDoubleTokenMode && (!isSingleTokenRes(tokenInfo.value) || !tokenInfo.value.token)) {
+        return true
+      }
+      if (isDoubleTokenMode && (!isDoubleTokenRes(tokenInfo.value) || !tokenInfo.value.accessToken)) {
+        return true
+      }
+
+      if (!isDoubleTokenMode && isSingleTokenRes(tokenInfo.value) && !tokenInfo.value.expiresIn) {
+        return false
       }
 
       const now = nowTime.value
@@ -167,6 +185,16 @@ export const useTokenStore = defineStore(
     /**
      * 退出登录 并 删除用户信息
      */
+    const clearLoginState = () => {
+      updateNowTime()
+      uni.removeStorageSync('accessTokenExpireTime')
+      uni.removeStorageSync('refreshTokenExpireTime')
+      tokenInfo.value = { ...tokenInfoState }
+      uni.removeStorageSync('token')
+      uni.removeStorageSync(AUTH_TOKEN_STORAGE_KEY)
+      useUserStore().clearUserInfo()
+    }
+
     const logout = async () => {
       try {
         // TODO 实现自己的退出登录逻辑
@@ -176,6 +204,7 @@ export const useTokenStore = defineStore(
         console.error('退出登录失败:', error)
       }
       finally {
+        clearLoginState()
         updateNowTime()
 
         // 无论成功失败，都需要清除本地token信息
@@ -289,6 +318,7 @@ export const useTokenStore = defineStore(
       login,
       completeExternalLogin,
       logout,
+      clearLoginState,
 
       // 认证状态判断（最常用的）
       hasLogin: hasValidLogin,

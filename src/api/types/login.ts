@@ -32,7 +32,8 @@ export interface BehaviorCaptchaRequest {
 // 单Token响应类型
 export interface ISingleTokenRes {
   token: string
-  expiresIn: number // 有效期(秒)
+  /** 当前后端 LoginResp 不返回有效期；有值时才使用本地过期预判。 */
+  expiresIn?: number
 }
 
 // 双Token响应类型

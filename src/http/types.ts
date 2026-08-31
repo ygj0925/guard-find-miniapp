@@ -17,7 +17,7 @@ export interface HttpRequestResult<T> {
 
 export interface HttpError<T = any> {
   type: 'business' | 'auth' | 'http' | 'network'
-  code?: number
+  code?: number | string
   statusCode?: number
   message: string
   data?: T

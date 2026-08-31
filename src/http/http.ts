@@ -29,11 +29,22 @@ export function http<T>(options: CustomRequestOptions) {
         // 检查是否是401错误（包括HTTP状态码401或业务码401）
         const isTokenExpired = res.statusCode === 401 || normalizedCode === ResultEnum.Unauthorized
 
+        if (isTokenExpired && options.url.includes('/auth/logout')) {
+          return reject(createHttpError({
+            type: HttpErrorType.Auth,
+            code,
+            statusCode: res.statusCode,
+            message: getResponseMessage(responseData, '登录已过期'),
+            data: responseData?.data,
+            raw: res,
+          }))
+        }
+
         if (isTokenExpired) {
           const tokenStore = useTokenStore()
           if (!isDoubleTokenMode) {
             // 未启用双token策略，清理用户信息，跳转到登录页
-            tokenStore.logout()
+            tokenStore.clearLoginState()
             toLoginPage()
             return reject(createHttpError({
               type: HttpErrorType.Auth,

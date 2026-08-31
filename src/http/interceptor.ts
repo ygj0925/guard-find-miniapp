@@ -1,5 +1,6 @@
 import type { CustomRequestOptions } from '@/http/types'
 import { useTokenStore } from '@/store'
+import { AUTH_TOKEN_STORAGE_KEY } from '@/store/token'
 import { getEnvBaseUrl } from '@/utils'
 import { stringifyQuery } from './tools/queryString'
 
@@ -50,7 +51,8 @@ const httpInterceptor = {
     }
     // 3. 添加 token 请求头标识
     const tokenStore = useTokenStore()
-    const token = tokenStore.updateNowTime().validToken
+    const persistedToken = uni.getStorageSync<string>(AUTH_TOKEN_STORAGE_KEY)
+    const token = persistedToken || tokenStore.updateNowTime().validToken
 
     if (token) {
       options.header.Authorization = `Bearer ${token}`

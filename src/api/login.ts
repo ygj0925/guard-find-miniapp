@@ -1,4 +1,4 @@
-import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, IDoubleTokenRes, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm } from './types/login'
+import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm } from './types/login'
 import { http } from '@/http/http'
 
 /**
@@ -49,21 +49,21 @@ export function sendSmsCaptcha(phone: string, captcha: BehaviorCaptchaRequest) {
  * @param refreshToken 刷新token
  */
 export function refreshToken(refreshToken: string) {
-  return http.post<IDoubleTokenRes>('/auth/refreshToken', { refreshToken })
+  return Promise.reject(new Error('当前后端未提供 Token 刷新接口'))
 }
 
 /**
  * 获取用户信息
  */
 export function getUserInfo() {
-  return http.get<IUserInfoRes>('/user/info')
+  return http.get<IUserInfoRes>('/auth/user/info')
 }
 
 /**
  * 退出登录
  */
 export function logout() {
-  return http.get<void>('/auth/logout')
+  return http.post<void>('/auth/logout')
 }
 
 /**
