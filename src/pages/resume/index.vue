@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onShow, ref } from 'vue'
+import { ref } from 'vue'
 import { deleteResume, getResumes, setDefaultResume, updateResume, uploadResume, type ResumeItem } from '@/api/resume'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 
