@@ -37,7 +37,7 @@ const loading = ref(false)
 const showFilter = ref(false)
 const pageNum = ref(0)
 const PAGE_SIZE = 20
-const categories = computed(() => [{ value: '', label: '推荐' }, ...filterOptions.value.kinds])
+const categories = computed(() => [{ value: '', label: '全部' }, ...filterOptions.value.kinds])
 const hasMore = computed(() => jobs.value.length < total.value)
 const quickLinks = [
   { label: '附近机会', description: '发现身边好工作', icon: 'i-carbon-location-company', colorClass: 'text-[#26b8bd]' },
