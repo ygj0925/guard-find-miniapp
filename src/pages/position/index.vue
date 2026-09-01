@@ -164,6 +164,8 @@ async function loadFilterOptions() {
 }
 
 function handleCategoryTap(kind: string) {
+  if (activeKind.value === kind)
+    return
   activeKind.value = kind
   loadPositions(true)
 }
@@ -276,39 +278,32 @@ onUnload(() => {
       </view>
     </view>
 
-    <scroll-view class="sticky top-[var(--position-header-offset)] z-90 w-full whitespace-nowrap bg-[rgba(255,255,255,0.98)] shadow-[0_8rpx_24rpx_rgba(38,64,105,0.06)]" scroll-x :show-scrollbar="false">
-      <view class="inline-flex items-center px-3 py-3">
+    <scroll-view
+      class="sticky top-[var(--position-header-offset)] z-90 w-full whitespace-nowrap bg-[rgba(255,255,255,0.98)] shadow-[0_8rpx_24rpx_rgba(38,64,105,0.06)]"
+      scroll-x
+      scroll-with-animation
+      :show-scrollbar="false"
+    >
+      <view class="h-92rpx min-w-full inline-flex items-stretch px-3">
         <view
           v-for="category in categories"
           :key="category.value || 'recommended'"
-          class="relative min-w-120rpx flex flex-col cursor-pointer items-center px-3 pb-2 pt-1 text-sm text-app-ink-soft font-600 active:opacity-72"
+          class="relative min-w-120rpx flex cursor-pointer items-center justify-center px-3 text-30rpx text-app-ink-soft font-600 active:opacity-70"
           :class="activeKind === category.value ? 'text-brand-blue' : ''"
           role="button"
+          :aria-label="category.label"
           @tap="handleCategoryTap(category.value)"
         >
-          <view
-            class="mb-2 h-68rpx w-68rpx flex items-center justify-center rounded-2xl text-xl leading-none"
-            :class="activeKind === category.value ? 'bg-[#e3f3ff] text-brand-blue' : 'bg-[#f0f2f5] text-app-muted'"
-          >
-            <view class="i-carbon-portfolio" />
-          </view>
           <text>{{ category.label }}</text>
-          <view v-if="activeKind === category.value" class="absolute bottom-0 h-5rpx w-34rpx rounded-full bg-brand-blue" />
+          <view
+            v-if="activeKind === category.value"
+            class="absolute bottom-0 left-1/2 h-5rpx w-36rpx rounded-full bg-brand-blue -translate-x-1/2"
+          />
         </view>
       </view>
     </scroll-view>
 
     <view class="px-3 pb-6 pt-3">
-      <view class="mb-3 flex items-center justify-between rounded-2xl bg-white px-4 py-4 shadow-[0_8rpx_24rpx_rgba(38,64,105,0.05)]">
-        <view class="min-w-0 flex flex-1 items-center">
-          <text class="text-base text-app-ink font-700">职位定制</text>
-          <text class="ml-2 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-muted">找工作无需大海捞针</text>
-        </view>
-        <view class="ml-3 h-68rpx flex cursor-pointer items-center justify-center border-1rpx border-brand-blue rounded-full border-solid px-4 text-sm text-brand-blue font-600 active:opacity-70">
-          添加意向
-        </view>
-      </view>
-
       <view class="flex flex-col gap-3">
         <view
           v-for="job in jobs"

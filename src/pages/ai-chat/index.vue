@@ -307,21 +307,21 @@ onUnmounted(() => {
           <text>陪你发现更适合的职业机会！</text>
         </view>
 
-        <image class="splash-hero" src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/第一页_01.png" mode="widthFix" />
+        <image class="splash-hero" src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/%E6%8C%A5%E6%89%8B%E5%85%A8%E6%99%AF.gif" mode="widthFix" />
 
         <view class="feature-row">
           <view class="feature-item">
-            <image src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/第一页_09.png" mode="aspectFit" />
+            <image src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/icon-1-job-search.svg" mode="aspectFit" />
             <text>岗位匹配</text>
           </view>
           <view class="feature-divider" />
           <view class="feature-item">
-            <image src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/第一页_06.png" mode="aspectFit" />
+            <image src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/icon-2-resume-edit.svg" mode="aspectFit" />
             <text>简历优化</text>
           </view>
           <view class="feature-divider" />
           <view class="feature-item">
-            <image src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/第一页_03.png" mode="aspectFit" />
+            <image src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/icon-3-talent-chat.svg" mode="aspectFit" />
             <text>面试辅导</text>
           </view>
         </view>
@@ -361,7 +361,7 @@ onUnmounted(() => {
             <text>你的招聘求职助手，</text>
             <text>欢迎与我交流职业问题！</text>
           </view>
-          <image class="welcome-character" src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/56.gif" mode="aspectFit" />
+          <image class="welcome-character" src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
         </view>
 
         <view class="quick-list">
