@@ -77,7 +77,7 @@ function handleLogout() {
 </script>
 
 <template>
-  <view class="relative app-tab-page overflow-hidden bg-white font-['Noto_Sans_SC','Microsoft_YaHei',sans-serif]">
+  <view class="relative app-tab-page overflow-hidden bg-white">
     <view class="pointer-events-none absolute inset-x-0 top-0 h-[var(--app-viewport-height)] bg-[var(--app-blue-white-gradient)]" aria-hidden="true" />
     <view class="relative z-1 box-border min-h-72 px-6.5 pb-20 text-white">
       <AppPageHeader
@@ -139,57 +139,57 @@ function handleLogout() {
           <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
             <view class="i-carbon-location mr-2 w-48rpx flex flex-[0_0_48rpx] items-center justify-center text-lg text-brand-blue leading-none" />
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm text-[#263249] font-600">求职意向</text>
-              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">设置期望职位与工作城市</text>
+              <text class="text-sm text-app-ink font-600">求职意向</text>
+              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-muted">设置期望职位与工作城市</text>
             </view>
-            <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
+            <view class="i-carbon-chevron-right ml-2 text-base text-app-muted leading-none" />
           </view>
           <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
             <view class="i-carbon-notification mr-2 w-48rpx flex flex-[0_0_48rpx] items-center justify-center text-lg text-brand-blue leading-none" />
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm text-[#263249] font-600">消息通知</text>
-              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">职位进展与面试提醒</text>
+              <text class="text-sm text-app-ink font-600">消息通知</text>
+              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-muted">职位进展与面试提醒</text>
             </view>
-            <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
+            <view class="i-carbon-chevron-right ml-2 text-base text-app-muted leading-none" />
           </view>
           <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
             <view class="i-carbon-help mr-2 w-48rpx flex flex-[0_0_48rpx] items-center justify-center text-lg text-brand-blue leading-none" />
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm text-[#263249] font-600">帮助与反馈</text>
-              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">常见问题与意见反馈</text>
+              <text class="text-sm text-app-ink font-600">帮助与反馈</text>
+              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-muted">常见问题与意见反馈</text>
             </view>
-            <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
+            <view class="i-carbon-chevron-right ml-2 text-base text-app-muted leading-none" />
           </view>
           <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
             <view class="i-carbon-settings mr-2 w-48rpx flex flex-[0_0_48rpx] items-center justify-center text-lg text-brand-blue leading-none" />
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm text-[#263249] font-600">账号设置</text>
-              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">隐私、安全与个人信息</text>
+              <text class="text-sm text-app-ink font-600">账号设置</text>
+              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-muted">隐私、安全与个人信息</text>
             </view>
-            <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
+            <view class="i-carbon-chevron-right ml-2 text-base text-app-muted leading-none" />
           </view>
           <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70" role="link" @tap="handleLegalTap(AGREEMENT_PAGE)">
             <view class="i-carbon-document mr-2 w-48rpx flex flex-[0_0_48rpx] items-center justify-center text-lg text-brand-blue leading-none" />
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm text-[#263249] font-600">服务使用协议</text>
-              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">了解服务使用规则</text>
+              <text class="text-sm text-app-ink font-600">服务使用协议</text>
+              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-muted">了解服务使用规则</text>
             </view>
-            <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
+            <view class="i-carbon-chevron-right ml-2 text-base text-app-muted leading-none" />
           </view>
           <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70" role="link" @tap="handleLegalTap(PRIVACY_PAGE)">
             <view class="i-carbon-locked mr-2 w-48rpx flex flex-[0_0_48rpx] items-center justify-center text-lg text-brand-blue leading-none" />
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm text-[#263249] font-600">隐私政策</text>
-              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">了解个人信息处理方式</text>
+              <text class="text-sm text-app-ink font-600">隐私政策</text>
+              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-muted">了解个人信息处理方式</text>
             </view>
-            <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
+            <view class="i-carbon-chevron-right ml-2 text-base text-app-muted leading-none" />
           </view>
         </view>
       </view>
 
       <view v-if="!tokenStore.hasLogin" class="mt-3 flex flex-col items-center rounded-28rpx bg-white px-3.5 py-4 text-center shadow-[0_10rpx_28rpx_rgba(42,92,178,0.08)]">
-        <text class="text-sm text-[#263249] font-600">登录后使用完整求职服务</text>
-        <text class="mt-1 block text-xs text-[#9aa5b5]">同步简历、投递记录与面试消息</text>
+        <text class="text-sm text-app-ink font-600">登录后使用完整求职服务</text>
+        <text class="mt-1 block text-xs text-app-muted">同步简历、投递记录与面试消息</text>
         <view
           class="mt-3 box-border min-h-84rpx w-full flex cursor-pointer items-center justify-center rounded-14rpx bg-brand-blue text-base text-white font-600 transition-[opacity,transform] duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-99 active:opacity-88 motion-reduce:transition-none"
           @tap="handleLogin"
@@ -200,7 +200,7 @@ function handleLogout() {
 
       <view
         v-else
-        class="mt-3 min-h-92rpx flex cursor-pointer items-center justify-center gap-1.5 rounded-28rpx bg-white text-sm text-[#df555b] font-600 shadow-[0_10rpx_28rpx_rgba(42,92,178,0.08)] active:bg-[#fff7f7]"
+        class="mt-3 min-h-92rpx flex cursor-pointer items-center justify-center gap-1.5 rounded-28rpx bg-white text-sm text-app-danger font-600 shadow-[0_10rpx_28rpx_rgba(42,92,178,0.08)] active:bg-[#fff7f7]"
         role="button"
         @tap="handleLogout"
       >

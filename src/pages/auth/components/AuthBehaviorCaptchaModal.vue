@@ -118,14 +118,18 @@ onMounted(loadCaptcha)
 <template>
   <view class="fixed inset-0 z-99 flex items-center justify-center bg-[rgba(35,50,82,0.5)] p-6" @tap.self="emit('cancel')">
     <view class="box-border w-620rpx rounded-28rpx bg-white px-4 pb-4 pt-5 shadow-[0_28rpx_70rpx_rgba(31,51,95,0.22)]" role="dialog" aria-label="滑动验证">
-      <text class="block text-center text-base text-#263249 font-700">安全验证</text>
+      <text class="block text-center text-base text-app-ink font-700">安全验证</text>
       <text class="mt-1.5 block text-center text-2xs text-#9aa5b8">拖动滑块完成验证后发送短信验证码</text>
       <view v-if="captcha" class="relative mt-4 h-310rpx overflow-hidden rounded-16rpx bg-#eef2f8">
         <image class="h-full w-full" :src="toDataUrl(captcha.originalImageBase64)" mode="scaleToFill" />
         <image class="pointer-events-none absolute top-0 h-310rpx w-84rpx" :style="{ left: `${sliderLeft}rpx` }" :src="toDataUrl(captcha.jigsawImageBase64)" mode="scaleToFill" />
-        <view v-if="loading" class="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">验证中...</view>
+        <view v-if="loading" class="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">
+          验证中...
+        </view>
       </view>
-      <view v-else class="mt-4 h-310rpx flex items-center justify-center rounded-16rpx bg-#eef2f8 text-xs text-#7f8aa0">{{ loading ? '加载中...' : '验证码加载失败' }}</view>
+      <view v-else class="mt-4 h-310rpx flex items-center justify-center rounded-16rpx bg-#eef2f8 text-xs text-#7f8aa0">
+        {{ loading ? '加载中...' : '验证码加载失败' }}
+      </view>
       <view class="relative mt-4 h-80rpx overflow-hidden rounded-14rpx bg-#edf2f8" @touchstart.stop="startDrag" @touchmove.stop="moveDrag" @touchend.stop="finishDrag" @touchcancel.stop="finishDrag">
         <view class="h-full rounded-14rpx bg-#dceafe" :style="{ width: `${sliderLeft + SLIDER_SIZE_RPX}rpx` }" />
         <view class="pointer-events-none absolute top-0 h-80rpx w-80rpx flex items-center justify-center rounded-14rpx bg-white text-#467bff shadow" :style="{ left: `${sliderLeft}rpx` }">

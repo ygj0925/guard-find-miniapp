@@ -440,7 +440,7 @@ onUnmounted(() => {
   width: 100%;
   overflow: hidden;
   background: #edf6ff url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg') center / cover fixed;
-  color: #121c39;
+  color: var(--app-ink);
 }
 
 :global(page) {
@@ -491,7 +491,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 32rpx 44rpx 0;
-  color: #2361a5;
+  color: var(--app-ink-soft);
   font-size: 38rpx;
   font-weight: 600;
   line-height: 1.55;
@@ -516,7 +516,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 2rpx;
-  color: #2668d9;
+  color: var(--app-ink-soft);
   font-size: 26rpx;
   font-weight: 500;
 }
@@ -579,7 +579,7 @@ onUnmounted(() => {
 .ai-disclaimer {
   display: block;
   margin-top: 10rpx;
-  color: #93a9ca;
+  color: var(--app-muted);
   font-size: 22rpx;
   text-align: center;
 }
@@ -647,7 +647,7 @@ onUnmounted(() => {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  color: #4474da;
+  color: var(--app-ink-soft);
   font-size: 30rpx;
   line-height: 1.55;
 }
@@ -760,7 +760,7 @@ onUnmounted(() => {
   height: 80rpx;
   display: block;
   overflow: hidden;
-  color: #16336e;
+  color: var(--app-ink);
   font-size: 27rpx;
   line-height: 80rpx;
   text-overflow: ellipsis;
@@ -796,7 +796,7 @@ onUnmounted(() => {
   border-radius: 30rpx;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 8rpx 24rpx rgba(61, 98, 177, 0.14);
-  color: #4170d7;
+  color: var(--app-ink-soft);
   font-size: 24rpx;
 }
 
@@ -816,7 +816,7 @@ onUnmounted(() => {
 
 .message-time {
   margin-bottom: 14rpx;
-  color: #7c8799;
+  color: var(--app-muted);
   font-size: 24rpx;
 }
 
@@ -841,7 +841,7 @@ onUnmounted(() => {
   border-bottom-left-radius: 8rpx;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 12rpx 28rpx rgba(77, 101, 155, 0.12);
-  color: #121934;
+  color: var(--app-ink);
 }
 
 .typing-bubble {
@@ -891,8 +891,8 @@ onUnmounted(() => {
   width: 18rpx;
   height: 18rpx;
   margin-top: -8rpx;
-  border-right: 5rpx solid #4779dc;
-  border-bottom: 5rpx solid #4779dc;
+  border-right: 5rpx solid var(--app-ink-soft);
+  border-bottom: 5rpx solid var(--app-ink-soft);
   transform: rotate(45deg);
 }
 

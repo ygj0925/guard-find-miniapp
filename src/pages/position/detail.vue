@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { getPositionDetail, type PositionDetail as PositionDetailResponse } from '@/api/position'
+import { getPositionDetail } from '@/api/position'
+import type { PositionDetail as PositionDetailResponse } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { useTokenStore } from '@/store/token'
@@ -48,7 +49,24 @@ interface PositionDetailView {
 }
 
 const EMPTY_POSITION: PositionDetailView = {
-  id: '', title: '', company: '', companyIndustry: '', companyStage: '', companySize: '', companyLogo: '/static/logo.svg', salary: '', location: '', address: '', longitude: 0, latitude: 0, education: '', experience: '', tags: [], recruiter: { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' }, responsibilities: [], requirements: [],
+  id: '',
+  title: '',
+  company: '',
+  companyIndustry: '',
+  companyStage: '',
+  companySize: '',
+  companyLogo: '/static/logo.svg',
+  salary: '',
+  location: '',
+  address: '',
+  longitude: 0,
+  latitude: 0,
+  education: '',
+  experience: '',
+  tags: [],
+  recruiter: { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
+  responsibilities: [],
+  requirements: [],
 }
 const positionStore = usePositionStore()
 const tokenStore = useTokenStore()
@@ -64,7 +82,7 @@ const shareTitle = computed(() => `${position.value.title}｜${position.value.co
 const hasLocation = computed(() => position.value.longitude !== 0 && position.value.latitude !== 0)
 
 function normalizeTextList(value?: string[] | string) {
-  const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/(?:\\r?\\n|\r?\n)/) : []
+  const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\\r?\\n|\r?\n/) : []
   return entries
     .map(item => item.trim().replace(/^\d+[.、]\s*/, ''))
     .filter(Boolean)
@@ -206,11 +224,11 @@ function openCompanyLocation() {
 </script>
 
 <template>
-  <view class="min-h-[var(--app-viewport-height)] bg-[#f5f7fa] text-app-ink font-[Noto_Sans_SC,Microsoft_YaHei,sans-serif]">
+  <view class="min-h-[var(--app-viewport-height)] bg-app-surface text-app-ink">
     <AppPageHeader title="职位详情" background="#ffffff" scrolled-background="#ffffff">
       <template #left>
         <button
-          class="plain-button h-12 w-12 flex cursor-pointer items-center justify-center border-0 rounded-full bg-transparent p-0 text-xl text-[#17233d] leading-none active:bg-[#eef4ff]"
+          class="plain-button h-12 w-12 flex cursor-pointer items-center justify-center border-0 rounded-full bg-transparent p-0 text-xl text-app-ink leading-none active:bg-[#eef4ff]"
           aria-label="返回职位列表"
           @tap="handleBack"
         >
@@ -251,20 +269,20 @@ function openCompanyLocation() {
     <template v-else>
       <view class="bg-white px-4 pb-5 pt-4">
         <view class="flex items-start justify-between gap-3">
-          <text class="min-w-0 flex-1 text-2xl text-[#202938] font-700 leading-[1.3]">{{ position.title }}</text>
+          <text class="min-w-0 flex-1 text-2xl text-app-ink font-700 leading-[1.3]">{{ position.title }}</text>
           <text class="flex-none pt-1 text-xl text-brand-blue font-700 leading-none">{{ position.salary }}</text>
         </view>
-        <view class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#4b5565]">
-          <view class="flex items-center gap-1.5">
-            <view class="i-carbon-location text-base text-[#667085] leading-none" />
+        <view v-if="position.location || position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-app-ink-soft">
+          <view v-if="position.location" class="flex items-center gap-1.5">
+            <view class="i-carbon-location text-base text-app-muted leading-none" />
             <text>{{ position.location }}</text>
           </view>
-          <view class="flex items-center gap-1.5">
-            <view class="i-carbon-portfolio text-base text-[#667085] leading-none" />
+          <view v-if="position.experience" class="flex items-center gap-1.5">
+            <view class="i-carbon-portfolio text-base text-app-muted leading-none" />
             <text>{{ position.experience }}</text>
           </view>
-          <view class="flex items-center gap-1.5">
-            <view class="i-carbon-education text-base text-[#667085] leading-none" />
+          <view v-if="position.education" class="flex items-center gap-1.5">
+            <view class="i-carbon-education text-base text-app-muted leading-none" />
             <text>{{ position.education }}</text>
           </view>
         </view>
@@ -274,28 +292,28 @@ function openCompanyLocation() {
         <view class="mt-4 flex cursor-pointer items-center active:opacity-75" role="button" aria-label="查看招聘者信息">
           <image class="h-14 w-14 flex-none rounded-full bg-[#eef4ff]" :src="position.recruiter.avatar" mode="aspectFill" />
           <view class="ml-3 min-w-0 flex-1">
-            <text class="block text-base text-[#252d3d] font-700">{{ position.recruiter.name }}</text>
-            <text class="mt-1 block text-sm text-[#596579]">{{ position.company }} · {{ position.recruiter.role }}</text>
-            <text class="mt-0.5 block text-xs text-[#a0a8b5]">{{ position.recruiter.activeText }}</text>
+            <text class="block text-base text-app-ink font-700">{{ position.recruiter.name }}</text>
+            <text class="mt-1 block text-sm text-app-ink-soft">{{ position.company }} · {{ position.recruiter.role }}</text>
+            <text class="mt-0.5 block text-xs text-app-muted">{{ position.recruiter.activeText }}</text>
           </view>
-          <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
+          <view class="i-carbon-chevron-right text-lg text-app-muted leading-none" />
         </view>
       </view>
 
       <view class="mt-2 bg-white px-4 py-5">
-        <text class="block text-xl text-[#202938] font-700">职位详情</text>
-        <view class="mt-3 flex flex-wrap gap-2">
-          <text v-for="tag in position.tags" :key="tag" class="rounded-lg bg-[#f2f6fb] px-2.5 py-1.5 text-xs text-[#5f6b7d]">{{ tag }}</text>
+        <text class="block text-xl text-app-ink font-700">职位详情</text>
+        <view v-if="position.tags.some(Boolean)" class="mt-3 flex flex-wrap gap-2">
+          <text v-for="tag in position.tags.filter(Boolean)" :key="tag" class="rounded-lg bg-[#f2f6fb] px-2.5 py-1.5 text-xs text-app-ink-soft">{{ tag }}</text>
         </view>
 
-        <view class="mt-4 flex flex-col gap-2.5 text-base text-[#5b6472] leading-[1.8]">
+        <view class="mt-4 flex flex-col gap-2.5 text-base text-app-ink-soft leading-[1.8]">
           <text v-for="(item, index) in position.responsibilities" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
         </view>
 
-        <text class="mt-5 block text-lg text-[#202938] font-700">任职要求</text>
-        <view class="mt-3 flex flex-col gap-2.5 text-base text-[#5b6472] leading-[1.8]">
+        <text class="mt-5 block text-lg text-app-ink font-700">任职要求</text>
+        <view class="mt-3 flex flex-col gap-2.5 text-base text-app-ink-soft leading-[1.8]">
           <text v-for="(item, index) in position.requirements" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
@@ -308,16 +326,16 @@ function openCompanyLocation() {
             <image class="h-12 w-12" :src="position.companyLogo" mode="aspectFit" />
           </view>
           <view class="ml-3 min-w-0 flex-1">
-            <text class="block overflow-hidden text-ellipsis whitespace-nowrap text-lg text-[#202938] font-700">{{ position.company }}</text>
-            <text class="mt-1 block text-sm text-[#667085]">{{ position.companyIndustry }} · {{ position.companyStage }} · {{ position.companySize }}</text>
+            <text class="block overflow-hidden text-ellipsis whitespace-nowrap text-lg text-app-ink font-700">{{ position.company }}</text>
+            <text class="mt-1 block text-sm text-app-ink-soft">{{ position.companyIndustry }} · {{ position.companyStage }} · {{ position.companySize }}</text>
           </view>
-          <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
+          <view class="i-carbon-chevron-right text-lg text-app-muted leading-none" />
         </view>
 
         <view v-if="hasLocation" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
           <map class="h-full w-full" :latitude="position.latitude" :longitude="position.longitude" :scale="15" :enable-scroll="false" :enable-zoom="false" />
           <view class="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
-            <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-[#263249] shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
+            <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-app-ink shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
               <view class="i-carbon-location-filled mr-1.5 flex-none text-base text-brand-blue leading-none" />
               <text class="overflow-hidden text-ellipsis whitespace-nowrap">{{ position.address }}</text>
             </view>
@@ -326,7 +344,9 @@ function openCompanyLocation() {
             <view class="i-carbon-location-filled" />
           </view>
         </view>
-        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">暂未提供工作地点坐标</view>
+        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-app-muted">
+          暂未提供工作地点坐标
+        </view>
       </view>
 
       <view class="h-36" />
@@ -335,25 +355,25 @@ function openCompanyLocation() {
     <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-3 pt-2 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
       <view class="flex items-center gap-2">
         <!-- #ifdef MP-WEIXIN -->
-        <button class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs text-[#586579] leading-none active:opacity-65" open-type="share" aria-label="分享职位">
-          <view class="i-carbon-share mb-1 text-xl text-[#202938] leading-none" />
+        <button class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs text-app-ink-soft leading-none active:opacity-65" open-type="share" aria-label="分享职位">
+          <view class="i-carbon-share mb-1 text-xl text-app-ink leading-none" />
           <text>分享</text>
         </button>
         <!-- #endif -->
         <!-- #ifndef MP-WEIXIN -->
-        <button class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs text-[#586579] leading-none active:opacity-65" aria-label="分享职位" @tap="handleShare">
-          <view class="i-carbon-share mb-1 text-xl text-[#202938] leading-none" />
+        <button class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs text-app-ink-soft leading-none active:opacity-65" aria-label="分享职位" @tap="handleShare">
+          <view class="i-carbon-share mb-1 text-xl text-app-ink leading-none" />
           <text>分享</text>
         </button>
         <!-- #endif -->
 
         <button
           class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs leading-none active:opacity-65"
-          :class="isFavorite ? 'text-brand-blue' : 'text-[#586579]'"
+          :class="isFavorite ? 'text-brand-blue' : 'text-app-ink-soft'"
           :aria-label="isFavorite ? '取消收藏职位' : '收藏职位'"
           @tap="handleFavorite"
         >
-          <view class="mb-1 text-xl leading-none" :class="isFavorite ? 'i-carbon-star-filled text-brand-blue' : 'i-carbon-star text-[#202938]'" />
+          <view class="mb-1 text-xl leading-none" :class="isFavorite ? 'i-carbon-star-filled text-brand-blue' : 'i-carbon-star text-app-ink'" />
           <text>{{ isFavorite ? '已收藏' : '收藏' }}</text>
         </button>
 

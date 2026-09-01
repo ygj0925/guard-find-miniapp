@@ -174,7 +174,7 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
 
 <template>
   <view class="min-h-[var(--app-viewport-height)] flex flex-col overflow-hidden bg-white text-[#222]">
-    <view class="relative min-h-480rpx flex-1 overflow-hidden bg-[linear-gradient(180deg,#d9edff_0%,#f0f8ff_66%,#ffffff_100%)]">
+    <view class="relative h-620rpx flex-none overflow-hidden bg-[linear-gradient(180deg,#d9edff_0%,#f0f8ff_66%,#ffffff_100%)]">
       <view class="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_35%,rgba(64,151,246,0.22),transparent_58%)]" />
       <view class="absolute bottom-372rpx left-0 right-0 text-center text-64rpx text-[#8ecbff] font-900 tracking-2rpx">
         TALENT FOR YOU
@@ -198,20 +198,20 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
       <view class="absolute bottom-20rpx left-1/2 h-40rpx w-380rpx rounded-[50%] bg-[#2387ed] -translate-x-1/2" />
     </view>
 
-    <view class="flex-none px-88rpx pb-[calc(28rpx+env(safe-area-inset-bottom))] pt-24rpx">
+    <view class="min-h-0 flex-1 px-88rpx pb-[calc(28rpx+env(safe-area-inset-bottom))] pt-24rpx">
       <view v-if="mode === 'phone'">
         <view class="h-96rpx flex items-center border-b-1rpx border-b-[#eee] border-b-solid text-34rpx">
           <view
-            class="flex items-center whitespace-nowrap pr-24rpx"
+            class="h-full flex flex-none items-center whitespace-nowrap border-r-1rpx border-r-app-border border-r-solid pr-22rpx"
             role="button"
             :aria-label="`当前区号 +${area.code}，点击选择国家和地区`"
             @tap="showAreaPicker = true"
           >
-            <text>+{{ area.code }}</text>
-            <text class="ml-10rpx text-30rpx text-[#999]">⌄</text>
+            <text class="leading-none">+{{ area.code }}</text>
+            <view class="i-carbon-chevron-down ml-10rpx h-30rpx w-30rpx flex-none text-app-muted leading-none" />
           </view>
           <input
-            class="h-full min-w-0 flex-1 text-[#333]"
+            class="h-full min-w-0 flex-1 pl-24rpx text-[#333]"
             :value="form.phone"
             type="number"
             :maxlength="phoneMaxLength"

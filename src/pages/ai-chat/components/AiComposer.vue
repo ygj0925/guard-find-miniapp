@@ -280,13 +280,13 @@ function showVoiceTip() {
 .composer-input {
   width: 100%;
   height: 64rpx;
-  color: #17233d;
+  color: var(--app-ink);
   font-size: 29rpx;
   line-height: 64rpx;
 }
 
 :deep(.composer-placeholder) {
-  color: #8f9cb1;
+  color: var(--app-placeholder);
 }
 
 .hold-to-talk {
@@ -300,7 +300,7 @@ function showVoiceTip() {
   border: 1rpx solid rgba(88, 126, 201, 0.28);
   border-radius: 34rpx;
   background: #f5f8ff;
-  color: #315fba;
+  color: var(--app-ink-soft);
   font-size: 28rpx;
   font-weight: 500;
   user-select: none;
@@ -317,7 +317,7 @@ function showVoiceTip() {
 
 .hold-to-talk.recognizing {
   background: #f1f4fa;
-  color: #617497;
+  color: var(--app-muted);
 }
 
 .icon-button {
@@ -344,7 +344,7 @@ function showVoiceTip() {
 }
 
 .voice-button.active {
-  background: #2d6fe6;
+  background: var(--app-brand-blue);
 }
 
 .voice-button.active::after {
@@ -366,7 +366,7 @@ function showVoiceTip() {
 .voice-icon {
   width: 34rpx;
   height: 34rpx;
-  color: #315fba;
+  color: var(--app-ink-soft);
 }
 
 .voice-button.active .voice-icon {
@@ -432,7 +432,7 @@ function showVoiceTip() {
 }
 
 .send-button {
-  background: #2d6fe6;
+  background: var(--app-brand-blue);
   box-shadow: 0 7rpx 18rpx rgba(45, 111, 230, 0.24);
 }
 
@@ -448,7 +448,7 @@ function showVoiceTip() {
 }
 
 .stop-button {
-  background: #e05545;
+  background: var(--app-danger);
   box-shadow: 0 7rpx 18rpx rgba(224, 85, 69, 0.24);
 }
 
