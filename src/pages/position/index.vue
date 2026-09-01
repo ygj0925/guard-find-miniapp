@@ -143,9 +143,10 @@ onShow(() => {
 onLoad(async () => {
   try {
     await loadFilterOptions()
+    await loadPositions(true)
   }
-  finally {
-    loadPositions(true)
+  catch {
+    // 请求层会在 401 时跳转登录页；此处不再继续发送列表请求，避免跳转期间出现空白页。
   }
 })
 
