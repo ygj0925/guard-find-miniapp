@@ -61,27 +61,35 @@ const isFavorite = computed(() => positionStore.isFavorite(position.value.id))
 const isApplied = computed(() => positionStore.isApplied(position.value.id))
 const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
 const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
+const hasLocation = computed(() => position.value.longitude !== 0 && position.value.latitude !== 0)
+
+function normalizeTextList(value?: string[] | string) {
+  const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/(?:\\r?\\n|\r?\n)/) : []
+  return entries
+    .map(item => item.trim().replace(/^\d+[.、]\s*/, ''))
+    .filter(Boolean)
+}
 
 function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
   return {
     id: source.positionId,
     title: source.positionName,
-    company: source.company,
-    companyIndustry: source.companyIndustry,
-    companyStage: source.companyStage,
-    companySize: source.companySize,
+    company: source.company || '招聘企业',
+    companyIndustry: source.companyIndustry || '',
+    companyStage: source.companyStage || '',
+    companySize: source.companySize || '',
     companyLogo: source.companyLogo || '/static/logo.svg',
     salary: source.salaryMin != null && source.salaryMax != null ? `${Math.round(source.salaryMin / 1000)}K-${Math.round(source.salaryMax / 1000)}K` : source.salaryUnit || '面议',
     location: source.location,
-    address: source.address,
+    address: source.address || source.location || '',
     longitude: Number(source.longitude || 0),
     latitude: Number(source.latitude || 0),
     education: source.edu,
     experience: source.experience,
     tags: source.tags || [],
     recruiter: source.recruiter || { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
-    responsibilities: source.responsibilities || [],
-    requirements: source.requirements || [],
+    responsibilities: normalizeTextList(source.responsibilities),
+    requirements: normalizeTextList(source.requirements),
   }
 }
 
@@ -183,6 +191,10 @@ function handleApply() {
 }
 
 function openCompanyLocation() {
+  if (!hasLocation.value) {
+    uni.showToast({ title: '暂未提供工作地点坐标', icon: 'none' })
+    return
+  }
   uni.openLocation({
     latitude: position.value.latitude,
     longitude: position.value.longitude,
@@ -302,7 +314,7 @@ function openCompanyLocation() {
           <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
         </view>
 
-        <view class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
+        <view v-if="hasLocation" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
           <map class="h-full w-full" :latitude="position.latitude" :longitude="position.longitude" :scale="15" :enable-scroll="false" :enable-zoom="false" />
           <view class="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
             <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-[#263249] shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
@@ -314,6 +326,7 @@ function openCompanyLocation() {
             <view class="i-carbon-location-filled" />
           </view>
         </view>
+        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">暂未提供工作地点坐标</view>
       </view>
 
       <view class="h-36" />

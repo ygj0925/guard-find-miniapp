@@ -50,17 +50,18 @@ export interface PositionRecruiter {
 }
 
 export interface PositionDetail extends PositionListItem {
-  company: string
-  companyIndustry: string
-  companyStage: string
-  companySize: string
-  companyLogo: string
-  address: string
+  company?: string
+  companyIndustry?: string
+  companyStage?: string
+  companySize?: string
+  companyLogo?: string
+  address?: string
   longitude?: number
   latitude?: number
-  recruiter: PositionRecruiter
-  responsibilities: string[]
-  requirements: string[]
+  recruiter?: PositionRecruiter
+  /** 上游当前可能返回换行分隔的字符串，页面会统一归一化。 */
+  responsibilities?: string[] | string
+  requirements?: string[] | string
 }
 
 export function getPositionFilterOptions() {
