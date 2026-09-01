@@ -40,6 +40,7 @@ const resumeShortcuts = [
 ]
 
 const profileScrolledBackground = 'var(--app-header-surface, rgba(255,255,255,0.98))'
+const RESUME_PAGE = '/pages/resume/index'
 
 onPageScroll(({ scrollTop }) => {
   headerScrolled.value = scrollTop > 16
@@ -57,6 +58,18 @@ function handleProfileTap() {
 
 function handleLegalTap(url: string) {
   uni.navigateTo({ url })
+}
+
+function handleResumeShortcut(label: string) {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  if (label === '附件简历') {
+    uni.navigateTo({ url: RESUME_PAGE })
+    return
+  }
+  uni.showToast({ title: '功能开发中', icon: 'none' })
 }
 
 function handleLogout() {
@@ -125,7 +138,7 @@ function handleLogout() {
             :key="shortcut.label"
             class="min-h-158rpx min-w-0 flex flex-col cursor-pointer items-center justify-center text-sm text-app-ink leading-[1.4] active:bg-[#f7f9fd]"
             role="button"
-            @tap="handleProfileTap"
+            @tap="handleResumeShortcut(shortcut.label)"
           >
             <view class="mb-2 text-3xl text-brand-blue leading-none" :class="[shortcut.icon]" />
             <text>{{ shortcut.label }}</text>
