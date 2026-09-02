@@ -3,7 +3,9 @@ import { computed, reactive, ref } from 'vue'
 import { getPositionFilterOptions, getPositions } from '@/api/position'
 import type { PositionFilterOptions, PositionListItem } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { usePositionStore } from '@/store/position'
 import { tabbarStore } from '@/tabbar/store'
+import { formatPositionSalary } from '@/utils/positionSalary'
 import PositionSearchBar from './components/PositionSearchBar.vue'
 
 defineOptions({
@@ -42,10 +44,37 @@ const pageNum = ref(0)
 const PAGE_SIZE = 20
 const categories = computed(() => [{ value: '', label: '全部' }, ...filterOptions.value.kinds])
 const hasMore = computed(() => jobs.value.length < total.value)
-const quickLinks = [
-  { label: '附近机会', description: '发现身边好工作', icon: 'i-carbon-location-company', colorClass: 'text-[#26b8bd]' },
-  { label: '热门职位', description: '精选高匹配岗位', icon: 'i-carbon-fire', colorClass: 'text-[#ff805c]' },
+const positionStore = usePositionStore()
+const activeCategory = ref('')
+const recruitmentCategories = [
+  {
+    value: '社招',
+    label: '社会招聘',
+    description: '经验人才 · 全职机会',
+    icon: 'https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/%E7%A4%BE%E4%BC%9A%E6%8B%9B%E8%81%98.png',
+    fallbackIcon: '/static/auth/recruit-social.svg',
+    activeGradient: 'linear-gradient(135deg, #2f6fe8 0%, #4d9bf6 100%)',
+    activeGlow: '0 16rpx 32rpx rgba(47,111,232,0.28)',
+  },
+  {
+    value: '校招',
+    label: '校园招聘',
+    description: '应届启航 · 培养计划',
+    icon: 'https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/%E6%A0%A1%E5%9B%AD%E6%8B%9B%E8%81%98.png',
+    fallbackIcon: '/static/auth/recruit-campus.svg',
+    activeGradient: 'linear-gradient(135deg, #12b3c7 0%, #46d8d0 100%)',
+    activeGlow: '0 16rpx 32rpx rgba(18,179,199,0.26)',
+  },
 ]
+const recruitmentIconError = reactive<Record<string, boolean>>({})
+
+function resolveRecruitmentIcon(item: typeof recruitmentCategories[number]) {
+  return recruitmentIconError[item.value] ? item.fallbackIcon : item.icon
+}
+
+function handleRecruitmentIconError(value: string) {
+  recruitmentIconError[value] = true
+}
 
 let statusBarHeight = 0
 let headerSearchExpandedWidth = 0
@@ -129,13 +158,6 @@ function showJobDetail(positionId: string) {
   })
 }
 
-function formatSalary(job: PositionListItem) {
-  if (job.salaryMin == null && job.salaryMax == null)
-    return job.salaryUnit || '面议'
-  const toK = (salary?: number) => salary == null ? '' : `${Math.round(salary / 1000)}K`
-  return job.salaryMin != null && job.salaryMax != null ? `${toK(job.salaryMin)}-${toK(job.salaryMax)}` : toK(job.salaryMin ?? job.salaryMax)
-}
-
 async function loadPositions(reset = false) {
   if (loading.value || (!reset && !hasMore.value))
     return
@@ -146,6 +168,7 @@ async function loadPositions(reset = false) {
       pageNum: nextPageNum,
       pageSize: PAGE_SIZE,
       kinds: activeKind.value ? [Number(activeKind.value)] : undefined,
+      category: activeCategory.value || undefined,
       educationInfos: selectedFilters.educationInfos.length ? selectedFilters.educationInfos : undefined,
       workExperiences: selectedFilters.workExperiences.length ? selectedFilters.workExperiences : undefined,
       locIds: selectedFilters.locIds.length ? selectedFilters.locIds : undefined,
@@ -170,6 +193,20 @@ function handleCategoryTap(kind: string) {
   loadPositions(true)
 }
 
+function toggleRecruitmentCategory(value: string) {
+  activeCategory.value = activeCategory.value === value ? '' : value
+  loadPositions(true)
+}
+
+function applyPendingCategory() {
+  const pending = positionStore.consumePendingCategory()
+  if (pending && recruitmentCategories.some(item => item.value === pending)) {
+    activeCategory.value = pending
+    return true
+  }
+  return false
+}
+
 function toggleFilter(type: 'educationInfos' | 'workExperiences' | 'locIds', value: string) {
   const selected = selectedFilters[type]
   selectedFilters[type] = selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]
@@ -192,9 +229,13 @@ onPageScroll(({ scrollTop }) => {
 
 onShow(() => {
   syncScrollState(currentScrollTop.value)
+  // switchTab 复用页面实例时不会重新触发 onLoad，这里消费首页携带的招聘类别并刷新列表。
+  if (applyPendingCategory())
+    loadPositions(true)
 })
 
 onLoad(async () => {
+  applyPendingCategory()
   try {
     await loadFilterOptions()
     await loadPositions(true)
@@ -254,19 +295,40 @@ onUnload(() => {
           <PositionSearchBar @tap="showFilter = true" />
         </view>
 
-        <view class="grid grid-cols-2 mt-4 overflow-hidden border-1rpx border-white/60 rounded-3xl border-solid bg-white/72 shadow-[0_12rpx_32rpx_rgba(39,105,180,0.08)] backdrop-blur-8rpx">
+        <view class="grid grid-cols-2 mt-4 gap-3">
           <view
-            v-for="(link, index) in quickLinks"
-            :key="link.label"
-            class="min-h-28 flex cursor-pointer items-center px-4 active:bg-white/72"
-            :class="index === 0 ? 'border-r-1rpx border-r-white/76 border-r-solid' : ''"
+            v-for="item in recruitmentCategories"
+            :key="item.value"
+            class="relative min-h-116rpx flex cursor-pointer items-center overflow-hidden border-1rpx rounded-3xl border-solid px-3.5 transition-all duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:opacity-88 motion-reduce:transition-none"
+            :class="activeCategory === item.value
+              ? 'border-white/60 shadow-[0_18rpx_38rpx_rgba(39,105,180,0.22)]'
+              : 'border-white/60 bg-white/72 shadow-[0_12rpx_32rpx_rgba(39,105,180,0.08)] backdrop-blur-8rpx'"
+            :style="activeCategory === item.value ? { background: item.activeGradient, boxShadow: item.activeGlow } : {}"
             role="button"
-            @tap="showFilter = true"
+            :aria-pressed="activeCategory === item.value"
+            :aria-label="item.label"
+            @tap="toggleRecruitmentCategory(item.value)"
           >
-            <view class="mr-3 text-3xl leading-none" :class="[link.icon, link.colorClass]" />
+            <view
+              class="mr-3 h-72rpx w-72rpx flex flex-none items-center justify-center rounded-2xl transition-colors duration-220"
+              :class="activeCategory === item.value ? 'bg-white/22' : 'bg-white/70'"
+            >
+              <image
+                class="h-44rpx w-44rpx"
+                :src="resolveRecruitmentIcon(item)"
+                mode="aspectFit"
+                @error="handleRecruitmentIconError(item.value)"
+              />
+            </view>
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm text-app-ink font-700">{{ link.label }}</text>
-              <text class="mt-1 block text-xs text-app-muted">{{ link.description }}</text>
+              <text class="text-sm font-700" :class="activeCategory === item.value ? 'text-white' : 'text-app-ink'">{{ item.label }}</text>
+              <text class="mt-1 block text-2xs" :class="activeCategory === item.value ? 'text-white/82' : 'text-app-muted'">{{ item.description }}</text>
+            </view>
+            <view
+              v-if="activeCategory === item.value"
+              class="absolute right-3 top-3 h-32rpx w-32rpx flex items-center justify-center rounded-full bg-white/28"
+            >
+              <view class="i-carbon-checkmark text-xs text-white leading-none" />
             </view>
           </view>
         </view>
@@ -314,7 +376,7 @@ onUnload(() => {
         >
           <view class="flex items-start justify-between gap-3">
             <text class="min-w-0 flex-1 text-base text-app-ink font-700 leading-[1.35]">{{ job.positionName }}</text>
-            <text class="flex-none text-sm text-brand-blue font-700">{{ formatSalary(job) }}</text>
+            <text class="flex-none text-sm text-brand-blue font-700">{{ formatPositionSalary(job) }}</text>
           </view>
           <view v-if="[job.location, job.edu, job.experience].some(Boolean)" class="mt-2.5 flex flex-wrap gap-1.5">
             <text

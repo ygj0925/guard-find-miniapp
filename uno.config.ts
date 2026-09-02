@@ -110,6 +110,7 @@ export default defineConfig({
     'i-carbon-template',
     'i-carbon-ibm-watson-language-translator',
     'i-carbon-menu',
+    'i-carbon-checkmark',
   ],
   rules: [
     ['bg-brand-hero', { background: 'var(--app-brand-hero)' }],

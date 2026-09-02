@@ -5,6 +5,7 @@ import type { PositionDetail as PositionDetailResponse } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { useTokenStore } from '@/store/token'
+import { formatPositionSalary } from '@/utils/positionSalary'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 defineOptions({
@@ -97,7 +98,7 @@ function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
     companyStage: source.companyStage || '',
     companySize: source.companySize || '',
     companyLogo: source.companyLogo || '/static/logo.svg',
-    salary: source.salaryMin != null && source.salaryMax != null ? `${Math.round(source.salaryMin / 1000)}K-${Math.round(source.salaryMax / 1000)}K` : source.salaryUnit || '面议',
+    salary: formatPositionSalary(source),
     location: source.location,
     address: source.address || source.location || '',
     longitude: Number(source.longitude || 0),

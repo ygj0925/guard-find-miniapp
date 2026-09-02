@@ -16,9 +16,16 @@ export interface PositionListQuery {
   pageNum: number
   pageSize: number
   kinds?: number[]
+  /** 招聘类别文本，如 社招 / 校招，用于社会招聘、校园招聘的快捷过滤。 */
+  category?: string
   educationInfos?: string[]
   workExperiences?: string[]
   locIds?: string[]
+}
+
+export interface HotPositionListQuery {
+  pageNum: number
+  pageSize: number
 }
 
 export interface PositionListItem {
@@ -70,6 +77,10 @@ export function getPositionFilterOptions() {
 
 export function getPositions(query: PositionListQuery) {
   return http.get<PositionListPage>('/miniapp/positions', query)
+}
+
+export function getHotPositions(query: HotPositionListQuery) {
+  return http.get<PositionListPage>('/miniapp/positions/hot', query)
 }
 
 export function getPositionDetail(positionId: string) {

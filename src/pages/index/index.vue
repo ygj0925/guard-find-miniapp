@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { PositionListItem } from '@/api/position'
+import { getHotPositions } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { usePositionStore } from '@/store/position'
+import { formatPositionSalary } from '@/utils/positionSalary'
 
 defineOptions({
   name: 'Home',
@@ -25,6 +29,8 @@ interface QuickEntry {
   gradient: string
   glow: string
   pagePath: string
+  /** 跳转职位页时携带的招聘类别（如 社招 / 校招），用于自动选中并过滤。 */
+  category?: string
 }
 
 const TAB_PAGES = [
@@ -58,8 +64,8 @@ const banners = [
 
 const quickEntryPages: QuickEntry[][] = [
   [
-    { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index' },
-    { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index' },
+    { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '社招' },
+    { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '校招' },
     { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #ff7a2f 0%, #ffab3d 100%)', glow: '0 10rpx 20rpx rgba(255,122,47,0.24)', pagePath: 'pages/position/index' },
     { title: '求职工作台', iconClass: 'i-carbon-dashboard', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
     { title: '我的投递', iconClass: 'i-carbon-send-alt', gradient: 'linear-gradient(140deg, #6a63ef 0%, #9a7cf3 100%)', glow: '0 10rpx 20rpx rgba(106,99,239,0.24)', pagePath: 'pages/me/me' },
@@ -77,15 +83,15 @@ const quickEntryPages: QuickEntry[][] = [
   ],
 ]
 
-const popularJobs = [
-  { title: '生物药研发高级研究员', tags: ['上海', '硕士', '3-5年'], salary: '25-40K' },
-  { title: '医学联络官（MSL）', tags: ['北京', '本科', '1-3年'], salary: '20-35K' },
-  { title: '质量注册专员', tags: ['沈阳', '本科', '经验不限'], salary: '12-18K' },
-]
-
+const HOT_POSITION_LIMIT = 10
+const hotPositions = ref<PositionListItem[]>([])
+const hotPositionsLoading = ref(false)
+const hotPositionsFailed = ref(false)
 const headerScrolled = ref(false)
 const bannerIndex = ref(0)
 const entryPageIndex = ref(0)
+
+const positionStore = usePositionStore()
 
 function openPage(pagePath: string) {
   const url = `/${pagePath}`
@@ -96,6 +102,43 @@ function openPage(pagePath: string) {
   uni.navigateTo({ url })
 }
 
+function openEntry(entry: QuickEntry) {
+  if (entry.category) {
+    positionStore.setPendingCategory(entry.category)
+  }
+  openPage(entry.pagePath)
+}
+
+function showJobDetail(positionId: string) {
+  uni.navigateTo({
+    url: `/pages/position/detail?id=${encodeURIComponent(positionId)}`,
+  })
+}
+
+function getJobMeta(job: PositionListItem) {
+  const meta = [job.location, job.edu, job.experience, ...job.tags]
+    .filter((item): item is string => Boolean(item))
+  return meta.filter((item, index) => meta.indexOf(item) === index).slice(0, 3)
+}
+
+async function loadHotPositions() {
+  if (hotPositionsLoading.value)
+    return
+  hotPositionsLoading.value = true
+  hotPositionsFailed.value = false
+  try {
+    const page = await getHotPositions({ pageNum: 1, pageSize: HOT_POSITION_LIMIT })
+    hotPositions.value = page.list.slice(0, HOT_POSITION_LIMIT)
+  }
+  catch {
+    hotPositions.value = []
+    hotPositionsFailed.value = true
+  }
+  finally {
+    hotPositionsLoading.value = false
+  }
+}
+
 function handleBannerChange(event: SwiperChangeEvent) {
   bannerIndex.value = event.detail.current
 }
@@ -103,6 +146,10 @@ function handleBannerChange(event: SwiperChangeEvent) {
 function handleEntryPageChange(event: SwiperChangeEvent) {
   entryPageIndex.value = event.detail.current
 }
+
+onLoad(() => {
+  loadHotPositions()
+})
 
 onPageScroll(({ scrollTop }) => {
   headerScrolled.value = scrollTop > 8
@@ -206,7 +253,7 @@ onPageScroll(({ scrollTop }) => {
                 :key="entry.title"
                 class="flex flex-col cursor-pointer items-center active:opacity-70"
                 role="button"
-                @tap="openPage(entry.pagePath)"
+                @tap="openEntry(entry)"
               >
                 <view
                   class="h-84rpx w-84rpx center rounded-26rpx"
@@ -246,27 +293,42 @@ onPageScroll(({ scrollTop }) => {
         </view>
       </view>
 
-      <view class="flex flex-col gap-2.5">
+      <view v-if="hotPositionsLoading" class="app-card py-8 text-center text-sm text-app-muted">
+        热门岗位加载中...
+      </view>
+      <view
+        v-else-if="hotPositionsFailed"
+        class="cursor-pointer app-card py-8 text-center active:opacity-74"
+        role="button"
+        @tap="loadHotPositions"
+      >
+        <text class="block text-sm text-app-ink-soft">热门岗位加载失败</text>
+        <text class="mt-1 block text-xs text-brand-blue">点击重新加载</text>
+      </view>
+      <view v-else-if="!hotPositions.length" class="app-card py-8 text-center text-sm text-app-muted">
+        暂无热门岗位
+      </view>
+      <view v-else class="flex flex-col gap-2.5">
         <view
-          v-for="(job, index) in popularJobs"
-          :key="job.title"
+          v-for="(job, index) in hotPositions"
+          :key="job.positionId"
           class="cursor-pointer app-card px-3.5 py-3.5 active:opacity-80"
           role="button"
-          @tap="openPage('pages/position/index')"
+          @tap="showJobDetail(job.positionId)"
         >
           <view class="flex items-center gap-2">
             <text class="flex-none rounded-8rpx bg-[#fff1e6] px-1.5 py-0.5 text-3xs text-app-warning font-700">
               TOP{{ index + 1 }}
             </text>
             <text class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-app-ink font-700">
-              {{ job.title }}
+              {{ job.positionName }}
             </text>
-            <text class="flex-none text-sm text-brand-blue font-800">{{ job.salary }}</text>
+            <text class="flex-none text-sm text-brand-blue font-800">{{ formatPositionSalary(job) }}</text>
           </view>
 
-          <view class="mt-2.5 flex flex-wrap gap-1.5">
+          <view v-if="getJobMeta(job).length" class="mt-2.5 flex flex-wrap gap-1.5">
             <text
-              v-for="tag in job.tags"
+              v-for="tag in getJobMeta(job)"
               :key="tag"
               class="rounded-10rpx bg-[#f1f5fb] px-2 py-1 text-2xs text-app-ink-soft"
             >
