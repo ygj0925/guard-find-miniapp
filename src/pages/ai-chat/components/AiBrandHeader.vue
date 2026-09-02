@@ -24,17 +24,22 @@ function goHome() {
 
 <template>
   <view class="ai-brand-header" :style="headerStyle">
-    <view class="brand" @tap="goHome">
-      <view class="brand-mark">
-        <view class="brand-dot brand-dot-left" />
-        <view class="brand-dot brand-dot-right" />
-        <view class="brand-body" />
+    <view class="header-left">
+      <view class="brand-logo" @tap="goHome">
+        <view class="brand-mark">
+          <view class="brand-dot brand-dot-left" />
+          <view class="brand-dot brand-dot-right" />
+          <view class="brand-body" />
+        </view>
       </view>
-      <text class="brand-name">麟才寻你</text>
+      <view class="back-button" @tap="goHome">
+        <view class="back-icon" />
+        <text>返回</text>
+      </view>
     </view>
 
     <view v-if="showHistory" class="history-button" @tap="emit('history')">
-      历史对话
+      <text>历史对话</text>
     </view>
   </view>
 </template>
@@ -49,18 +54,20 @@ function goHome() {
   padding-left: 32rpx;
 }
 
-.brand {
+.header-left {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
-.brand-name {
-  color: var(--app-ink);
-  font-size: 36rpx;
-  font-weight: 600;
-  letter-spacing: 1rpx;
-  white-space: nowrap;
+.brand-logo {
+  width: 68rpx;
+  height: 68rpx;
+  flex: 0 0 68rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .brand-mark {
@@ -109,14 +116,48 @@ function goHome() {
   content: '';
 }
 
-.history-button {
-  margin-left: 24rpx;
-  padding: 10rpx 24rpx;
-  border-radius: 28rpx;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 8rpx 24rpx rgba(77, 115, 204, 0.08);
-  color: var(--app-ink);
+.back-button {
+  box-sizing: border-box;
+  height: 58rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 0 20rpx 0 16rpx;
+  border-radius: 29rpx;
+  background: #fff;
+  color: #222938;
   font-size: 28rpx;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.back-icon {
+  box-sizing: border-box;
+  width: 20rpx;
+  height: 20rpx;
+  border-bottom: 4rpx solid #5c88eb;
+  border-left: 4rpx solid #5c88eb;
+  transform: rotate(45deg);
+}
+
+.history-button {
+  box-sizing: border-box;
+  width: 152rpx;
+  height: 58rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border-radius: 29rpx;
+  background: #fff;
+  color: #222938;
+  font-size: 28rpx;
+  font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
 }
 </style>

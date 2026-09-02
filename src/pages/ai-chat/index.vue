@@ -1,6 +1,16 @@
 <script setup lang="ts">
+import type { AiChatConversation, AiChatMessage, AiChatMessageRole, AiChatMessageStatus } from './aiHistory'
+import { onShow } from '@dcloudio/uni-app'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { safeAreaInsets, systemInfo } from '@/utils/systemInfo'
+import {
+  clearNewConversationRequest,
+  consumeActiveHistoryConversation,
+  consumeDeletedConversationIds,
+  consumeNewConversationRequest,
+  findHistoryConversation,
+  upsertHistoryConversation,
+} from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
 import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
@@ -17,22 +27,7 @@ definePage({
   },
 })
 
-type MessageRole = 'assistant' | 'user'
-type MessageStatus = 'complete' | 'streaming'
 type SpeechRecognitionState = 'idle' | 'recording' | 'recognizing'
-
-interface MockMessage {
-  id: string
-  role: MessageRole
-  content: string
-  createdAt: number
-  status: MessageStatus
-}
-
-interface MockConversation {
-  id: string
-  messages: MockMessage[]
-}
 
 interface MockQuickQuestion {
   id: number
@@ -60,8 +55,9 @@ const quickQuestions = ref<MockQuickQuestion[]>([
 
 const hasStarted = ref(false)
 const inputValue = ref('')
-const currentConversation = ref<MockConversation | null>(null)
+const currentConversation = ref<AiChatConversation | null>(null)
 const isReplying = ref(false)
+const isOpeningHistory = ref(false)
 const isFollowingLatest = ref(true)
 const scrollIntoView = ref('')
 const scrollWithAnimation = ref(false)
@@ -116,10 +112,6 @@ const contentScrollStyle = computed(() => ({
   paddingBottom: `${keyboardHeight.value + (keyboardHeight.value > 0 ? 76 : safeBottom + 76)}px`,
 }))
 
-const newChatStyle = {
-  top: `${aiHeaderMetrics.height + 12}px`,
-}
-
 const composerStyle = computed(() => ({
   bottom: `${keyboardHeight.value}px`,
   paddingBottom: `${keyboardHeight.value > 0 ? 12 : safeBottom + 12}px`,
@@ -129,7 +121,11 @@ const scrollLatestStyle = computed(() => ({
   bottom: `${keyboardHeight.value + (keyboardHeight.value > 0 ? 82 : safeBottom + 82)}px`,
 }))
 
-function createMessage(role: MessageRole, content: string, status: MessageStatus = 'complete'): MockMessage {
+function createMessage(
+  role: AiChatMessageRole,
+  content: string,
+  status: AiChatMessageStatus = 'complete',
+): AiChatMessage {
   messageSequence += 1
   return {
     id: `message-${Date.now()}-${messageSequence}`,
@@ -172,6 +168,18 @@ function clearVoiceTimer() {
   }
 }
 
+function createConversationTitle(question: string) {
+  const title = question.replace(/\s+/g, ' ').trim()
+  return title.length > 18 ? `${title.slice(0, 18)}…` : title
+}
+
+function persistCurrentConversation() {
+  const conversation = currentConversation.value
+  if (conversation?.messages.some(message => message.role === 'user')) {
+    upsertHistoryConversation(conversation)
+  }
+}
+
 function startExperience() {
   hasStarted.value = true
   if (currentConversation.value) {
@@ -180,30 +188,30 @@ function startExperience() {
 }
 
 function openHistory() {
-  uni.showActionSheet({
-    itemList: ['上海研发岗位咨询', '医学联络官面试准备'],
-    success(result) {
-      clearReplyTimer()
-      const histories = [
-        ['我想找上海的研发岗位', '可以重点关注生物药研发、工艺开发和分析研究方向。建议在简历中突出实验平台、项目阶段及具体成果。'],
-        ['如何准备医学联络官面试？', '建议准备疾病领域知识、文献解读案例和跨部门沟通经历，并用具体情境说明你的表达与协作能力。'],
-      ]
-      const history = histories[result.tapIndex]
-      if (!history) {
-        return
-      }
-      currentConversation.value = {
-        id: `history-${result.tapIndex}`,
-        messages: [createMessage('user', history[0]), createMessage('assistant', history[1])],
-      }
-      isReplying.value = false
-      scrollToBottom(true, false)
-    },
+  if (isReplying.value) {
+    uni.showToast({ title: '请先停止当前回复，再查看历史对话', icon: 'none' })
+    return
+  }
+  if (isOpeningHistory.value) {
+    return
+  }
+  persistCurrentConversation()
+  isOpeningHistory.value = true
+  uni.navigateTo({
+    url: '/pages/ai-chat/history',
+    complete: () => (isOpeningHistory.value = false),
   })
 }
 
 function startNewConversation() {
-  clearReplyTimer()
+  if (isReplying.value) {
+    cancelReply()
+  }
+  else {
+    clearReplyTimer()
+  }
+  clearNewConversationRequest()
+  hasStarted.value = true
   currentConversation.value = null
   inputValue.value = ''
   isReplying.value = false
@@ -218,8 +226,12 @@ function sendMessage(content = inputValue.value) {
   }
 
   if (!currentConversation.value) {
+    const createdAt = Date.now()
     currentConversation.value = {
-      id: `conversation-${Date.now()}`,
+      id: `conversation-${createdAt}`,
+      title: createConversationTitle(question),
+      createdAt,
+      updatedAt: createdAt,
       messages: [],
     }
   }
@@ -228,6 +240,7 @@ function sendMessage(content = inputValue.value) {
   currentConversation.value.messages.push(createMessage('user', question))
   const assistantMessage = createMessage('assistant', '', 'streaming')
   currentConversation.value.messages.push(assistantMessage)
+  currentConversation.value.updatedAt = Date.now()
   isReplying.value = true
   scrollToBottom(true, true)
 
@@ -235,8 +248,12 @@ function sendMessage(content = inputValue.value) {
   replyTimer = setTimeout(() => {
     assistantMessage.content = getMockReply(question)
     assistantMessage.status = 'complete'
+    if (currentConversation.value) {
+      currentConversation.value.updatedAt = Date.now()
+    }
     isReplying.value = false
     replyTimer = null
+    persistCurrentConversation()
     scrollToBottom(true, true)
   }, 760)
 }
@@ -249,7 +266,41 @@ function cancelReply() {
     pendingMessage.content = '已停止回复'
     pendingMessage.status = 'complete'
   }
+  if (currentConversation.value) {
+    currentConversation.value.updatedAt = Date.now()
+  }
   isReplying.value = false
+  persistCurrentConversation()
+}
+
+function restoreHistorySelection() {
+  isOpeningHistory.value = false
+  const deletedIds = consumeDeletedConversationIds()
+  if (currentConversation.value && deletedIds.includes(currentConversation.value.id)) {
+    startNewConversation()
+  }
+
+  if (consumeNewConversationRequest()) {
+    startNewConversation()
+    return
+  }
+
+  const activeConversationId = consumeActiveHistoryConversation()
+  if (!activeConversationId) {
+    return
+  }
+  const conversation = findHistoryConversation(activeConversationId)
+  if (!conversation) {
+    uni.showToast({ title: '该历史对话已不存在', icon: 'none' })
+    return
+  }
+
+  clearReplyTimer()
+  currentConversation.value = conversation
+  hasStarted.value = true
+  isReplying.value = false
+  isFollowingLatest.value = true
+  scrollToBottom(true, false)
 }
 
 async function scrollToBottom(forceFollow = true, animated = true) {
@@ -313,8 +364,10 @@ function handleRecordCancel() {
   speechStateText.value = ''
 }
 
+onShow(restoreHistorySelection)
 onMounted(() => uni.onKeyboardHeightChange(handleKeyboardHeightChange))
 onUnmounted(() => {
+  isReplying.value ? cancelReply() : persistCurrentConversation()
   clearReplyTimer()
   clearVoiceTimer()
   uni.offKeyboardHeightChange(handleKeyboardHeightChange)
@@ -324,7 +377,7 @@ onUnmounted(() => {
 <template>
   <view class="ai-page">
     <view class="ai-header-fixed">
-      <AiBrandHeader :show-history="hasStarted" @history="openHistory" />
+      <AiBrandHeader @history="openHistory" />
     </view>
 
     <scroll-view
@@ -336,9 +389,9 @@ onUnmounted(() => {
     >
       <view class="splash-page">
         <view class="splash-copy">
-          <text>你好！</text>
-          <text>我是麟才寻你招聘助手，</text>
-          <text>陪你发现更适合的职业机会！</text>
+          <text class="splash-line">你好！</text>
+          <text class="splash-line">我是麟才寻你招聘助手，</text>
+          <text class="splash-line">陪你发现更适合的职业机会！</text>
         </view>
 
         <image
@@ -380,12 +433,6 @@ onUnmounted(() => {
     </view>
 
     <template v-else>
-      <view v-if="currentConversation" class="chat-actions" :style="newChatStyle">
-        <view class="new-chat-button" @tap="startNewConversation">
-          ＋ 新对话
-        </view>
-      </view>
-
       <scroll-view
         class="page-scroll content-scroll"
         scroll-y
@@ -786,28 +833,6 @@ onUnmounted(() => {
   border-top: 4rpx solid #78a0ff;
   border-right: 4rpx solid #78a0ff;
   transform: rotate(45deg);
-}
-
-.chat-actions {
-  position: fixed;
-  right: 24rpx;
-  z-index: 25;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.new-chat-button {
-  min-height: 56rpx;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  padding: 10rpx 24rpx;
-  border: 1rpx solid rgba(108, 145, 225, 0.24);
-  border-radius: 30rpx;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 8rpx 24rpx rgba(61, 98, 177, 0.14);
-  color: var(--app-ink-soft);
-  font-size: 24rpx;
 }
 
 .message-row {
