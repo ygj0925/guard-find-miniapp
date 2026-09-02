@@ -69,14 +69,42 @@ const keyboardHeight = ref(0)
 const speechState = ref<SpeechRecognitionState>('idle')
 const speechStateText = ref('')
 const safeBottom = safeAreaInsets?.bottom || 0
-const scrollViewportHeight = Number(systemInfo?.windowHeight || 0)
+const scrollViewportHeight = Number(systemInfo?.windowHeight || 844)
+const scrollViewportWidth = Number(systemInfo?.windowWidth || 390)
+const rpxScale = scrollViewportWidth / 750
+const splashCopyHeight = (22 + 34 * 1.42 * 3) * rpxScale
+const splashFeatureHeight = (82 + 26 * 1.35 - 18) * rpxScale
+const splashActionTailHeight = (108 + 10 + 22 * 1.35 + 72) * rpxScale + safeBottom + 12
+const splashHeroHeight = Math.max(
+  220,
+  Math.round(
+    scrollViewportHeight
+    - aiHeaderMetrics.height
+    - splashCopyHeight
+    - splashFeatureHeight
+    - splashActionTailHeight
+    - 10 * rpxScale,
+  ),
+)
+const splashHeroWidth = Math.min(
+  scrollViewportWidth - 24,
+  Math.round(splashHeroHeight * (590 / 714)),
+)
 let messageSequence = 0
 let replyTimer: ReturnType<typeof setTimeout> | null = null
 let voiceTimer: ReturnType<typeof setTimeout> | null = null
 
 const splashScrollStyle = computed(() => ({
   paddingTop: `${aiHeaderMetrics.height}px`,
-  paddingBottom: `${safeBottom + 124}px`,
+}))
+
+const splashHeroStyle = {
+  width: `${splashHeroWidth}px`,
+  height: `${splashHeroHeight}px`,
+}
+
+const splashBottomSpacerStyle = computed(() => ({
+  height: `${safeBottom + 124}px`,
 }))
 
 const splashActionsStyle = computed(() => ({
@@ -299,7 +327,13 @@ onUnmounted(() => {
       <AiBrandHeader :show-history="hasStarted" @history="openHistory" />
     </view>
 
-    <view v-if="!hasStarted" class="page-scroll" :style="splashScrollStyle">
+    <scroll-view
+      v-if="!hasStarted"
+      class="page-scroll splash-scroll"
+      scroll-y
+      :show-scrollbar="false"
+      :style="splashScrollStyle"
+    >
       <view class="splash-page">
         <view class="splash-copy">
           <text>你好！</text>
@@ -307,32 +341,39 @@ onUnmounted(() => {
           <text>陪你发现更适合的职业机会！</text>
         </view>
 
-        <image class="splash-hero" src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/%E6%8C%A5%E6%89%8B%E5%85%A8%E6%99%AF.gif" mode="widthFix" />
+        <image
+          class="splash-hero"
+          src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B%E5%85%A8%E6%99%AF.gif"
+          mode="aspectFit"
+          :style="splashHeroStyle"
+        />
 
         <view class="feature-row">
           <view class="feature-item">
-            <image src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/icon-1-job-search.svg" mode="aspectFit" />
+            <image src="https://static1.3sbio.com/assets/icon-1-job-search.svg" mode="aspectFit" />
             <text>岗位匹配</text>
           </view>
           <view class="feature-divider" />
           <view class="feature-item">
-            <image src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/icon-2-resume-edit.svg" mode="aspectFit" />
+            <image src="https://static1.3sbio.com/assets/icon-2-resume-edit.svg" mode="aspectFit" />
             <text>简历优化</text>
           </view>
           <view class="feature-divider" />
           <view class="feature-item">
-            <image src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/icon-3-talent-chat.svg" mode="aspectFit" />
+            <image src="https://static1.3sbio.com/assets/icon-3-talent-chat.svg" mode="aspectFit" />
             <text>面试辅导</text>
           </view>
         </view>
+
+        <view class="splash-bottom-spacer" :style="splashBottomSpacerStyle" />
       </view>
-    </view>
+    </scroll-view>
 
     <view v-if="!hasStarted" class="splash-actions" :style="splashActionsStyle">
-      <view class="start-button" @tap="startExperience">
+      <view class="start-button" role="button" aria-label="开启求职对话" @tap="startExperience">
         <text>开启求职对话</text>
         <view class="start-arrow">
-          <text>›</text>
+          <view class="start-arrow-icon" />
         </view>
       </view>
       <text class="ai-disclaimer">内容由 AI 生成</text>
@@ -361,7 +402,7 @@ onUnmounted(() => {
             <text>你的招聘求职助手，</text>
             <text>欢迎与我交流职业问题！</text>
           </view>
-          <image class="welcome-character" src="https://3sbio-it-video.oss-cn-shanghai.aliyuncs.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
+          <image class="welcome-character" src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
         </view>
 
         <view class="quick-list">
@@ -467,6 +508,11 @@ onUnmounted(() => {
   min-height: 100%;
 }
 
+.splash-bottom-spacer {
+  width: 100%;
+  flex: none;
+}
+
 .splash-actions {
   position: fixed;
   right: 0;
@@ -474,7 +520,7 @@ onUnmounted(() => {
   left: 0;
   z-index: 20;
   box-sizing: border-box;
-  padding-top: 18rpx;
+  padding-top: 32rpx;
   background-image:
     linear-gradient(180deg, rgba(237, 246, 255, 0) 0%, rgba(237, 246, 255, 0.68) 38%, rgba(237, 246, 255, 0.16) 100%),
     url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg');
@@ -490,63 +536,62 @@ onUnmounted(() => {
 .splash-copy {
   display: flex;
   flex-direction: column;
-  padding: 32rpx 44rpx 0;
+  padding: 22rpx 40rpx 0;
   color: var(--app-ink-soft);
-  font-size: 38rpx;
+  font-size: 34rpx;
   font-weight: 600;
-  line-height: 1.55;
+  line-height: 1.42;
 }
 
 .splash-hero {
-  width: 590rpx;
-  height: 714rpx;
   display: block;
-  margin: 22rpx auto 0;
+  margin: 10rpx auto 0;
 }
 
 .feature-row {
   display: grid;
   grid-template-columns: 1fr 1rpx 1fr 1rpx 1fr;
   align-items: center;
-  margin: -8rpx 42rpx 0;
+  margin: -18rpx 40rpx 0;
 }
 
 .feature-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rpx;
+  gap: 0;
   color: var(--app-ink-soft);
   font-size: 26rpx;
   font-weight: 500;
+  line-height: 1.35;
 }
 
 .feature-item image {
-  width: 116rpx;
-  height: 92rpx;
+  width: 104rpx;
+  height: 82rpx;
 }
 
 .feature-divider {
   width: 1rpx;
-  height: 92rpx;
+  height: 76rpx;
   background: rgba(83, 132, 243, 0.45);
 }
 
 .start-button {
   box-sizing: border-box;
-  width: 514rpx;
-  height: 126rpx;
+  width: 480rpx;
+  height: 108rpx;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 48rpx;
+  gap: 40rpx;
   margin: 0 auto;
-  padding: 12rpx 14rpx 12rpx 54rpx;
-  border-radius: 68rpx;
+  padding: 10rpx 12rpx 10rpx 46rpx;
+  border-radius: 58rpx;
   background: linear-gradient(100deg, #0d68ed 0%, #3d70ff 72%, #567aff 100%);
   box-shadow: 0 12rpx 30rpx rgba(36, 97, 229, 0.28);
   color: #fff;
-  font-size: 36rpx;
+  font-size: 32rpx;
   font-weight: 600;
   transition:
     transform 0.2s ease,
@@ -559,21 +604,23 @@ onUnmounted(() => {
 }
 
 .start-arrow {
-  width: 92rpx;
-  height: 92rpx;
+  width: 80rpx;
+  height: 80rpx;
+  flex: 0 0 80rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
-  color: #1763da;
-  font-size: 78rpx;
-  font-weight: 300;
-  line-height: 1;
 }
 
-.start-arrow text {
-  margin-top: -10rpx;
+.start-arrow-icon {
+  width: 17rpx;
+  height: 17rpx;
+  margin-left: -6rpx;
+  border-top: 3rpx solid #1763da;
+  border-right: 3rpx solid #1763da;
+  transform: rotate(45deg);
 }
 
 .ai-disclaimer {
@@ -581,45 +628,8 @@ onUnmounted(() => {
   margin-top: 10rpx;
   color: var(--app-muted);
   font-size: 22rpx;
+  line-height: 1.35;
   text-align: center;
-}
-
-@media screen and (max-height: 700px) {
-  .splash-copy {
-    padding-top: 16rpx;
-    font-size: 34rpx;
-    line-height: 1.42;
-  }
-
-  .splash-hero {
-    width: 500rpx;
-    margin-top: 0;
-  }
-
-  .feature-row {
-    margin-top: -18rpx;
-  }
-
-  .feature-item image {
-    width: 100rpx;
-    height: 76rpx;
-  }
-
-  .feature-divider {
-    height: 76rpx;
-  }
-
-  .start-button {
-    width: 480rpx;
-    height: 108rpx;
-    font-size: 32rpx;
-  }
-
-  .start-arrow {
-    width: 80rpx;
-    height: 80rpx;
-    font-size: 68rpx;
-  }
 }
 
 .content-scroll {
