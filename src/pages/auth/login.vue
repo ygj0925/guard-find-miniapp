@@ -199,7 +199,7 @@ function skipLogin() {
 
 <template>
   <view class="min-h-[var(--app-viewport-height)] bg-white text-[#222]">
-    <view class="relative h-940rpx overflow-hidden bg-[#dceeff]">
+    <view class="login-hero relative overflow-hidden bg-[#dceeff]">
       <image
         class="absolute inset-0 h-full w-full"
         src="/static/auth/login-hero-bg.jpg"
@@ -231,7 +231,7 @@ function skipLogin() {
       </view>
 
       <image
-        class="login-mascot absolute bottom-0 right-68rpx z-3 h-406rpx w-270rpx"
+        class="login-mascot absolute bottom-0 right-68rpx z-3"
         src="/static/auth/login-mascot.png"
         mode="aspectFit"
         aria-label="三生制药招聘卡通形象挥手欢迎"
@@ -409,13 +409,58 @@ function skipLogin() {
 </template>
 
 <style scoped>
+.login-hero {
+  height: 940rpx;
+}
+
 .hero-copy {
   top: calc(env(safe-area-inset-top) + 190rpx);
+}
+
+.login-mascot {
+  width: 270rpx;
+  height: 406rpx;
+  filter: drop-shadow(0 12rpx 16rpx rgba(24, 98, 161, 0.08));
 }
 
 .hero-form-transition {
   margin-top: -2rpx;
   background: linear-gradient(180deg, #e8f5ff 0%, rgba(246, 251, 255, 0.92) 48%, #fff 100%);
+}
+
+@media (max-height: 820px) {
+  .login-hero {
+    height: 800rpx;
+  }
+
+  .hero-copy {
+    top: calc(env(safe-area-inset-top) + 150rpx);
+  }
+
+  .login-mascot {
+    width: 232rpx;
+    height: 350rpx;
+  }
+
+  .hero-form-transition {
+    height: 24rpx;
+  }
+}
+
+@media (max-height: 700px) {
+  .login-hero {
+    height: 650rpx;
+  }
+
+  .hero-copy {
+    top: calc(env(safe-area-inset-top) + 84rpx);
+  }
+
+  .login-mascot {
+    right: 48rpx;
+    width: 180rpx;
+    height: 270rpx;
+  }
 }
 
 .login-placeholder {
@@ -450,9 +495,5 @@ function skipLogin() {
 .code-button:active,
 .login-button:active {
   opacity: 0.68;
-}
-
-.login-mascot {
-  filter: drop-shadow(0 12rpx 16rpx rgba(24, 98, 161, 0.08));
 }
 </style>
