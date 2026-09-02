@@ -16,8 +16,8 @@ function goBack() {
 
 <template>
   <AuthLayout title="隐私政策" subtitle="我们重视并保护你的个人信息" @back="goBack">
-    <view class="flex flex-col gap-5 text-xs text-#475467 leading-relaxed">
-      <text class="text-2xs text-#98a2b3">更新日期：2026 年 8 月 26 日</text>
+    <view class="flex flex-col gap-5 text-xs text-app-ink-soft leading-relaxed">
+      <text class="text-2xs text-app-muted">更新日期：2026 年 8 月 26 日</text>
       <wd-cell-group border>
         <wd-cell title="收集的信息" label="仅收集实现账号登录、求职服务和安全保障所必需的信息。" />
         <wd-cell title="信息使用" label="用于提供岗位推荐、账号服务、消息通知及必要的安全风控。" />

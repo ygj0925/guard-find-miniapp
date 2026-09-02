@@ -110,7 +110,7 @@ onPageScroll(({ scrollTop }) => {
 </script>
 
 <template>
-  <view class="app-tab-page font-['Noto_Sans_SC','Microsoft_YaHei',sans-serif]">
+  <view class="app-tab-page">
     <view class="relative overflow-hidden bg-home-hero">
       <AppPageHeader
         title="三生制药招聘"
@@ -255,20 +255,20 @@ onPageScroll(({ scrollTop }) => {
           @tap="openPage('pages/position/index')"
         >
           <view class="flex items-center gap-2">
-            <text class="flex-none rounded-8rpx bg-[#fff1e6] px-1.5 py-0.5 text-3xs text-[#ff7311] font-700">
+            <text class="flex-none rounded-8rpx bg-[#fff1e6] px-1.5 py-0.5 text-3xs text-app-warning font-700">
               TOP{{ index + 1 }}
             </text>
             <text class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-app-ink font-700">
               {{ job.title }}
             </text>
-            <text class="flex-none text-sm text-[#ff7311] font-800">{{ job.salary }}</text>
+            <text class="flex-none text-sm text-brand-blue font-800">{{ job.salary }}</text>
           </view>
 
           <view class="mt-2.5 flex flex-wrap gap-1.5">
             <text
               v-for="tag in job.tags"
               :key="tag"
-              class="rounded-10rpx bg-[#f1f5fb] px-2 py-1 text-2xs text-[#5b6b85]"
+              class="rounded-10rpx bg-[#f1f5fb] px-2 py-1 text-2xs text-app-ink-soft"
             >
               {{ tag }}
             </text>

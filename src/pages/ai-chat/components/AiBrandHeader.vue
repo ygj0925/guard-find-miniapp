@@ -56,7 +56,7 @@ function goHome() {
 }
 
 .brand-name {
-  color: #111b2f;
+  color: var(--app-ink);
   font-size: 36rpx;
   font-weight: 600;
   letter-spacing: 1rpx;
@@ -79,12 +79,12 @@ function goHome() {
 
 .brand-dot-left {
   left: 5rpx;
-  background: #138dff;
+  background: var(--app-brand-sky);
 }
 
 .brand-dot-right {
   right: 5rpx;
-  background: #35d9bd;
+  background: var(--app-brand-mint);
 }
 
 .brand-body {
@@ -115,7 +115,7 @@ function goHome() {
   border-radius: 28rpx;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 8rpx 24rpx rgba(77, 115, 204, 0.08);
-  color: #26334c;
+  color: var(--app-ink);
   font-size: 28rpx;
   white-space: nowrap;
 }

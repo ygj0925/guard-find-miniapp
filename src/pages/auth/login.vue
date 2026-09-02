@@ -27,6 +27,7 @@ interface PhoneNumberEvent { detail: { code?: string, errMsg?: string } }
 const mode = ref<LoginMode>('phone')
 const agreed = ref(false)
 const showAgreement = ref(false)
+const pendingPhoneLogin = ref(false)
 const loading = ref(false)
 const seconds = ref(0)
 const redirectUrl = ref('')
@@ -41,7 +42,6 @@ const authClientId = import.meta.env.VITE_AUTH_CLIENT_ID || 'ef51c9a3e9046c4f2ea
 const tokenStore = useTokenStore()
 
 const phoneMaxLength = computed(() => getPhoneMaxLength(area.value.code))
-const phoneLoginEnabled = computed(() => !loading.value && !validatePhoneByAreaCode(form.phone, area.value.code) && !validateVerificationCode(form.code) && agreed.value)
 
 onLoad((options) => {
   redirectUrl.value = typeof options?.redirect === 'string' ? options.redirect : ''
@@ -72,13 +72,14 @@ function checkCode() {
 function requireAgreement() {
   if (agreed.value)
     return true
+  pendingPhoneLogin.value = false
   showAgreement.value = true
   return false
 }
 
-function confirmAgreement() {
-  agreed.value = true
+function closeAgreement() {
   showAgreement.value = false
+  pendingPhoneLogin.value = false
 }
 
 function selectArea(selected: AreaCodeItem) {
@@ -124,10 +125,8 @@ async function sendCodeAfterCaptcha(captchaVerification: string) {
   }
 }
 
-async function submitPhoneLogin() {
-  checkPhone()
-  checkCode()
-  if (loading.value || !requireAgreement() || errors.phone || errors.code)
+async function performPhoneLogin() {
+  if (loading.value)
     return
   loading.value = true
   feedback.value = ''
@@ -147,6 +146,28 @@ async function submitPhoneLogin() {
   finally {
     loading.value = false
   }
+}
+
+async function submitPhoneLogin() {
+  checkPhone()
+  checkCode()
+  if (loading.value || errors.phone || errors.code)
+    return
+  if (!agreed.value) {
+    pendingPhoneLogin.value = true
+    showAgreement.value = true
+    return
+  }
+  await performPhoneLogin()
+}
+
+async function confirmAgreementAndLogin() {
+  agreed.value = true
+  showAgreement.value = false
+  if (!pendingPhoneLogin.value)
+    return
+  pendingPhoneLogin.value = false
+  await performPhoneLogin()
 }
 
 function startWechatLogin() {
@@ -170,82 +191,109 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
   // 短信验证码提交时再获取 wx.login() code，避免临时凭证在输入期间过期。
   startWechatLogin()
 }
+
+function skipLogin() {
+  uni.reLaunch({ url: '/pages/index/index' })
+}
 </script>
 
 <template>
-  <view class="min-h-[var(--app-viewport-height)] flex flex-col overflow-hidden bg-white text-[#222]">
-    <view class="relative min-h-480rpx flex-1 overflow-hidden bg-[linear-gradient(180deg,#d9edff_0%,#f0f8ff_66%,#ffffff_100%)]">
-      <view class="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_35%,rgba(64,151,246,0.22),transparent_58%)]" />
-      <view class="absolute bottom-372rpx left-0 right-0 text-center text-64rpx text-[#8ecbff] font-900 tracking-2rpx">
-        TALENT FOR YOU
-      </view>
-      <view class="absolute bottom-300rpx left-0 right-0 flex items-start justify-center text-72rpx text-[#262626] font-900 tracking-5rpx">
-        <text>麟才寻你</text>
-        <text class="ml-4rpx mt-6rpx text-22rpx font-500">®</text>
-      </view>
-      <view class="absolute bottom-50rpx left-1/2 z-2 h-250rpx w-186rpx -translate-x-1/2" aria-label="品牌吉祥物">
-        <view class="absolute left-20rpx top-0 z-3 h-99rpx w-145rpx rounded-[50%_50%_25%_25%] bg-[#075fc2] shadow-[inset_0_12rpx_18rpx_rgba(255,255,255,0.32)]" />
-        <view class="absolute left-10rpx top-65rpx z-1 h-123rpx w-166rpx rounded-[46%] bg-[#ffd8c7]" />
-        <view class="absolute left-0 top-50rpx z-4 h-87rpx w-186rpx rounded-[52%_52%_38%_38%] bg-[#77bcff]">
-          <view class="mascot-eye absolute left-38rpx top-24rpx h-56rpx w-36rpx border-6rpx border-[#252525] rounded-[48%] border-solid bg-white" />
-          <view class="mascot-eye absolute right-39rpx top-24rpx h-56rpx w-36rpx border-6rpx border-[#252525] rounded-[48%] border-solid bg-white" />
+  <view class="min-h-[var(--app-viewport-height)] bg-white text-[#222]">
+    <view class="relative h-940rpx overflow-hidden bg-[#dceeff]">
+      <image
+        class="absolute inset-0 h-full w-full"
+        src="/static/auth/login-hero-bg.jpg"
+        mode="aspectFill"
+        aria-hidden="true"
+      />
+
+      <view class="hero-copy absolute left-0 right-0 z-2 flex flex-col items-center text-center">
+        <text class="text-58rpx text-[#8ebeff] font-800 leading-68rpx tracking-1rpx">TALENT FOR YOU</text>
+        <view class="mt-2rpx flex items-start justify-center text-70rpx text-[#255b8f] font-900 leading-84rpx tracking-3rpx">
+          <text>麟才寻你</text>
+          <text class="ml-4rpx mt-2rpx text-22rpx font-700 leading-30rpx">®</text>
         </view>
-        <view class="absolute bottom-0 left-36rpx z-0 h-92rpx w-115rpx rounded-t-36rpx bg-[#0870d9]" />
-        <view class="absolute bottom-34rpx left-66rpx z-0 h-62rpx w-55rpx rounded-t-24rpx bg-[#77bcff]" />
-        <view class="absolute bottom-0 left-27rpx z-0 h-63rpx w-46rpx rounded-b-24rpx bg-[#0574da] -rotate-12" />
-        <view class="absolute bottom-0 right-27rpx z-0 h-63rpx w-46rpx rotate-12 rounded-b-24rpx bg-[#0574da]" />
+        <view class="mt-12rpx flex items-center justify-center">
+          <view class="h-2rpx w-44rpx bg-[linear-gradient(90deg,transparent,#1788f4)]" />
+          <text class="mx-20rpx text-27rpx text-[#344b60] font-500 leading-38rpx tracking-2rpx">与你一起 · 让优秀被看见</text>
+          <view class="h-2rpx w-44rpx bg-[linear-gradient(90deg,#1788f4,transparent)]" />
+        </view>
+        <view class="mt-20rpx flex items-center justify-center gap-18rpx text-25rpx text-[#0a82f7] font-500">
+          <view class="h-60rpx w-188rpx flex items-center justify-center rounded-full bg-[rgba(255,255,255,0.8)]">
+            <image class="mr-10rpx h-34rpx w-34rpx" src="/static/auth/recruit-social.svg" mode="aspectFit" aria-hidden="true" />
+            <text>社会招聘</text>
+          </view>
+          <view class="h-60rpx w-188rpx flex items-center justify-center rounded-full bg-[rgba(255,255,255,0.8)]">
+            <image class="mr-10rpx h-34rpx w-34rpx" src="/static/auth/recruit-campus.svg" mode="aspectFit" aria-hidden="true" />
+            <text>校园招聘</text>
+          </view>
+        </view>
       </view>
-      <view class="absolute bottom-20rpx left-1/2 h-40rpx w-380rpx rounded-[50%] bg-[#2387ed] -translate-x-1/2" />
+
+      <image
+        class="login-mascot absolute bottom-0 right-68rpx z-3 h-406rpx w-270rpx"
+        src="/static/auth/login-mascot.png"
+        mode="aspectFit"
+        aria-label="三生制药招聘卡通形象挥手欢迎"
+      />
     </view>
 
-    <view class="flex-none px-88rpx pb-[calc(28rpx+env(safe-area-inset-bottom))] pt-24rpx">
+    <view class="hero-form-transition h-36rpx" aria-hidden="true" />
+
+    <view class="bg-white px-104rpx pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-6rpx">
       <view v-if="mode === 'phone'">
-        <view class="h-96rpx flex items-center border-b-1rpx border-b-[#eee] border-b-solid text-34rpx">
+        <view class="h-94rpx flex items-center border-b-1rpx border-b-[#ececec] border-b-solid text-31rpx">
           <view
-            class="flex items-center whitespace-nowrap pr-24rpx"
+            class="tap-target h-full min-w-128rpx flex flex-none items-center whitespace-nowrap pr-20rpx"
             role="button"
+            :aria-expanded="showAreaPicker"
             :aria-label="`当前区号 +${area.code}，点击选择国家和地区`"
             @tap="showAreaPicker = true"
           >
-            <text>+{{ area.code }}</text>
-            <text class="ml-10rpx text-30rpx text-[#999]">⌄</text>
+            <text class="leading-none">+{{ area.code }}</text>
+            <view class="i-carbon-chevron-down ml-9rpx h-26rpx w-26rpx flex-none text-[#727b84] leading-none" />
           </view>
           <input
-            class="h-full min-w-0 flex-1 text-[#333]"
+            class="h-full min-w-0 flex-1 pl-18rpx text-[#333]"
             :value="form.phone"
             type="number"
             :maxlength="phoneMaxLength"
             placeholder="请输入手机号"
             placeholder-class="login-placeholder"
+            aria-label="手机号"
             @input="updatePhone($event.detail.value)"
             @blur="checkPhone"
           >
         </view>
-        <text v-if="errors.phone" class="mt-8rpx block text-24rpx text-[#d74b3f]">{{ errors.phone }}</text>
+        <text v-if="errors.phone" class="mt-8rpx block text-24rpx text-[#d74b3f]" role="alert">{{ errors.phone }}</text>
 
-        <view class="h-96rpx flex items-center border-b-1rpx border-b-[#eee] border-b-solid text-34rpx">
+        <view class="h-94rpx flex items-center border-b-1rpx border-b-[#ececec] border-b-solid text-31rpx">
           <input
             v-model="form.code"
             class="h-full min-w-0 flex-1 text-[#333]"
             type="number"
-            maxlength="6"
+            :maxlength="6"
             placeholder="请输入验证码"
             placeholder-class="login-placeholder"
+            aria-label="短信验证码"
             @blur="checkCode"
           >
-          <text
-            class="whitespace-nowrap border-l-1rpx border-l-[#ddd] border-l-solid pl-28rpx text-brand-blue font-600"
+          <button
+            class="code-button h-full flex flex-none items-center justify-center whitespace-nowrap border-0 border-l-1rpx border-l-[#e4e4e4] border-l-solid bg-transparent pl-26rpx text-30rpx text-[#087ff5] font-600"
+            :disabled="Boolean(seconds || loading)"
+            :aria-label="seconds ? `${seconds} 秒后可重新获取验证码` : '获取短信验证码'"
             @tap="requestCode"
           >
             {{ seconds ? `${seconds}s 后重试` : '获取验证码' }}
-          </text>
+          </button>
         </view>
-        <text v-if="errors.code" class="mt-8rpx block text-24rpx text-[#d74b3f]">{{ errors.code }}</text>
+        <text v-if="errors.code" class="mt-8rpx block text-24rpx text-[#d74b3f]" role="alert">{{ errors.code }}</text>
 
         <button
-          class="login-button mt-44rpx h-96rpx rounded-48rpx border-none text-38rpx leading-96rpx"
-          :class="phoneLoginEnabled ? 'bg-brand-blue text-white' : 'bg-[#b8d9fa] text-[#78a9d8]'"
-          :disabled="!phoneLoginEnabled"
+          class="login-button mt-44rpx h-92rpx rounded-48rpx border-none bg-[#2389ef] text-34rpx text-white font-600 leading-92rpx transition-opacity duration-180"
+          :disabled="loading"
+          :loading="loading"
+          aria-label="登录"
           @tap="submitPhoneLogin"
         >
           登录
@@ -256,7 +304,7 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
         <!-- #ifdef MP-WEIXIN -->
         <button
           v-if="agreed"
-          class="login-button h-96rpx rounded-48rpx border-none bg-brand-blue text-38rpx text-white leading-96rpx"
+          class="login-button h-92rpx rounded-48rpx border-none bg-[#2389ef] text-34rpx text-white font-600 leading-92rpx"
           :loading="loading"
           open-type="getPhoneNumber"
           @getphonenumber="onWechatPhoneNumber"
@@ -265,7 +313,7 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
         </button>
         <button
           v-else
-          class="login-button h-96rpx rounded-48rpx border-none bg-brand-blue text-38rpx text-white leading-96rpx"
+          class="login-button h-92rpx rounded-48rpx border-none bg-[#2389ef] text-34rpx text-white font-600 leading-92rpx"
           @tap="requireAgreement"
         >
           一键登录
@@ -273,43 +321,57 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
         <!-- #endif -->
         <!-- #ifndef MP-WEIXIN -->
         <button
-          class="login-button h-96rpx rounded-48rpx border-none bg-brand-blue text-38rpx text-white leading-96rpx"
+          class="login-button h-92rpx rounded-48rpx border-none bg-[#2389ef] text-34rpx text-white font-600 leading-92rpx"
           :loading="loading"
           @tap="startWechatLogin"
         >
           微信一键登录
         </button>
         <!-- #endif -->
-        <text class="mt-32rpx block text-center text-30rpx text-[#999]">手机号安全登录</text>
+        <text class="mt-28rpx block text-center text-29rpx text-[#8b8b8b]">手机号安全登录</text>
       </view>
 
-      <view class="mt-28rpx flex flex-wrap items-start text-24rpx text-[#777] leading-36rpx" @tap="agreed = !agreed">
-        <view
-          class="mr-14rpx mt-3rpx box-border h-32rpx w-32rpx flex-none border-2rpx rounded-full border-solid text-center text-24rpx text-white leading-28rpx"
-          :class="agreed ? 'border-brand-blue bg-brand-blue' : 'border-[#c8c8c8]'"
-        >
-          {{ agreed ? '✓' : '' }}
+      <view
+        class="mt-24rpx flex items-start text-23rpx text-[#666] leading-34rpx"
+        role="checkbox"
+        :aria-checked="agreed"
+        aria-label="同意服务使用协议和隐私政策"
+        @tap="agreed = !agreed"
+      >
+        <view class="h-64rpx w-64rpx flex flex-none items-center justify-center -ml-16rpx -mt-13rpx">
+          <view
+            class="box-border h-30rpx w-30rpx border-2rpx rounded-full border-solid text-center text-22rpx text-white leading-26rpx transition-colors duration-180"
+            :class="agreed ? 'border-[#2389ef] bg-[#2389ef]' : 'border-[#bfc4c9] bg-white'"
+          >
+            {{ agreed ? '✓' : '' }}
+          </view>
         </view>
-        <text>我已阅读并同意</text>
-        <text class="text-brand-blue" @tap.stop="goTo(AGREEMENT_PAGE)">《服务使用协议》</text>
-        <text>和</text>
-        <text class="text-brand-blue" @tap.stop="goTo(PRIVACY_PAGE)">《隐私政策》</text>
-        <text>，未注册手机号登录后自动生成会员账号</text>
+        <view class="min-w-0 flex flex-1 flex-wrap">
+          <text>我已阅读并同意</text>
+          <text class="tap-link text-[#087ff5]" role="link" @tap.stop="goTo(AGREEMENT_PAGE)">《服务使用协议》</text>
+          <text>和</text>
+          <text class="tap-link text-[#087ff5]" role="link" @tap.stop="goTo(PRIVACY_PAGE)">《隐私政策》</text>
+          <text>，未注册手机号登录后自动生成会员账号</text>
+        </view>
       </view>
 
-      <text v-if="feedback" class="mt-8rpx block text-center text-24rpx text-[#888]">{{ feedback }}</text>
-      <text
-        class="mt-36rpx block text-center text-30rpx text-[#999]"
+      <text v-if="feedback" class="mt-10rpx block text-center text-24rpx text-[#6f7780]" role="status">{{ feedback }}</text>
+      <view
+        class="tap-target mt-18rpx h-80rpx flex items-center justify-center text-29rpx text-[#777]"
+        role="button"
+        :aria-label="mode === 'phone' ? '切换为微信一键登录' : '切换为手机号登录'"
         @tap="mode = mode === 'phone' ? 'wechat' : 'phone'"
       >
-        {{ mode === 'phone' ? '切换为一键登录' : '切换为手机号登录' }}
-      </text>
-      <text
-        class="mt-24rpx block text-center text-30rpx text-[#999]"
-        @tap="uni.reLaunch({ url: '/pages/index/index' })"
+        <text>{{ mode === 'phone' ? '切换为一键登录' : '切换为手机号登录' }}</text>
+      </view>
+      <view
+        class="tap-target h-80rpx flex items-center justify-center text-29rpx text-[#777]"
+        role="button"
+        aria-label="暂不登录，进入首页"
+        @tap="skipLogin"
       >
-        暂不登录
-      </text>
+        <text>暂不登录</text>
+      </view>
     </view>
 
     <AuthBehaviorCaptchaModal v-if="showCaptcha" @cancel="showCaptcha = false" @success="sendCodeAfterCaptcha" />
@@ -317,30 +379,29 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
 
     <view
       v-if="showAgreement"
-      class="fixed inset-0 z-10 flex items-center justify-center bg-[rgba(0,0,0,0.68)]"
-      @tap="showAgreement = false"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-[rgba(7,24,54,0.72)] px-40rpx"
+      role="dialog"
+      aria-label="服务协议确认"
     >
-      <view class="box-border w-592rpx rounded-26rpx bg-white px-40rpx pb-38rpx pt-48rpx" @tap.stop>
-        <text class="text-29rpx text-[#555] leading-46rpx">
-          请您认真阅读以下协议的全部条款，接受后可开始使用我们的服务，未注册手机号登录后自动生成会员账号。
-        </text>
-        <view class="mt-24rpx flex flex-wrap gap-16rpx text-28rpx">
-          <text class="text-brand-blue" @tap="goTo(AGREEMENT_PAGE)">《服务使用协议》</text>
-          <text class="text-brand-blue" @tap="goTo(PRIVACY_PAGE)">《隐私政策》</text>
-        </view>
-        <view class="mt-46rpx flex gap-26rpx">
-          <button
-            class="login-button flex-1 border-2rpx border-[#333] rounded-42rpx border-solid bg-white text-34rpx leading-74rpx"
-            @tap="showAgreement = false"
-          >
-            不同意
-          </button>
-          <button
-            class="login-button flex-1 rounded-42rpx border-none bg-brand-blue text-34rpx text-white font-600 leading-78rpx"
-            @tap="confirmAgreement"
-          >
-            同意并登录
-          </button>
+      <view class="box-border max-w-620rpx w-full overflow-hidden rounded-32rpx bg-white shadow-[0_24rpx_80rpx_rgba(7,45,94,0.28)]" @tap.stop>
+        <view class="h-12rpx bg-[linear-gradient(90deg,#21b9f3_0%,#2d6fe6_100%)]" />
+        <view class="px-40rpx pb-38rpx pt-36rpx">
+          <text class="block text-center text-34rpx text-[#18365f] font-700">服务协议与隐私政策</text>
+          <view class="mt-24rpx flex flex-wrap text-28rpx text-[#5d6775] leading-46rpx">
+            <text>请您认真阅读</text>
+            <text class="tap-link text-[#167cf3]" role="link" @tap="goTo(AGREEMENT_PAGE)">《服务使用协议》</text>
+            <text>和</text>
+            <text class="tap-link text-[#167cf3]" role="link" @tap="goTo(PRIVACY_PAGE)">《隐私政策》</text>
+            <text>的全部条款，接受后可开始使用我们的服务，未注册手机号登录后将自动生成会员账号。</text>
+          </view>
+          <view class="mt-40rpx flex gap-22rpx">
+            <button class="login-button h-84rpx flex-1 border-2rpx border-[#2d6fe6] rounded-44rpx border-solid bg-white p-0 text-31rpx text-[#2d6fe6] font-600 leading-80rpx" @tap="closeAgreement">
+              不同意
+            </button>
+            <button class="login-button h-84rpx flex-1 rounded-44rpx border-none bg-[linear-gradient(90deg,#21a9ef_0%,#2d6fe6_100%)] p-0 text-31rpx text-white font-600 leading-84rpx" @tap="confirmAgreementAndLogin">
+              同意并登录
+            </button>
+          </view>
         </view>
       </view>
     </view>
@@ -348,22 +409,50 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
 </template>
 
 <style scoped>
-.login-placeholder {
-  color: #d8d8d8;
+.hero-copy {
+  top: calc(env(safe-area-inset-top) + 190rpx);
 }
 
-.login-button::after {
+.hero-form-transition {
+  margin-top: -2rpx;
+  background: linear-gradient(180deg, #e8f5ff 0%, rgba(246, 251, 255, 0.92) 48%, #fff 100%);
+}
+
+.login-placeholder {
+  color: #aaa;
+}
+
+.login-button::after,
+.code-button::after {
   border: none;
 }
 
-.mascot-eye::after {
-  content: '';
-  position: absolute;
-  top: 18rpx;
-  left: 11rpx;
-  width: 17rpx;
-  height: 27rpx;
-  background: #151515;
-  border-radius: 50%;
+.code-button {
+  margin: 0;
+  border-radius: 0;
+  line-height: 1;
+}
+
+.code-button[disabled] {
+  color: #8ebce8;
+  opacity: 1;
+}
+
+.tap-target,
+.tap-link,
+.code-button,
+.login-button {
+  transition: opacity var(--app-motion-duration-fast) var(--app-motion-easing-standard);
+}
+
+.tap-target:active,
+.tap-link:active,
+.code-button:active,
+.login-button:active {
+  opacity: 0.68;
+}
+
+.login-mascot {
+  filter: drop-shadow(0 12rpx 16rpx rgba(24, 98, 161, 0.08));
 }
 </style>

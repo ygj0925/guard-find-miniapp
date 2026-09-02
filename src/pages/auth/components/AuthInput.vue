@@ -46,7 +46,7 @@ function updateValue(event: { detail: { value: string } }) {
     >
       <text v-if="icon" class="mr-2 h-42rpx w-42rpx flex items-center justify-center rounded-14rpx bg-[#eaf4ff] text-center text-sm text-brand-blue">{{ icon }}</text>
       <input
-        class="min-w-0 flex-1 text-sm text-[#263249]"
+        class="min-w-0 flex-1 text-sm text-app-ink"
         :value="modelValue"
         :type="actualType"
         :password="password && !showPassword"
