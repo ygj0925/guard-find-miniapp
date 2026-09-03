@@ -44,6 +44,16 @@ export function sendSmsCaptcha(phone: string, captcha: BehaviorCaptchaRequest) {
   return http.get<void>('/captcha/sms', { phone, ...captcha })
 }
 
+// 发送内部员工认证验证码
+export function innerEmployeeSend(email: string) {
+  return http.post<string>('/portal/internal-employee/send', undefined, { email })
+}
+
+// 验证内部员工身份
+export function innerEmployeeVerify(data: { email: string, captcha: string }) {
+  return http.post<void>('/portal/internal-employee/verify', data)
+}
+
 /**
  * 刷新token
  * @param refreshToken 刷新token
