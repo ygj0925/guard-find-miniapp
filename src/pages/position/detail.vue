@@ -30,6 +30,7 @@ const DETAIL_PATH = '/pages/position/detail'
 const POSITION_PROGRESS_PATH = '/pages/position/progress'
 interface PositionDetailView {
   id: string
+  jobId: string | number
   title: string
   company: string
   companyIndustry: string
@@ -53,6 +54,7 @@ interface PositionDetailView {
 
 const EMPTY_POSITION: PositionDetailView = {
   id: '',
+  jobId: '',
   title: '',
   company: '',
   companyIndustry: '',
@@ -80,7 +82,7 @@ const isApplying = ref(false)
 const isResumePickerVisible = ref(false)
 const isResumesLoading = ref(false)
 const resumes = ref<ResumeItem[]>([])
-const selectedResumeId = ref<number>()
+const selectedResumeId = ref<string>()
 
 const isFavorite = computed(() => positionStore.isFavorite(position.value.id))
 const isApplied = computed(() => position.value.applied)
@@ -98,6 +100,7 @@ function normalizeTextList(value?: string[] | string) {
 function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
   return {
     id: source.positionId,
+    jobId: source.jobId,
     title: source.positionName,
     company: source.company || '招聘企业',
     companyIndustry: source.companyIndustry || '',
@@ -225,7 +228,7 @@ function closeResumePicker() {
     isResumePickerVisible.value = false
 }
 
-function selectResume(resumeId: number) {
+function selectResume(resumeId: string) {
   if (!isApplying.value)
     selectedResumeId.value = resumeId
 }
@@ -239,9 +242,17 @@ async function confirmApply() {
   if (!selectedResumeId.value || isApplying.value)
     return
 
+  if (position.value.jobId === '' || position.value.jobId == null) {
+    uni.showToast({ title: '职位 jobId 缺失，暂时无法投递', icon: 'none' })
+    return
+  }
+
   isApplying.value = true
   try {
-    await applyPosition(position.value.id, { resumeId: selectedResumeId.value })
+    await applyPosition(position.value.id, {
+      resumeId: selectedResumeId.value,
+      jobId: position.value.jobId,
+    })
     position.value = toPositionDetail(await getPositionDetail(position.value.id))
     isResumePickerVisible.value = false
     uni.showToast({ title: '简历投递成功', icon: 'success' })

@@ -23,6 +23,8 @@ export interface PositionListQuery {
 
 export interface PositionListItem {
   positionId: string
+  /** 上游职位 jobId，投递时必须一并提交。 */
+  jobId: string | number
   positionName: string
   jobType: string
   recruitmentTargetType: string
@@ -68,7 +70,9 @@ export interface PositionDetail extends PositionListItem {
 }
 
 export interface PositionApplyForm {
-  resumeId: number
+  /** 简历雪花 ID，必须使用字符串避免 JavaScript 精度丢失。 */
+  resumeId: string
+  jobId: string | number
 }
 
 export interface PositionApplyResult {
@@ -79,7 +83,7 @@ export interface PositionApplyResult {
 
 export interface PositionApplyRecord {
   id: number
-  resumeId: number
+  resumeId: string
   positionId: string
   importStatus: string
   failedReason?: string
