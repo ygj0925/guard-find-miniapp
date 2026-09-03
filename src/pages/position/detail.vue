@@ -21,8 +21,6 @@ definePage({
     backgroundColor: '#F5F7FA',
     backgroundColorTop: '#FFFFFF',
     backgroundColorBottom: '#FFFFFF',
-    enableShareAppMessage: true,
-    enableShareTimeline: true,
   },
 })
 
