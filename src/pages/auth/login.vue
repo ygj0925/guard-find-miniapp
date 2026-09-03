@@ -393,7 +393,6 @@ function skipLogin() {
       aria-label="服务协议确认"
     >
       <view class="box-border max-w-620rpx w-full overflow-hidden rounded-32rpx bg-white shadow-[0_24rpx_80rpx_rgba(7,45,94,0.28)]" @tap.stop>
-        <view class="h-12rpx bg-[linear-gradient(90deg,#21b9f3_0%,#2d6fe6_100%)]" />
         <view class="px-40rpx pb-38rpx pt-36rpx">
           <text class="block text-center text-34rpx text-[#18365f] font-700">服务协议与隐私政策</text>
           <view class="mt-24rpx flex flex-wrap text-28rpx text-[#5d6775] leading-46rpx">

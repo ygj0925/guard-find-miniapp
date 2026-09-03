@@ -404,17 +404,17 @@ onUnmounted(() => {
         <view class="feature-row">
           <view class="feature-item">
             <image src="https://static1.3sbio.com/assets/icon-1-job-search.svg" mode="aspectFit" />
-            <text>岗位匹配</text>
+            <text class="mt-6rpx tracking-2rpx">岗位匹配</text>
           </view>
           <view class="feature-divider" />
           <view class="feature-item">
             <image src="https://static1.3sbio.com/assets/icon-2-resume-edit.svg" mode="aspectFit" />
-            <text>简历优化</text>
+            <text class="mt-6rpx tracking-2rpx">简历投递</text>
           </view>
           <view class="feature-divider" />
           <view class="feature-item">
             <image src="https://static1.3sbio.com/assets/icon-3-talent-chat.svg" mode="aspectFit" />
-            <text>面试辅导</text>
+            <text class="mt-6rpx tracking-2rpx">信息咨询</text>
           </view>
         </view>
 
@@ -423,8 +423,8 @@ onUnmounted(() => {
     </scroll-view>
 
     <view v-if="!hasStarted" class="splash-actions" :style="splashActionsStyle">
-      <view class="start-button" role="button" aria-label="开启求职对话" @tap="startExperience">
-        <text>开启求职对话</text>
+      <view class="start-button relative" role="button" aria-label="开启求职对话" @tap="startExperience">
+        <text class="pointer-events-none absolute inset-0 center text-center tracking-2rpx">开启求职对话</text>
         <view class="start-arrow">
           <view class="start-arrow-icon" />
         </view>

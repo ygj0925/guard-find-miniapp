@@ -130,7 +130,7 @@ function handleLogout() {
         @tap="handleProfileTap"
       >
         <!-- 头像 -->
-        <view class="mr-3.5 h-120rpx w-120rpx flex flex-shrink-0 overflow-hidden items-center justify-center border-2rpx border-solid border-[rgba(45,111,230,0.2)] rounded-full bg-[rgba(45,111,230,0.12)] shadow-[0_4rpx_16rpx_rgba(42,92,178,0.12)]">
+        <view class="mr-3.5 h-120rpx w-120rpx flex flex-shrink-0 items-center justify-center overflow-hidden border-2rpx border-[rgba(45,111,230,0.2)] rounded-full border-solid bg-[rgba(45,111,230,0.12)] shadow-[0_4rpx_16rpx_rgba(42,92,178,0.12)]">
           <image v-if="tokenStore.hasLogin && userInfo.avatar" class="h-full w-full" :src="userInfo.avatar" mode="aspectFill" />
           <text v-else-if="tokenStore.hasLogin" class="text-2xl text-brand-blue font-700 leading-none">{{ profileInitial }}</text>
           <view v-else class="i-carbon-user-avatar text-4xl text-brand-blue leading-none" />

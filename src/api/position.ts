@@ -79,6 +79,7 @@ export interface PositionDetail extends PositionListItem {
 export interface PositionApplyForm {
   /** 简历雪花 ID，必须使用字符串避免 JavaScript 精度丢失。 */
   resumeId: string
+  /** 上游职位 jobId，投递时必须一并提交。 */
   jobId: string | number
 }
 
