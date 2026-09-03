@@ -65,8 +65,8 @@ async function handleSendCode() {
       }
     }, 1000)
   }
-  catch (error) {
-    uni.showToast({ title: error instanceof Error ? error.message : '发送失败', icon: 'none' })
+  catch (error: any) {
+    uni.showToast({ title: error?.message || '发送失败', icon: 'none' })
   }
   finally {
     sending.value = false
