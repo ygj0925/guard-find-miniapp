@@ -22,21 +22,27 @@ definePage({
 const userStore = useUserStore()
 const tokenStore = useTokenStore()
 const { userInfo } = storeToRefs(userStore)
-const profileName = computed(() => userInfo.value.username || '求职者')
+const profileName = computed(() => userInfo.value.nickname || userInfo.value.username || '求职者')
 const profileInitial = computed(() => profileName.value.slice(0, 1))
 const profileSubtitle = computed(() => {
   if (!tokenStore.hasLogin)
     return '同步简历、投递记录与面试消息'
-  return userInfo.value.phone ? `手机号：${String(userInfo.value.phone).replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}` : '查看并完善你的求职资料'
+  return '查看并完善你的求职资料'
 })
 const headerScrolled = ref(false)
 const profileScrolledBackground = 'var(--app-header-surface, rgba(255,255,255,0.98))'
 const resumeShortcuts = [
   { label: '附件简历', icon: 'i-carbon-attachment' },
+  { label: '我的收藏', icon: 'i-carbon-favorite' },
   { label: '我的分享', icon: 'i-carbon-share' },
 ]
 
 const RESUME_PAGE = '/pages/resume/index'
+const CERTIFICATION_PAGE = '/pages/certification/index'
+
+onShow(() => {
+  console.log('userInfo', userInfo.value)
+})
 
 onPageScroll(({ scrollTop }) => {
   headerScrolled.value = scrollTop > 16
@@ -52,6 +58,18 @@ function handleProfileTap() {
   }
 }
 
+function handleNotificationTap() {
+  uni.switchTab({ url: '/pages/notification/index' })
+}
+
+function handleCertification() {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  uni.navigateTo({ url: CERTIFICATION_PAGE })
+}
+
 function handleLegalTap(url: string) {
   uni.navigateTo({ url })
 }
@@ -63,6 +81,10 @@ function handleResumeShortcut(label: string) {
   }
   if (label === '附件简历') {
     uni.navigateTo({ url: RESUME_PAGE })
+    return
+  }
+  if (label === '我的收藏') {
+    uni.showToast({ title: '功能开发中', icon: 'none' })
     return
   }
   if (label === '我的分享') {
@@ -108,8 +130,9 @@ function handleLogout() {
         @tap="handleProfileTap"
       >
         <!-- 头像 -->
-        <view class="mr-3.5 h-120rpx w-120rpx flex flex-shrink-0 items-center justify-center border-2rpx border-[rgba(45,111,230,0.2)] rounded-full border-solid bg-[rgba(45,111,230,0.12)] shadow-[0_4rpx_16rpx_rgba(42,92,178,0.12)]">
-          <text v-if="tokenStore.hasLogin" class="text-2xl text-brand-blue font-700 leading-none">{{ profileInitial }}</text>
+        <view class="mr-3.5 h-120rpx w-120rpx flex flex-shrink-0 overflow-hidden items-center justify-center border-2rpx border-solid border-[rgba(45,111,230,0.2)] rounded-full bg-[rgba(45,111,230,0.12)] shadow-[0_4rpx_16rpx_rgba(42,92,178,0.12)]">
+          <image v-if="tokenStore.hasLogin && userInfo.avatar" class="h-full w-full" :src="userInfo.avatar" mode="aspectFill" />
+          <text v-else-if="tokenStore.hasLogin" class="text-2xl text-brand-blue font-700 leading-none">{{ profileInitial }}</text>
           <view v-else class="i-carbon-user-avatar text-4xl text-brand-blue leading-none" />
         </view>
 
@@ -118,7 +141,10 @@ function handleLogout() {
           <text class="overflow-hidden text-ellipsis whitespace-nowrap text-xl text-[#1a2640] font-700 leading-[1.3]">
             {{ tokenStore.hasLogin ? profileName : '点击登录 / 注册' }}
           </text>
-          <text class="mt-1.5 block text-sm text-[#6b7a8d] leading-[1.4]">
+          <text v-if="tokenStore.hasLogin && userInfo.deptName" class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-brand-blue leading-[1.4]">
+            {{ userInfo.deptName }}
+          </text>
+          <text v-if="!tokenStore.hasLogin" class="mt-1.5 block text-sm text-[#6b7a8d] leading-[1.4]">
             {{ profileSubtitle }}
           </text>
           <view v-if="!tokenStore.hasLogin" class="mt-2 inline-flex items-center self-start gap-1 rounded-full bg-brand-blue px-3 py-1 text-xs text-white font-500">
@@ -136,7 +162,7 @@ function handleLogout() {
     <view class="relative z-1 mx-4 mt-4">
       <text class="mx-1 mb-2 block text-base text-[#263249] font-700">常用功能</text>
       <view class="rounded-2xl bg-white px-0.5 py-2 shadow-[0_4rpx_20rpx_rgba(42,92,178,0.08)]">
-        <view class="grid grid-cols-2">
+        <view class="grid grid-cols-3">
           <view
             v-for="shortcut in resumeShortcuts"
             :key="shortcut.label"
@@ -155,15 +181,15 @@ function handleLogout() {
     <view class="relative z-1 mx-4 mt-4">
       <text class="mx-1 mb-2 block text-base text-[#263249] font-700">其他功能</text>
       <view class="rounded-2xl bg-white px-3.5 shadow-[0_4rpx_20rpx_rgba(42,92,178,0.08)]">
-        <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
+        <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70" @tap="handleCertification">
           <view class="i-carbon-certificate mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
           <view class="min-w-0 flex flex-1 flex-col">
-            <text class="text-sm text-[#263249] font-600">员工认证</text>
+            <text class="text-sm text-[#263249] font-600">{{ userInfo.data?.isInternalEmployee ? '更改认证' : '员工认证' }}</text>
             <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">验证员工身份，解锁更多权益</text>
           </view>
           <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
         </view>
-        <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
+        <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70" @tap="handleNotificationTap">
           <view class="i-carbon-notification mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
           <view class="min-w-0 flex flex-1 flex-col">
             <text class="text-sm text-[#263249] font-600">消息通知</text>
