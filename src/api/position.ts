@@ -62,6 +62,44 @@ export interface PositionDetail extends PositionListItem {
   /** 上游当前可能返回换行分隔的字符串，页面会统一归一化。 */
   responsibilities?: string[] | string
   requirements?: string[] | string
+  /** 是否已投递；未返回时视为未投递，兼容旧版后端响应。 */
+  applied?: boolean
+  applyRecordId?: number
+}
+
+export interface PositionApplyForm {
+  resumeId: number
+}
+
+export interface PositionApplyResult {
+  status: string
+  applyId: string
+  message: string
+}
+
+export interface PositionApplyRecord {
+  id: number
+  resumeId: number
+  positionId: string
+  importStatus: string
+  failedReason?: string
+  jobTitle: string
+  processName: string
+  phaseName: string
+  statusName: string
+  createTime: string
+}
+
+export interface PositionApplyProgressItem {
+  processName: string
+  phaseName: string
+  statusName: string
+  createTime: string
+}
+
+export interface PositionApplyProgress {
+  apply: PositionApplyRecord
+  progressList: PositionApplyProgressItem[]
 }
 
 export function getPositionFilterOptions() {
@@ -74,4 +112,16 @@ export function getPositions(query: PositionListQuery) {
 
 export function getPositionDetail(positionId: string) {
   return http.get<PositionDetail>(`/miniapp/positions/${encodeURIComponent(positionId)}`)
+}
+
+export function applyPosition(positionId: string, data: PositionApplyForm) {
+  return http.post<PositionApplyResult>(`/miniapp/positions/${encodeURIComponent(positionId)}/apply`, data)
+}
+
+export function getPositionApplies() {
+  return http.get<PositionApplyRecord[]>('/miniapp/position-applies')
+}
+
+export function getPositionApplyProgress(id: number) {
+  return http.get<PositionApplyProgress>(`/miniapp/position-applies/${id}/progress`)
 }

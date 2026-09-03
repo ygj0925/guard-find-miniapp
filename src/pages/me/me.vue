@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { getPositionApplies } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { AGREEMENT_PAGE, PRIVACY_PAGE } from '@/router/config'
 import { usePositionStore, useUserStore } from '@/store'
@@ -26,11 +27,12 @@ const { userInfo } = storeToRefs(userStore)
 const profileName = computed(() => userInfo.value.username || '求职者')
 const profileInitial = computed(() => profileName.value.slice(0, 1))
 const headerScrolled = ref(false)
+const applyCount = ref(0)
 const profileStats = computed(() => [
-  { label: '投递', value: tokenStore.hasLogin ? String(positionStore.appliedIds.length) : '**' },
+  { label: '投递', value: tokenStore.hasLogin ? String(applyCount.value) : '**' },
   { label: '收藏', value: tokenStore.hasLogin ? String(positionStore.favoriteIds.length) : '**' },
   { label: '面试', value: tokenStore.hasLogin ? '0' : '**' },
-  { label: '足迹', value: tokenStore.hasLogin ? String(positionStore.appliedIds.length + positionStore.favoriteIds.length) : '**' },
+  { label: '足迹', value: tokenStore.hasLogin ? String(applyCount.value + positionStore.favoriteIds.length) : '**' },
 ])
 const resumeShortcuts = [
   { label: '在线简历', icon: 'i-carbon-document' },
@@ -44,6 +46,19 @@ const RESUME_PAGE = '/pages/resume/index'
 
 onPageScroll(({ scrollTop }) => {
   headerScrolled.value = scrollTop > 16
+})
+
+onShow(async () => {
+  if (!tokenStore.hasLogin) {
+    applyCount.value = 0
+    return
+  }
+  try {
+    applyCount.value = (await getPositionApplies()).length
+  }
+  catch {
+    applyCount.value = 0
+  }
 })
 
 function handleLogin() {

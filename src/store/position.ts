@@ -5,7 +5,6 @@ export const usePositionStore = defineStore(
   'position',
   () => {
     const favoriteIds = ref<string[]>([])
-    const appliedIds = ref<string[]>([])
 
     function isFavorite(positionId: string) {
       return favoriteIds.value.includes(positionId)
@@ -20,23 +19,10 @@ export const usePositionStore = defineStore(
       return true
     }
 
-    function isApplied(positionId: string) {
-      return appliedIds.value.includes(positionId)
-    }
-
-    function markApplied(positionId: string) {
-      if (!isApplied(positionId)) {
-        appliedIds.value = [...appliedIds.value, positionId]
-      }
-    }
-
     return {
       favoriteIds,
-      appliedIds,
       isFavorite,
       toggleFavorite,
-      isApplied,
-      markApplied,
     }
   },
   {
