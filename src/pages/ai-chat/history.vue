@@ -226,7 +226,7 @@ watch(keyword, () => {
             <view class="brand-dot brand-dot-right" />
             <view class="brand-body" />
           </view>
-          <text class="brand-name">麟才寻你</text>
+          <text class="brand-name">生生智家</text>
         </view>
         <view class="header-actions">
           <view class="back-button" @tap="goBack">

@@ -208,10 +208,8 @@ function skipLogin() {
       />
 
       <view class="hero-copy absolute left-0 right-0 z-2 flex flex-col items-center text-center">
-        <text class="text-58rpx text-[#8ebeff] font-800 leading-68rpx tracking-1rpx">TALENT FOR YOU</text>
-        <view class="mt-2rpx flex items-start justify-center text-70rpx text-[#255b8f] font-900 leading-84rpx tracking-3rpx">
-          <text>麟才寻你</text>
-          <text class="ml-4rpx mt-2rpx text-22rpx font-700 leading-30rpx">®</text>
+        <view class="flex items-center justify-center text-68rpx text-[#255b8f] font-900 leading-82rpx tracking-3rpx">
+          <text>生生智家</text>
         </view>
         <view class="mt-12rpx flex items-center justify-center">
           <view class="h-2rpx w-44rpx bg-[linear-gradient(90deg,transparent,#1788f4)]" />
@@ -234,27 +232,27 @@ function skipLogin() {
         class="login-mascot absolute bottom-0 right-68rpx z-3"
         src="/static/auth/login-mascot.png"
         mode="aspectFit"
-        aria-label="三生制药招聘卡通形象挥手欢迎"
+        aria-label="生生智家卡通形象挥手欢迎"
       />
     </view>
 
     <view class="hero-form-transition h-36rpx" aria-hidden="true" />
 
-    <view class="bg-white px-104rpx pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-6rpx">
+    <view class="bg-white px-104rpx pb-[calc(188rpx+env(safe-area-inset-bottom))] pt-6rpx">
       <view v-if="mode === 'phone'">
         <view class="h-94rpx flex items-center border-b-1rpx border-b-[#ececec] border-b-solid text-31rpx">
           <view
-            class="tap-target h-full min-w-128rpx flex flex-none items-center whitespace-nowrap pr-20rpx"
+            class="tap-target h-full min-w-104rpx flex flex-none items-center whitespace-nowrap pr-8rpx"
             role="button"
             :aria-expanded="showAreaPicker"
             :aria-label="`当前区号 +${area.code}，点击选择国家和地区`"
             @tap="showAreaPicker = true"
           >
             <text class="leading-none">+{{ area.code }}</text>
-            <view class="i-carbon-chevron-down ml-9rpx h-26rpx w-26rpx flex-none text-[#727b84] leading-none" />
+            <view class="i-carbon-chevron-down ml-5rpx h-24rpx w-24rpx flex-none text-[#727b84] leading-none" />
           </view>
           <input
-            class="h-full min-w-0 flex-1 pl-18rpx text-[#333]"
+            class="h-full min-w-0 flex-1 pl-8rpx text-[#333]"
             :value="form.phone"
             type="number"
             :maxlength="phoneMaxLength"
@@ -279,7 +277,7 @@ function skipLogin() {
             @blur="checkCode"
           >
           <button
-            class="code-button h-full flex flex-none items-center justify-center whitespace-nowrap border-0 border-l-1rpx border-l-[#e4e4e4] border-l-solid bg-transparent pl-26rpx text-30rpx text-[#087ff5] font-600"
+            class="code-button h-full flex flex-none items-center justify-center whitespace-nowrap border-0 bg-transparent pl-26rpx text-30rpx text-[#087ff5] font-400"
             :disabled="Boolean(seconds || loading)"
             :aria-label="seconds ? `${seconds} 秒后可重新获取验证码` : '获取短信验证码'"
             @tap="requestCode"
@@ -328,7 +326,14 @@ function skipLogin() {
           微信一键登录
         </button>
         <!-- #endif -->
-        <text class="mt-28rpx block text-center text-29rpx text-[#8b8b8b]">手机号安全登录</text>
+        <view
+          class="tap-target mt-28rpx h-72rpx flex items-center justify-center text-29rpx text-[#8b8b8b]"
+          role="button"
+          aria-label="切换为手机号安全登录"
+          @tap="mode = 'phone'"
+        >
+          <text>手机号安全登录</text>
+        </view>
       </view>
 
       <view
@@ -356,16 +361,20 @@ function skipLogin() {
       </view>
 
       <text v-if="feedback" class="mt-10rpx block text-center text-24rpx text-[#6f7780]" role="status">{{ feedback }}</text>
+    </view>
+
+    <view class="login-footer fixed inset-x-0 bottom-0 z-10 bg-white px-104rpx pb-[calc(12rpx+env(safe-area-inset-bottom))] pt-8rpx">
       <view
-        class="tap-target mt-18rpx h-80rpx flex items-center justify-center text-29rpx text-[#777]"
+        v-if="mode === 'phone'"
+        class="tap-target h-72rpx flex items-center justify-center text-29rpx text-[#777]"
         role="button"
-        :aria-label="mode === 'phone' ? '切换为微信一键登录' : '切换为手机号登录'"
-        @tap="mode = mode === 'phone' ? 'wechat' : 'phone'"
+        aria-label="切换为微信一键登录"
+        @tap="mode = 'wechat'"
       >
-        <text>{{ mode === 'phone' ? '切换为一键登录' : '切换为手机号登录' }}</text>
+        <text>切换为一键登录</text>
       </view>
       <view
-        class="tap-target h-80rpx flex items-center justify-center text-29rpx text-[#777]"
+        class="tap-target h-72rpx flex items-center justify-center text-29rpx text-[#777]"
         role="button"
         aria-label="暂不登录，进入首页"
         @tap="skipLogin"
@@ -410,7 +419,7 @@ function skipLogin() {
 
 <style scoped>
 .login-hero {
-  height: 940rpx;
+  height: 840rpx;
 }
 
 .hero-copy {
@@ -430,7 +439,7 @@ function skipLogin() {
 
 @media (max-height: 820px) {
   .login-hero {
-    height: 800rpx;
+    height: 720rpx;
   }
 
   .hero-copy {
@@ -449,7 +458,7 @@ function skipLogin() {
 
 @media (max-height: 700px) {
   .login-hero {
-    height: 650rpx;
+    height: 590rpx;
   }
 
   .hero-copy {
@@ -474,11 +483,15 @@ function skipLogin() {
 
 .code-button {
   margin: 0;
+  border: none;
   border-radius: 0;
+  background: transparent !important;
+  font-weight: 400;
   line-height: 1;
 }
 
 .code-button[disabled] {
+  background: transparent !important;
   color: #8ebce8;
   opacity: 1;
 }

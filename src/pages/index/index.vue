@@ -75,7 +75,7 @@ const quickEntryPages: QuickEntry[][] = [
   ],
   [
     { title: '简历完善', iconClass: 'i-carbon-user-profile', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
-    { title: '麟才 AI', iconClass: 'i-carbon-ai-status', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
+    { title: '生生 AI', iconClass: 'i-carbon-ai-status', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
     { title: '薪酬福利', iconClass: 'i-carbon-wallet', gradient: 'linear-gradient(140deg, #f2a13c 0%, #ffc768 100%)', glow: '0 10rpx 20rpx rgba(242,161,60,0.24)', pagePath: 'pages/about/about' },
     { title: '企业介绍', iconClass: 'i-carbon-building', gradient: 'linear-gradient(140deg, #1f9ab0 0%, #47c3cc 100%)', glow: '0 10rpx 20rpx rgba(31,154,176,0.24)', pagePath: 'pages/about/about' },
     { title: '常见问题', iconClass: 'i-carbon-help', gradient: 'linear-gradient(140deg, #6b7fa8 0%, #98abc9 100%)', glow: '0 10rpx 20rpx rgba(107,127,168,0.22)', pagePath: 'pages/about/about' },
@@ -160,7 +160,7 @@ onPageScroll(({ scrollTop }) => {
   <view class="app-tab-page">
     <view class="relative overflow-hidden bg-home-hero">
       <AppPageHeader
-        title="三生制药招聘"
+        title="生生智家"
         transparent
         :scrolled="headerScrolled"
       />
@@ -227,7 +227,7 @@ onPageScroll(({ scrollTop }) => {
 
           <view class="ml-3 min-w-0 flex flex-1 flex-col">
             <view class="flex items-center">
-              <text class="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-white font-700">麟才寻你 · AI 助手</text>
+              <text class="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-white font-700">生生智家 · AI 助手</text>
               <text class="ml-1.5 flex-none rounded-full bg-white/24 px-1.5 py-0.5 text-3xs text-white font-600">NEW</text>
             </view>
             <text class="mt-1.5 block text-2xs text-white/82">说出期望，AI 帮你匹配岗位并一键投递</text>

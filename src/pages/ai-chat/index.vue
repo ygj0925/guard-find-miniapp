@@ -22,7 +22,7 @@ defineOptions({
 definePage({
   style: {
     navigationStyle: 'custom',
-    navigationBarTitleText: '麟才寻你招聘助手',
+    navigationBarTitleText: '生生智家',
     backgroundColor: '#EDF6FF',
   },
 })
@@ -389,9 +389,9 @@ onUnmounted(() => {
     >
       <view class="splash-page">
         <view class="splash-copy">
-          <text class="splash-line">你好！</text>
-          <text class="splash-line">我是麟才寻你招聘助手，</text>
-          <text class="splash-line">陪你发现更适合的职业机会！</text>
+          <text class="splash-line">你好!</text>
+          <text class="splash-line">我是生生智家助手-生生</text>
+          <text class="splash-line">伴你身边每一天!</text>
         </view>
 
         <image
@@ -445,9 +445,10 @@ onUnmounted(() => {
       >
         <view class="welcome-card">
           <view class="welcome-copy">
-            <text>hello~我是麟才，</text>
-            <text>你的招聘求职助手，</text>
-            <text>欢迎与我交流职业问题！</text>
+            <text>hello~我是生生</text>
+            <text>欢迎来到生生智家，</text>
+            <text>我是您的数智伙伴，</text>
+            <text>有任何问题欢迎与我交流！</text>
           </view>
           <image class="welcome-character" src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
         </view>
