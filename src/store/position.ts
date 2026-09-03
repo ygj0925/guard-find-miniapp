@@ -5,7 +5,6 @@ export const usePositionStore = defineStore(
   'position',
   () => {
     const favoriteIds = ref<string[]>([])
-    const appliedIds = ref<string[]>([])
     /** 首页跳转到职位页时携带的待选招聘类别（如 社招 / 校招），职位页消费后需清空避免重复过滤。 */
     const pendingCategory = ref('')
 
@@ -32,26 +31,13 @@ export const usePositionStore = defineStore(
       return true
     }
 
-    function isApplied(positionId: string) {
-      return appliedIds.value.includes(positionId)
-    }
-
-    function markApplied(positionId: string) {
-      if (!isApplied(positionId)) {
-        appliedIds.value = [...appliedIds.value, positionId]
-      }
-    }
-
     return {
       favoriteIds,
-      appliedIds,
       pendingCategory,
       setPendingCategory,
       consumePendingCategory,
       isFavorite,
       toggleFavorite,
-      isApplied,
-      markApplied,
     }
   },
   {

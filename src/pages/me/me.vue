@@ -31,7 +31,6 @@ const profileSubtitle = computed(() => {
 })
 const headerScrolled = ref(false)
 const profileScrolledBackground = 'var(--app-header-surface, rgba(255,255,255,0.98))'
-
 const resumeShortcuts = [
   { label: '附件简历', icon: 'i-carbon-attachment' },
   { label: '我的分享', icon: 'i-carbon-share' },

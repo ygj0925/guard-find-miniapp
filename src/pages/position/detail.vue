@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { getPositionDetail } from '@/api/position'
+import { applyPosition, getPositionDetail } from '@/api/position'
 import type { PositionDetail as PositionDetailResponse } from '@/api/position'
+import { getResumes } from '@/api/resume'
+import type { ResumeItem } from '@/api/resume'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { useTokenStore } from '@/store/token'
@@ -26,6 +28,7 @@ definePage({
 
 const POSITION_LIST_PATH = '/pages/position/index'
 const DETAIL_PATH = '/pages/position/detail'
+const POSITION_PROGRESS_PATH = '/pages/position/progress'
 interface PositionDetailView {
   id: string
   title: string
@@ -45,6 +48,8 @@ interface PositionDetailView {
   recruiter: { name: string, role: string, avatar: string, activeText: string }
   responsibilities: string[]
   requirements: string[]
+  applied: boolean
+  applyRecordId?: number
 }
 
 const EMPTY_POSITION: PositionDetailView = {
@@ -66,16 +71,20 @@ const EMPTY_POSITION: PositionDetailView = {
   recruiter: { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
   responsibilities: [],
   requirements: [],
+  applied: false,
 }
 const positionStore = usePositionStore()
 const tokenStore = useTokenStore()
 const position = ref<PositionDetailView>(EMPTY_POSITION)
 const isLoading = ref(true)
 const isApplying = ref(false)
-let applyingTimer: ReturnType<typeof setTimeout> | undefined
+const isResumePickerVisible = ref(false)
+const isResumesLoading = ref(false)
+const resumes = ref<ResumeItem[]>([])
+const selectedResumeId = ref<number>()
 
 const isFavorite = computed(() => positionStore.isFavorite(position.value.id))
-const isApplied = computed(() => positionStore.isApplied(position.value.id))
+const isApplied = computed(() => position.value.applied)
 const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
 const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
 const hasLocation = computed(() => position.value.longitude !== 0 && position.value.latitude !== 0)
@@ -107,6 +116,8 @@ function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
     recruiter: source.recruiter || { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
     responsibilities: normalizeTextList(source.responsibilities),
     requirements: normalizeTextList(source.requirements),
+    applied: Boolean(source.applied),
+    applyRecordId: source.applyRecordId,
   }
 }
 
@@ -124,11 +135,6 @@ onLoad(async (options) => {
   finally {
     isLoading.value = false
   }
-})
-
-onUnload(() => {
-  if (applyingTimer)
-    clearTimeout(applyingTimer)
 })
 
 onShareAppMessage(() => ({
@@ -183,7 +189,7 @@ async function handleShare() {
   })
 }
 
-function handleApply() {
+async function handleApply() {
   if (isApplied.value) {
     uni.showToast({ title: '该职位已投递', icon: 'none' })
     return
@@ -199,12 +205,59 @@ function handleApply() {
   if (isApplying.value)
     return
 
+  isResumePickerVisible.value = true
+  isResumesLoading.value = true
+  selectedResumeId.value = undefined
+  try {
+    resumes.value = await getResumes()
+    selectedResumeId.value = resumes.value.find(item => item.isDefault)?.id ?? resumes.value[0]?.id
+  }
+  catch {
+    resumes.value = []
+    isResumePickerVisible.value = false
+  }
+  finally {
+    isResumesLoading.value = false
+  }
+}
+
+function closeResumePicker() {
+  if (!isApplying.value)
+    isResumePickerVisible.value = false
+}
+
+function selectResume(resumeId: number) {
+  if (!isApplying.value)
+    selectedResumeId.value = resumeId
+}
+
+function goToResumePage() {
+  isResumePickerVisible.value = false
+  uni.navigateTo({ url: '/pages/resume/index' })
+}
+
+async function confirmApply() {
+  if (!selectedResumeId.value || isApplying.value)
+    return
+
   isApplying.value = true
-  applyingTimer = setTimeout(() => {
-    positionStore.markApplied(position.value.id)
-    isApplying.value = false
+  try {
+    await applyPosition(position.value.id, { resumeId: selectedResumeId.value })
+    position.value = toPositionDetail(await getPositionDetail(position.value.id))
+    isResumePickerVisible.value = false
     uni.showToast({ title: '简历投递成功', icon: 'success' })
-  }, 650)
+  }
+  finally {
+    isApplying.value = false
+  }
+}
+
+function openApplyProgress() {
+  if (!position.value.applyRecordId) {
+    uni.showToast({ title: '投递记录加载中，请稍后重试', icon: 'none' })
+    return
+  }
+  uni.navigateTo({ url: `${POSITION_PROGRESS_PATH}?id=${position.value.applyRecordId}` })
 }
 
 function openCompanyLocation() {
@@ -378,13 +431,74 @@ function openCompanyLocation() {
 
         <button
           class="plain-button ml-1 h-14 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_10rpx_24rpx_rgba(45,111,230,0.22)] transition-[opacity,background-color] duration-180 ease-out disabled:cursor-not-allowed disabled:bg-[#8fb4ef] active:opacity-86 motion-reduce:transition-none"
-          :disabled="isApplying || isApplied"
-          :aria-label="isApplied ? '简历已投递' : '一键投递简历'"
-          @tap="handleApply"
+          :disabled="isApplying"
+          :aria-label="isApplied ? '查看投递进度' : '一键投递简历'"
+          @tap="isApplied ? openApplyProgress() : handleApply()"
         >
           <view v-if="isApplying" class="apply-spinner mr-2 h-5 w-5 border-2 border-white/35 border-t-white rounded-full" />
-          <text>{{ isApplying ? '正在投递' : isApplied ? '已投递' : '一键投递简历' }}</text>
+          <text>{{ isApplying ? '正在投递' : isApplied ? '查看投递进度' : '一键投递简历' }}</text>
         </button>
+      </view>
+    </view>
+
+    <view v-if="isResumePickerVisible" class="fixed inset-0 z-200 flex items-end bg-black/45" @tap="closeResumePicker">
+      <view class="w-full rounded-t-2xl bg-white px-4 pb-safe" @tap.stop>
+        <view class="flex items-center justify-between py-5">
+          <text class="text-xl text-app-ink font-700">选择附件简历</text>
+          <button class="plain-button h-9 w-9 flex items-center justify-center border-0 rounded-full bg-[#f2f4f7] p-0 text-app-ink-soft" aria-label="关闭简历选择" :disabled="isApplying" @tap="closeResumePicker">
+            <view class="i-carbon-close text-xl" />
+          </button>
+        </view>
+
+        <view v-if="isResumesLoading" class="flex items-center justify-center py-12 text-sm text-app-muted">
+          <view class="apply-spinner mr-2 h-4 w-4 border-2 border-[#bdd1ef] border-t-brand-blue rounded-full" />
+          <text>正在加载简历</text>
+        </view>
+
+        <scroll-view v-else-if="resumes.length" scroll-y class="max-h-80">
+          <view
+            v-for="resume in resumes"
+            :key="resume.id"
+            class="mb-3 flex items-center border border-solid rounded-xl px-4 py-4 transition-colors duration-150"
+            :class="selectedResumeId === resume.id ? 'border-brand-blue bg-[#f2f7ff]' : 'border-[#e7ebf1] bg-white'"
+            role="radio"
+            :aria-checked="selectedResumeId === resume.id"
+            :aria-label="`选择简历 ${resume.name}`"
+            @tap="selectResume(resume.id)"
+          >
+            <view class="h-10 w-10 flex flex-none items-center justify-center rounded-lg bg-[#eaf2ff] text-xl text-brand-blue">
+              <view class="i-carbon-document-pdf" />
+            </view>
+            <view class="ml-3 min-w-0 flex-1">
+              <view class="flex items-center gap-2">
+                <text class="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-base text-app-ink font-600">{{ resume.name }}</text>
+                <text v-if="resume.isDefault" class="flex-none rounded bg-[#dceaff] px-1.5 py-0.5 text-2xs text-brand-blue">默认</text>
+              </view>
+              <text class="mt-1 block text-xs text-app-muted">{{ resume.uploadedAt }}</text>
+            </view>
+            <view class="ml-3 h-5 w-5 flex flex-none items-center justify-center border-2 rounded-full" :class="selectedResumeId === resume.id ? 'border-brand-blue bg-brand-blue text-white' : 'border-[#cbd5e1]'">
+              <view v-if="selectedResumeId === resume.id" class="i-carbon-checkmark text-xs" />
+            </view>
+          </view>
+        </scroll-view>
+
+        <view v-else class="py-10 text-center">
+          <view class="i-carbon-document-blank mx-auto text-4xl text-[#b7c2d0]" />
+          <text class="mt-3 block text-base text-app-ink">暂无附件简历</text>
+          <text class="mt-1 block text-sm text-app-muted">上传简历后即可投递职位</text>
+          <button class="plain-button mt-5 border-0 rounded-lg bg-brand-blue px-5 py-2 text-sm text-white" @tap="goToResumePage">
+            去上传
+          </button>
+        </view>
+
+        <view v-if="resumes.length" class="flex gap-3 border-t border-[#edf0f4] py-4">
+          <button class="plain-button flex-1 border border-solid border-[#d8e0eb] rounded-xl bg-white py-3 text-base text-app-ink" :disabled="isApplying" @tap="closeResumePicker">
+            取消
+          </button>
+          <button class="plain-button flex-1 border-0 rounded-xl bg-brand-blue py-3 text-base text-white font-700 disabled:bg-[#8fb4ef]" :disabled="!selectedResumeId || isApplying" @tap="confirmApply">
+            {{ isApplying ? '正在投递' : '确认投递' }}
+          </button>
+        </view>
       </view>
     </view>
   </view>
