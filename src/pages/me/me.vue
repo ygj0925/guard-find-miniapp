@@ -33,7 +33,6 @@ const headerScrolled = ref(false)
 const profileScrolledBackground = 'var(--app-header-surface, rgba(255,255,255,0.98))'
 const resumeShortcuts = [
   { label: '附件简历', icon: 'i-carbon-attachment' },
-  { label: '我的收藏', icon: 'i-carbon-favorite' },
   { label: '我的分享', icon: 'i-carbon-share' },
 ]
 
@@ -83,12 +82,8 @@ function handleResumeShortcut(label: string) {
     uni.navigateTo({ url: RESUME_PAGE })
     return
   }
-  if (label === '我的收藏') {
-    uni.showToast({ title: '功能开发中', icon: 'none' })
-    return
-  }
   if (label === '我的分享') {
-    uni.showShareMenu({ withShareTicket: true, menus: ['shareAppMessage', 'shareTimeline'] })
+    uni.navigateTo({ url: '/pages/favorites/index' })
     return
   }
   uni.showToast({ title: '功能开发中', icon: 'none' })
@@ -154,7 +149,7 @@ function handleLogout() {
         </view>
 
         <!-- 右箭头 -->
-        <view class="i-carbon-chevron-right ml-2 flex-shrink-0 text-2xl text-[#bec7d4]" />
+        <view v-if="!tokenStore.hasLogin" class="i-carbon-chevron-right ml-2 flex-shrink-0 text-2xl text-[#bec7d4]" />
       </view>
     </view>
 
@@ -162,7 +157,7 @@ function handleLogout() {
     <view class="relative z-1 mx-4 mt-4">
       <text class="mx-1 mb-2 block text-base text-[#263249] font-700">常用功能</text>
       <view class="rounded-2xl bg-white px-0.5 py-2 shadow-[0_4rpx_20rpx_rgba(42,92,178,0.08)]">
-        <view class="grid grid-cols-3">
+        <view class="grid grid-cols-2">
           <view
             v-for="shortcut in resumeShortcuts"
             :key="shortcut.label"
@@ -184,8 +179,8 @@ function handleLogout() {
         <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70" @tap="handleCertification">
           <view class="i-carbon-certificate mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
           <view class="min-w-0 flex flex-1 flex-col">
-            <text class="text-sm text-[#263249] font-600">{{ userInfo.data?.isInternalEmployee ? '更改认证' : '员工认证' }}</text>
-            <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">验证员工身份，解锁更多权益</text>
+            <text class="text-sm text-[#263249] font-600">{{ userInfo.isInternalEmployee ? '更改认证' : '员工认证' }}</text>
+            <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">{{ userInfo.isInternalEmployee ? `邮箱：${userInfo.email}` : '验证员工身份，解锁更多权益' }}</text>
           </view>
           <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
         </view>
@@ -198,18 +193,10 @@ function handleLogout() {
           <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
         </view>
         <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
-          <view class="i-carbon-help mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
-          <view class="min-w-0 flex flex-1 flex-col">
-            <text class="text-sm text-[#263249] font-600">帮助与反馈</text>
-            <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">常见问题与意见反馈</text>
-          </view>
-          <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
-        </view>
-        <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
           <view class="i-carbon-settings mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
           <view class="min-w-0 flex flex-1 flex-col">
             <text class="text-sm text-[#263249] font-600">账号设置</text>
-            <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">隐私、安全与个人信息</text>
+            <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">个人信息</text>
           </view>
           <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
         </view>
