@@ -61,6 +61,10 @@ function handleNotificationTap() {
   uni.switchTab({ url: '/pages/notification/index' })
 }
 
+function handleProfileSettings() {
+  uni.navigateTo({ url: '/pages/me/profile' })
+}
+
 function handleCertification() {
   if (!tokenStore.hasLogin) {
     handleLogin()
@@ -192,7 +196,7 @@ function handleLogout() {
           </view>
           <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
         </view>
-        <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70">
+        <view class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70" @tap="handleProfileSettings">
           <view class="i-carbon-settings mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
           <view class="min-w-0 flex flex-1 flex-col">
             <text class="text-sm text-[#263249] font-600">账号设置</text>

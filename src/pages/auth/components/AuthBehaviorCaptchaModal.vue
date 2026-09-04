@@ -116,7 +116,7 @@ onMounted(loadCaptcha)
 </script>
 
 <template>
-  <view class="fixed inset-0 z-99 flex items-center justify-center bg-[rgba(35,50,82,0.5)] p-6" @tap.self="emit('cancel')">
+  <view class="fixed inset-0 z-200 flex items-center justify-center bg-[rgba(35,50,82,0.5)] p-6" @tap.self="emit('cancel')">
     <view class="box-border w-620rpx rounded-28rpx bg-white px-4 pb-4 pt-5 shadow-[0_28rpx_70rpx_rgba(31,51,95,0.22)]" role="dialog" aria-label="滑动验证">
       <text class="block text-center text-base text-app-ink font-700">安全验证</text>
       <text class="mt-1.5 block text-center text-2xs text-#9aa5b8">拖动滑块完成验证后发送短信验证码</text>

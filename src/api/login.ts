@@ -10,6 +10,18 @@ export interface ILoginForm {
 }
 
 /**
+ * 小程序换绑手机号
+ */
+
+export interface IChangePhoneData {
+  code: string | number
+  msg: string
+  success: boolean
+  timestamp: string
+  data?: any
+}
+
+/**
  * 获取验证码
  * @returns ICaptcha 验证码
  */
@@ -40,7 +52,7 @@ export function checkBehaviorCaptcha(data: { captchaType: 'blockPuzzle', pointJs
   return http.post<BehaviorCaptchaCheckResult>('/captcha/behavior', data)
 }
 
-export function sendSmsCaptcha(phone: string, captcha: BehaviorCaptchaRequest) {
+export function sendSmsCaptcha(phone: string, captcha?: BehaviorCaptchaRequest) {
   return http.get<void>('/captcha/sms', { phone, ...captcha })
 }
 
@@ -52,6 +64,24 @@ export function innerEmployeeSend(email: string) {
 // 验证内部员工身份
 export function innerEmployeeVerify(data: { email: string, captcha: string }) {
   return http.post<void>('/portal/internal-employee/verify', data)
+}
+
+// 修改小程序个人信息 (gender： 1-男，2-女)
+export function changeInfoProfile(data: { nickname: string }) {
+  return http<IChangePhoneData>({
+    url: '/miniapp/profile',
+    method: 'PATCH' as any,
+    data,
+  })
+}
+
+// 小程序换绑手机号
+export function changeProfilePhone(data: { phone: string, captcha: string }) {
+  return http<IChangePhoneData>({
+    url: '/miniapp/profile/phone',
+    method: 'PATCH' as any,
+    data,
+  })
 }
 
 /**

@@ -115,6 +115,7 @@ onLoad(async (options) => {
 onShareAppMessage(() => ({
   title: shareTitle.value,
   path: sharePath.value,
+  imageUrl: 'https://my.3sbio.com/agents/logo.png',
 }))
 
 onShareTimeline(() => ({
