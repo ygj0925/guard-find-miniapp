@@ -15,9 +15,13 @@ interface ShareItem {
   positionName: string
   company: string
   salary: string
+  status: 'active' | 'closed'
   location: string
   experience: string
   edu: string
+  recruiterAvatar: string
+  recruiterName: string
+  recruiterRole: string
   sharedAt: string
 }
 
@@ -27,9 +31,13 @@ const shareList = ref<ShareItem[]>([
     positionName: '高级前端工程师',
     company: '三生制药',
     salary: '20-35K',
+    status: 'active',
     location: '上海·浦东新区',
     experience: '3-5年',
     edu: '本科',
+    recruiterAvatar: '',
+    recruiterName: '李女士',
+    recruiterRole: 'HR',
     sharedAt: '09月01日',
   },
   {
@@ -37,12 +45,17 @@ const shareList = ref<ShareItem[]>([
     positionName: '产品经理',
     company: '三生生物',
     salary: '15-25K',
+    status: 'closed',
     location: '上海·静安区',
     experience: '1-3年',
     edu: '本科',
+    recruiterAvatar: '',
+    recruiterName: '王先生',
+    recruiterRole: '招聘者',
     sharedAt: '08月28日',
   },
 ])
+
 const loading = ref(false)
 
 function handleBack() {
@@ -54,10 +67,6 @@ function handleBack() {
 
 function handleTapPosition(positionId: string) {
   uni.navigateTo({ url: `/pages/position/detail?id=${encodeURIComponent(positionId)}` })
-}
-
-function handleShare() {
-  uni.showShareMenu({ withShareTicket: true, menus: ['shareAppMessage', 'shareTimeline'] })
 }
 
 onShow(() => {
@@ -102,38 +111,56 @@ onShow(() => {
           @tap="handleTapPosition(item.positionId)"
         >
           <view class="px-4 pb-3 pt-4">
-            <!-- 职位名 + 薪资 -->
+            <!-- 职位名 + 薪资/停止招聘 -->
             <view class="flex items-start justify-between gap-2">
-              <text class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base text-[#1a2640] font-700 leading-[1.4]">
+              <text
+                class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base font-700 leading-[1.4]"
+                :class="item.status === 'closed' ? 'text-[#b0bac8]' : 'text-[#1a2640]'"
+              >
                 {{ item.positionName }}
               </text>
-              <text class="flex-shrink-0 text-base text-brand-blue font-700">{{ item.salary }}</text>
+              <text v-if="item.status === 'closed'" class="flex-shrink-0 text-base text-[#9aa5b5] font-700">
+                停止招聘
+              </text>
+              <text v-else class="flex-shrink-0 text-base text-brand-blue font-700">
+                {{ item.salary }}
+              </text>
             </view>
 
             <!-- 公司 -->
-            <text class="mt-1 block text-xs text-[#6b7a8d]">{{ item.company }}</text>
+            <text class="mt-1 block text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#6b7a8d]'">{{ item.company }}</text>
 
             <!-- 地点/经验/学历 -->
             <view class="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <text v-if="item.location" class="text-xs text-[#9aa5b5]">{{ item.location }}</text>
+              <text v-if="item.location" class="text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.location }}</text>
               <text v-if="item.location && item.experience" class="text-xs text-[#c8d0dc]">·</text>
-              <text v-if="item.experience" class="text-xs text-[#9aa5b5]">{{ item.experience }}</text>
+              <text v-if="item.experience" class="text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.experience }}</text>
               <text v-if="item.edu && (item.location || item.experience)" class="text-xs text-[#c8d0dc]">·</text>
-              <text v-if="item.edu" class="text-xs text-[#9aa5b5]">{{ item.edu }}</text>
+              <text v-if="item.edu" class="text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.edu }}</text>
             </view>
           </view>
 
-          <!-- 底部分享时间 + 再次分享 -->
-          <view class="flex items-center justify-between border-t-1rpx border-t-[#f0f4fa] border-t-solid px-4 py-2.5">
-            <text class="text-xs text-[#b0bac8]">{{ item.sharedAt }} 分享</text>
-            <view
-              class="flex items-center gap-1 px-2 py-1 text-xs text-brand-blue active:opacity-70"
-              role="button"
-              @tap.stop="handleShare"
-            >
-              <view class="i-carbon-share text-sm leading-none" />
-              <text>再次分享</text>
+          <!-- 底部：发布人 + 分享时间 -->
+          <view class="flex items-center justify-between border-t-1rpx border-t-[#f0f4fa] border-t-solid px-4 py-3">
+            <!-- 发布人 -->
+            <view class="flex items-center gap-2">
+              <view class="h-56rpx w-56rpx flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e8f0fd]">
+                <image
+                  v-if="item.recruiterAvatar"
+                  class="h-full w-full"
+                  :src="item.recruiterAvatar"
+                  mode="aspectFill"
+                />
+                <view v-else class="i-carbon-user-avatar text-base text-brand-blue leading-none" />
+              </view>
+              <view class="flex flex-col">
+                <text class="text-xs font-600 leading-[1.3]" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#1a2640]'">{{ item.recruiterName }}</text>
+                <text class="text-2xs leading-[1.3]" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.recruiterRole }}</text>
+              </view>
             </view>
+
+            <!-- 分享时间 -->
+            <text class="text-xs text-[#b0bac8]">{{ item.sharedAt }} 分享</text>
           </view>
         </view>
       </view>
