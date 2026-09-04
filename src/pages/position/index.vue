@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { getPositionFilterOptions, getPositions } from '@/api/position'
-import type { PositionFilterOptions, PositionListItem } from '@/api/position'
+import type { PositionFilterOption, PositionFilterOptions, PositionListItem, PositionLocationOption } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { tabbarStore } from '@/tabbar/store'
@@ -30,22 +30,51 @@ const HEADER_SEARCH_END = uni.upx2px(128)
 const BACK_TO_TOP_ENTER_THRESHOLD = uni.upx2px(760)
 const BACK_TO_TOP_EXIT_THRESHOLD = uni.upx2px(32)
 
+type FilterKey = 'educationInfos' | 'workExperiences' | 'locIds'
+
+interface FilterSection {
+  key: FilterKey
+  label: string
+  options: PositionFilterOption[]
+}
+
 const headerScrolled = ref(false)
 const currentScrollTop = ref(0)
 const searchMorphProgress = ref(0)
-const activeKind = ref('')
+const keywordDraft = ref('')
+const appliedKeyword = ref('')
+const activeKinds = ref<string[]>([])
+const kindScrollLeft = ref(0)
 const filterOptions = ref<PositionFilterOptions>({ kinds: [], educationInfos: [], workExperiences: [], locations: [] })
 const selectedFilters = reactive({ educationInfos: [] as string[], workExperiences: [] as string[], locIds: [] as string[] })
+const appliedFilters = reactive({ educationInfos: [] as string[], workExperiences: [] as string[], locIds: [] as string[] })
 const jobs = ref<PositionListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
+const positionsFailed = ref(false)
 const showFilter = ref(false)
 const pageNum = ref(0)
 const PAGE_SIZE = 20
-const categories = computed(() => [{ value: '', label: '全部' }, ...filterOptions.value.kinds])
+const kindOptions = computed(() => [{ value: '', label: '全部' }, ...filterOptions.value.kinds])
+const locationOptions = computed(() => flattenLocationOptions(filterOptions.value.locations))
+const filterSections = computed<FilterSection[]>(() => [
+  { key: 'educationInfos', label: '学历要求', options: filterOptions.value.educationInfos },
+  { key: 'workExperiences', label: '工作经验', options: filterOptions.value.workExperiences },
+  { key: 'locIds', label: '工作地点', options: locationOptions.value },
+])
+const selectedFilterCount = computed(() => (
+  appliedFilters.educationInfos.length
+  + appliedFilters.workExperiences.length
+  + appliedFilters.locIds.length
+))
+const selectedDraftFilterCount = computed(() => (
+  selectedFilters.educationInfos.length
+  + selectedFilters.workExperiences.length
+  + selectedFilters.locIds.length
+))
 const hasMore = computed(() => jobs.value.length < total.value)
 const positionStore = usePositionStore()
-const activeCategory = ref('')
+const activeCategories = ref<string[]>([])
 const recruitmentCategories = [
   {
     value: '社招',
@@ -67,6 +96,7 @@ const recruitmentCategories = [
   },
 ]
 const recruitmentIconError = reactive<Record<string, boolean>>({})
+let positionRequestVersion = 0
 
 function resolveRecruitmentIcon(item: typeof recruitmentCategories[number]) {
   return recruitmentIconError[item.value] ? item.fallbackIcon : item.icon
@@ -91,11 +121,9 @@ try {
   menuButtonLeft = uni.getMenuButtonBoundingClientRect().left
   // #endif
   if (menuButtonLeft > 0) {
-    const capsuleGap = uni.upx2px(16)
-    headerSearchCompactWidth = Math.max(
-      uni.upx2px(320),
-      menuButtonLeft - horizontalInset - capsuleGap,
-    )
+    const capsuleGap = uni.upx2px(12)
+    const availableWidth = menuButtonLeft - horizontalInset - capsuleGap
+    headerSearchCompactWidth = Math.max(0, Math.min(headerSearchExpandedWidth, availableWidth))
   }
 }
 catch {
@@ -159,26 +187,44 @@ function showJobDetail(positionId: string) {
 }
 
 async function loadPositions(reset = false) {
-  if (loading.value || (!reset && !hasMore.value))
+  if (!reset && (loading.value || !hasMore.value))
     return
+
+  const requestVersion = reset ? ++positionRequestVersion : positionRequestVersion
+  if (reset) {
+    jobs.value = []
+    total.value = 0
+    pageNum.value = 0
+    positionsFailed.value = false
+  }
   loading.value = true
   const nextPageNum = reset ? 1 : pageNum.value + 1
+  const kindValues = activeKinds.value.map(Number).filter(Number.isFinite)
   try {
     const page = await getPositions({
       pageNum: nextPageNum,
       pageSize: PAGE_SIZE,
-      kinds: activeKind.value ? [Number(activeKind.value)] : undefined,
-      category: activeCategory.value || undefined,
-      educationInfos: selectedFilters.educationInfos.length ? selectedFilters.educationInfos : undefined,
-      workExperiences: selectedFilters.workExperiences.length ? selectedFilters.workExperiences : undefined,
-      locIds: selectedFilters.locIds.length ? selectedFilters.locIds : undefined,
+      keyword: appliedKeyword.value || undefined,
+      kinds: kindValues.length ? kindValues : undefined,
+      educationInfos: appliedFilters.educationInfos.length ? appliedFilters.educationInfos : undefined,
+      workExperiences: appliedFilters.workExperiences.length ? appliedFilters.workExperiences : undefined,
+      locIds: appliedFilters.locIds.length ? appliedFilters.locIds : undefined,
+      categories: activeCategories.value.length ? activeCategories.value : undefined,
     })
+    if (requestVersion !== positionRequestVersion)
+      return
     jobs.value = reset ? page.list : [...jobs.value, ...page.list]
     total.value = page.total
     pageNum.value = nextPageNum
+    positionsFailed.value = false
+  }
+  catch {
+    if (reset && requestVersion === positionRequestVersion)
+      positionsFailed.value = true
   }
   finally {
-    loading.value = false
+    if (requestVersion === positionRequestVersion)
+      loading.value = false
   }
 }
 
@@ -186,25 +232,103 @@ async function loadFilterOptions() {
   filterOptions.value = await getPositionFilterOptions()
 }
 
-function handleCategoryTap(kind: string) {
-  if (activeKind.value === kind)
-    return
-  activeKind.value = kind
+function handleKeywordSearch(value: string) {
+  const normalizedKeyword = value.trim()
+  keywordDraft.value = normalizedKeyword
+  appliedKeyword.value = normalizedKeyword
+  loadPositions(true)
+}
+
+function flattenLocationOptions(options: PositionLocationOption[], parentLabels: string[] = []): PositionFilterOption[] {
+  const flattened: PositionFilterOption[] = []
+  for (const option of options) {
+    const labelPath = [...parentLabels, option.label].filter(Boolean)
+    if (option.children?.length) {
+      flattened.push(...flattenLocationOptions(option.children, labelPath))
+    }
+    else if (option.value) {
+      flattened.push({ value: option.value, label: labelPath.join(' · ') })
+    }
+  }
+  return flattened
+}
+
+function isKindActive(value: string) {
+  return value ? activeKinds.value.includes(value) : activeKinds.value.length === 0
+}
+
+function isRecruitmentCategoryActive(value: string) {
+  return activeCategories.value.includes(value)
+}
+
+async function centerKindOption(index: number) {
+  await nextTick()
+  let viewportLeft = 0
+  let viewportWidth = 0
+  let currentScrollLeft = 0
+  let optionLeft = 0
+  let optionWidth = 0
+
+  uni.createSelectorQuery()
+    .select('#position-kind-scroll')
+    .boundingClientRect((rect) => {
+      const nodeInfo = Array.isArray(rect) ? rect[0] : rect
+      viewportLeft = Number(nodeInfo?.left || 0)
+      viewportWidth = Number(nodeInfo?.width || 0)
+    })
+    .select('#position-kind-scroll')
+    .scrollOffset((offset) => {
+      const nodeInfo = Array.isArray(offset) ? offset[0] : offset
+      currentScrollLeft = Number(nodeInfo?.scrollLeft || 0)
+    })
+    .select(`#position-kind-${index}`)
+    .boundingClientRect((rect) => {
+      const nodeInfo = Array.isArray(rect) ? rect[0] : rect
+      optionLeft = Number(nodeInfo?.left || 0)
+      optionWidth = Number(nodeInfo?.width || 0)
+    })
+    .exec(() => {
+      if (viewportWidth <= 0 || optionWidth <= 0)
+        return
+      const target = currentScrollLeft + optionLeft - viewportLeft - (viewportWidth - optionWidth) / 2
+      kindScrollLeft.value = Math.max(0, Math.round(target))
+    })
+}
+
+function handleCategoryTap(kind: string, index: number) {
+  if (!kind) {
+    activeKinds.value = []
+  }
+  else {
+    activeKinds.value = activeKinds.value.includes(kind)
+      ? activeKinds.value.filter(item => item !== kind)
+      : [...activeKinds.value, kind]
+  }
+  void centerKindOption(index)
   loadPositions(true)
 }
 
 function toggleRecruitmentCategory(value: string) {
-  activeCategory.value = activeCategory.value === value ? '' : value
+  activeCategories.value = activeCategories.value.includes(value)
+    ? activeCategories.value.filter(item => item !== value)
+    : [...activeCategories.value, value]
   loadPositions(true)
 }
 
 function applyPendingCategory() {
   const pending = positionStore.consumePendingCategory()
   if (pending && recruitmentCategories.some(item => item.value === pending)) {
-    activeCategory.value = pending
+    activeCategories.value = [pending]
     return true
   }
   return false
+}
+
+function openFilter() {
+  selectedFilters.educationInfos = [...appliedFilters.educationInfos]
+  selectedFilters.workExperiences = [...appliedFilters.workExperiences]
+  selectedFilters.locIds = [...appliedFilters.locIds]
+  showFilter.value = true
 }
 
 function toggleFilter(type: 'educationInfos' | 'workExperiences' | 'locIds', value: string) {
@@ -219,6 +343,9 @@ function resetFilters() {
 }
 
 function applyFilters() {
+  appliedFilters.educationInfos = [...selectedFilters.educationInfos]
+  appliedFilters.workExperiences = [...selectedFilters.workExperiences]
+  appliedFilters.locIds = [...selectedFilters.locIds]
   showFilter.value = false
   loadPositions(true)
 }
@@ -241,7 +368,8 @@ onLoad(async () => {
     await loadPositions(true)
   }
   catch {
-    // 请求层会在 401 时跳转登录页；此处不再继续发送列表请求，避免跳转期间出现空白页。
+    // 请求层会在 401 时跳转登录页；其他错误保留页面内重试入口。
+    positionsFailed.value = true
   }
 })
 
@@ -281,7 +409,11 @@ onUnload(() => {
               :class="searchMorphProgress > 0.08 ? 'pointer-events-auto' : 'pointer-events-none'"
               :style="headerSearchStyle"
             >
-              <PositionSearchBar compact @tap="showFilter = true" />
+              <PositionSearchBar
+                v-model="keywordDraft"
+                compact
+                @search="handleKeywordSearch"
+              />
             </view>
           </view>
         </template>
@@ -292,40 +424,43 @@ onUnload(() => {
           class="transition-[opacity,transform] duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
           :style="heroSearchStyle"
         >
-          <PositionSearchBar @tap="showFilter = true" />
+          <PositionSearchBar
+            v-model="keywordDraft"
+            @search="handleKeywordSearch"
+          />
         </view>
 
         <view class="grid grid-cols-2 mt-4 gap-3">
           <view
             v-for="item in recruitmentCategories"
             :key="item.value"
-            class="relative min-h-116rpx flex cursor-pointer items-center overflow-hidden border-1rpx rounded-3xl border-solid px-3.5 transition-all duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:opacity-88 motion-reduce:transition-none"
-            :class="activeCategory === item.value
+            class="relative min-h-116rpx flex cursor-pointer items-center overflow-hidden border-1rpx rounded-2xl border-solid px-3.5 transition-all duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:opacity-88 motion-reduce:transition-none"
+            :class="isRecruitmentCategoryActive(item.value)
               ? 'border-white/60 shadow-[0_18rpx_38rpx_rgba(39,105,180,0.22)]'
               : 'border-white/60 bg-white/72 shadow-[0_12rpx_32rpx_rgba(39,105,180,0.08)] backdrop-blur-8rpx'"
-            :style="activeCategory === item.value ? { background: item.activeGradient, boxShadow: item.activeGlow } : {}"
+            :style="isRecruitmentCategoryActive(item.value) ? { background: item.activeGradient, boxShadow: item.activeGlow } : {}"
             role="button"
-            :aria-pressed="activeCategory === item.value"
+            :aria-pressed="isRecruitmentCategoryActive(item.value)"
             :aria-label="item.label"
             @tap="toggleRecruitmentCategory(item.value)"
           >
             <view
-              class="mr-3 h-72rpx w-72rpx flex flex-none items-center justify-center rounded-2xl transition-colors duration-220"
-              :class="activeCategory === item.value ? 'bg-white/22' : 'bg-white/70'"
+              class="mr-3 h-72rpx w-72rpx flex flex-none items-center justify-center rounded-xl transition-colors duration-220"
+              :class="isRecruitmentCategoryActive(item.value) ? 'bg-white/22' : 'bg-white/70'"
             >
               <image
-                class="h-44rpx w-44rpx"
+                class="h-56rpx w-56rpx"
                 :src="resolveRecruitmentIcon(item)"
                 mode="aspectFit"
                 @error="handleRecruitmentIconError(item.value)"
               />
             </view>
             <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm font-700" :class="activeCategory === item.value ? 'text-white' : 'text-app-ink'">{{ item.label }}</text>
-              <text class="mt-1 block text-2xs" :class="activeCategory === item.value ? 'text-white/82' : 'text-app-muted'">{{ item.description }}</text>
+              <text class="text-sm font-700" :class="isRecruitmentCategoryActive(item.value) ? 'text-white' : 'text-app-ink'">{{ item.label }}</text>
+              <text class="mt-1 block text-2xs" :class="isRecruitmentCategoryActive(item.value) ? 'text-white/82' : 'text-app-muted'">{{ item.description }}</text>
             </view>
             <view
-              v-if="activeCategory === item.value"
+              v-if="isRecruitmentCategoryActive(item.value)"
               class="absolute right-3 top-3 h-32rpx w-32rpx flex items-center justify-center rounded-full bg-white/28"
             >
               <view class="i-carbon-checkmark text-xs text-white leading-none" />
@@ -333,33 +468,57 @@ onUnload(() => {
           </view>
         </view>
 
-        <view class="mt-5 flex items-end">
-          <text class="text-xl text-app-ink font-700 leading-none">{{ total ? `${total} 个职位` : '职位推荐' }}</text>
-          <view class="mb-1 ml-2 h-2 w-2 rotate-45 border-b-3rpx border-r-3rpx border-app-ink-soft border-solid" />
+        <view class="mt-5 flex items-center justify-between gap-3">
+          <view class="min-w-0 flex flex-1 items-center">
+            <text class="overflow-hidden text-ellipsis whitespace-nowrap text-xl text-app-ink font-700 leading-none">{{ total }} 个职位</text>
+            <view class="i-carbon-chevron-right ml-1.5 flex-none text-base text-app-ink-soft leading-none" />
+          </view>
+          <view
+            class="min-h-88rpx flex flex-none cursor-pointer items-center border-1rpx border-[#cfe2ff] rounded-full border-solid bg-[linear-gradient(135deg,rgba(255,255,255,0.96)_0%,rgba(231,242,255,0.96)_100%)] px-3.5 text-xs text-brand-blue shadow-[0_10rpx_28rpx_rgba(47,111,232,0.14)] transition-transform duration-180 active:scale-98 active:opacity-78 motion-reduce:transition-none"
+            role="button"
+            :aria-label="`打开其他职位筛选，已选择 ${selectedFilterCount} 项`"
+            @tap="openFilter"
+          >
+            <view class="mr-2 h-48rpx w-48rpx flex items-center justify-center rounded-full bg-white shadow-[0_4rpx_12rpx_rgba(47,111,232,0.12)]">
+              <view class="i-carbon-settings-adjust text-base leading-none" />
+            </view>
+            <text class="font-700">其他筛选</text>
+            <text
+              v-if="selectedFilterCount"
+              class="ml-1.5 min-w-36rpx rounded-full bg-brand-blue px-1.5 py-0.5 text-center text-3xs text-white font-700"
+            >
+              {{ selectedFilterCount }}
+            </text>
+            <view class="i-carbon-chevron-right ml-1 text-xs leading-none" />
+          </view>
         </view>
       </view>
     </view>
 
     <scroll-view
+      id="position-kind-scroll"
       class="sticky top-[var(--position-header-offset)] z-90 w-full whitespace-nowrap bg-[rgba(255,255,255,0.98)] shadow-[0_8rpx_24rpx_rgba(38,64,105,0.06)]"
       scroll-x
       scroll-with-animation
+      :scroll-left="kindScrollLeft"
       :show-scrollbar="false"
     >
       <view class="h-92rpx min-w-full inline-flex items-stretch px-3">
         <view
-          v-for="category in categories"
+          v-for="(category, index) in kindOptions"
+          :id="`position-kind-${index}`"
           :key="category.value || 'recommended'"
           class="relative min-w-120rpx flex cursor-pointer items-center justify-center px-3 text-30rpx text-app-ink-soft font-600 active:opacity-70"
-          :class="activeKind === category.value ? 'text-brand-blue' : ''"
+          :class="isKindActive(category.value) ? 'text-brand-blue' : ''"
           role="button"
+          :aria-pressed="isKindActive(category.value)"
           :aria-label="category.label"
-          @tap="handleCategoryTap(category.value)"
+          @tap="handleCategoryTap(category.value, index)"
         >
           <text>{{ category.label }}</text>
           <view
-            v-if="activeKind === category.value"
-            class="absolute bottom-0 left-1/2 h-5rpx w-36rpx rounded-full bg-brand-blue -translate-x-1/2"
+            v-if="isKindActive(category.value)"
+            class="absolute bottom-0 left-0 right-0 mx-auto h-5rpx w-36rpx rounded-full bg-brand-blue"
           />
         </view>
       </view>
@@ -401,7 +560,17 @@ onUnload(() => {
           </view>
         </view>
       </view>
-      <view v-if="!loading && !jobs.length" class="py-16 text-center text-sm text-app-muted">
+      <view
+        v-if="!loading && positionsFailed"
+        class="cursor-pointer py-14 text-center active:opacity-74"
+        role="button"
+        aria-label="重新加载职位列表"
+        @tap="loadPositions(true)"
+      >
+        <text class="block text-sm text-app-ink-soft">职位加载失败</text>
+        <text class="mt-1 block text-xs text-brand-blue">点击重新加载</text>
+      </view>
+      <view v-else-if="!loading && !jobs.length" class="py-16 text-center text-sm text-app-muted">
         暂无符合条件的职位
       </view>
       <view v-if="loading" class="py-8 text-center text-sm text-app-muted">
@@ -413,22 +582,79 @@ onUnload(() => {
     </view>
 
     <view v-if="showFilter" class="fixed inset-0 z-200 flex items-end bg-black/45" @tap.self="showFilter = false">
-      <view class="max-h-[80vh] w-full overflow-y-auto rounded-t-3xl bg-white px-4 pt-5 pb-safe">
-        <view class="mb-5 flex items-center justify-between">
-          <text class="text-lg text-app-ink font-700">筛选职位</text><text class="text-sm text-app-ink-soft" @tap="showFilter = false">关闭</text>
-        </view>
-        <view v-for="section in [{ key: 'educationInfos', label: '学历要求', options: filterOptions.educationInfos }, { key: 'workExperiences', label: '工作经验', options: filterOptions.workExperiences }, { key: 'locIds', label: '工作地点', options: filterOptions.locations }]" :key="section.key" class="mb-5">
-          <text class="mb-3 block text-sm text-app-ink font-700">{{ section.label }}</text>
-          <view class="flex flex-wrap gap-2">
-            <text v-for="option in section.options" :key="option.value" class="rounded-lg px-3 py-2 text-xs" :class="selectedFilters[section.key as 'educationInfos' | 'workExperiences' | 'locIds'].includes(option.value) ? 'bg-[#e3f3ff] text-brand-blue' : 'bg-[#f2f4f7] text-app-ink-soft'" @tap="toggleFilter(section.key as 'educationInfos' | 'workExperiences' | 'locIds', option.value)">{{ option.label }}</text>
+      <view class="h-[82vh] w-full flex flex-col overflow-hidden rounded-t-[40rpx] bg-[#f7faff] shadow-[0_-20rpx_60rpx_rgba(18,43,82,0.2)]">
+        <view class="flex-none px-4 pb-3 pt-3">
+          <view class="mx-auto mb-3 h-8rpx w-72rpx rounded-full bg-[#d8e1ee]" />
+          <view class="flex items-center justify-between">
+            <view class="min-w-0 flex-1">
+              <text class="block text-lg text-app-ink font-700">其他筛选</text>
+              <text class="mt-1 block text-xs text-app-muted">学历、经验和地点均支持多选</text>
+            </view>
+            <view
+              class="ml-3 h-72rpx w-72rpx flex cursor-pointer items-center justify-center rounded-full bg-white text-app-ink-soft shadow-[0_6rpx_18rpx_rgba(38,64,105,0.1)] active:opacity-70"
+              role="button"
+              aria-label="关闭筛选面板"
+              @tap="showFilter = false"
+            >
+              <view class="i-carbon-close text-lg leading-none" />
+            </view>
           </view>
         </view>
-        <view class="flex gap-3 border-t-1rpx border-[#edf0f4] border-solid py-3">
-          <button class="flex-1 border-0 bg-[#f2f4f7] text-sm text-app-ink-soft" @tap="resetFilters">
-            重置
-          </button><button class="flex-1 border-0 bg-brand-blue text-sm text-white" @tap="applyFilters">
-            确定
-          </button>
+
+        <scroll-view class="min-h-0 flex-1 px-4" scroll-y :show-scrollbar="false">
+          <view class="pb-4">
+            <view
+              v-for="section in filterSections"
+              :key="section.key"
+              class="mb-4 rounded-2xl bg-white p-4 shadow-[0_8rpx_28rpx_rgba(38,64,105,0.07)]"
+            >
+              <view class="mb-3 flex items-center justify-between">
+                <text class="text-sm text-app-ink font-700">{{ section.label }}</text>
+                <text class="text-2xs text-app-muted">
+                  {{ selectedFilters[section.key].length ? `已选 ${selectedFilters[section.key].length} 项` : '可多选' }}
+                </text>
+              </view>
+              <view class="flex flex-wrap gap-2">
+                <view
+                  v-for="option in section.options"
+                  :key="option.value"
+                  class="box-border max-w-full min-h-80rpx flex cursor-pointer items-center border-1rpx rounded-xl border-solid px-3 py-2 text-xs transition-colors duration-180 active:opacity-72 motion-reduce:transition-none"
+                  :class="selectedFilters[section.key].includes(option.value)
+                    ? 'border-[#7cb6ff] bg-[#e8f3ff] text-brand-blue shadow-[0_4rpx_14rpx_rgba(47,111,232,0.1)]'
+                    : 'border-[#e5ebf3] bg-[#f7f9fc] text-app-ink-soft'"
+                  role="checkbox"
+                  :aria-checked="selectedFilters[section.key].includes(option.value)"
+                  :aria-label="option.label"
+                  @tap="toggleFilter(section.key, option.value)"
+                >
+                  <text class="min-w-0 break-words">{{ option.label }}</text>
+                  <view
+                    v-if="selectedFilters[section.key].includes(option.value)"
+                    class="i-carbon-checkmark-filled ml-1.5 flex-none text-sm text-brand-blue leading-none"
+                  />
+                </view>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+
+        <view class="flex-none border-t-1rpx border-t-[#e3eaf3] border-t-solid bg-white px-4 pt-3 pb-safe">
+          <view class="flex gap-3 pb-3">
+            <button
+              class="m-0 h-88rpx flex flex-1 items-center justify-center border-1rpx border-[#d9e3ef] rounded-full border-solid bg-[#f5f8fc] p-0 text-sm text-app-ink-soft font-700 leading-none after:border-0 active:opacity-72"
+              aria-label="重置其他筛选"
+              @tap="resetFilters"
+            >
+              重置
+            </button>
+            <button
+              class="m-0 h-88rpx flex flex-1 items-center justify-center border-0 rounded-full bg-[linear-gradient(135deg,#2f6fe8_0%,#4d9bf6_100%)] p-0 text-sm text-white font-700 leading-none shadow-[0_10rpx_24rpx_rgba(47,111,232,0.24)] after:border-0 active:opacity-78"
+              :aria-label="`应用筛选，当前选择 ${selectedDraftFilterCount} 项`"
+              @tap="applyFilters"
+            >
+              {{ selectedDraftFilterCount ? `筛选（${selectedDraftFilterCount}）` : '筛选' }}
+            </button>
+          </view>
         </view>
       </view>
     </view>
