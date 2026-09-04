@@ -230,7 +230,7 @@ function skipLogin() {
 
       <image
         class="login-mascot absolute bottom-0 right-68rpx z-3"
-        src="/static/auth/login-mascot.png"
+        src="https://static1.3sbio.com/assets/lingcai/%E7%94%9F%E7%94%9F%E7%99%BD%E5%A4%A7%E8%A4%82-%E5%85%A8%E8%BA%AB.gif"
         mode="aspectFit"
         aria-label="生生智家卡通形象挥手欢迎"
       />

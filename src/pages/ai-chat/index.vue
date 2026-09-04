@@ -1040,7 +1040,7 @@ onUnmounted(() => {
 
         <image
           class="splash-hero"
-          src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B%E5%85%A8%E6%99%AF.gif"
+          src="https://static1.3sbio.com/assets/lingcai/%E7%94%9F%E7%94%9F%2B2%E4%BD%8D%E7%99%BD%E5%A4%A7%E8%A4%82.gif"
           mode="aspectFit"
           :style="splashHeroStyle"
         />
@@ -1101,7 +1101,7 @@ onUnmounted(() => {
               <text>我是您的数智伙伴，</text>
               <text>有任何问题欢迎与我交流！</text>
             </view>
-            <image class="welcome-character" src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
+            <image class="welcome-character" src="https://static1.3sbio.com/assets/lingcai/%E7%94%9F%E7%94%9F%E7%99%BD%E5%A4%A7%E8%A4%82-%E5%8D%8A%E8%BA%AB.gif" mode="aspectFit" />
           </view>
 
           <view class="quick-list">
