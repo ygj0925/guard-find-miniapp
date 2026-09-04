@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useTokenStore } from '@/store/token'
+import { toLoginPage } from '@/utils/toLoginPage'
 import { customTabbarEnable, needHideNativeTabbar } from './config'
 import { setTabbarItem } from './i18n'
 import { normalizeRoutePath, tabbarList, tabbarStore } from './store'
@@ -12,6 +14,7 @@ defineOptions({
 // #endif
 
 const AI_PAGE_PATH = '/pages/ai-chat/index'
+const tokenStore = useTokenStore()
 const shouldShowTabbar = ref(true)
 
 function syncTabbarVisibility() {
@@ -38,6 +41,16 @@ function handleClick(index: number) {
   const list = tabbarList.value
   const item = list[index]
   if (!item) {
+    return
+  }
+
+  if (
+    normalizeRoutePath(item.pagePath) === AI_PAGE_PATH
+    && !tokenStore.updateNowTime().hasLogin
+  ) {
+    toLoginPage({
+      queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
+    })
     return
   }
 

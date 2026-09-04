@@ -202,7 +202,7 @@ function skipLogin() {
     <view class="login-hero relative overflow-hidden bg-[#dceeff]">
       <image
         class="absolute inset-0 h-full w-full"
-        src="/static/auth/login-hero-bg.jpg"
+        src="https://static1.3sbio.com/assets/lingcai/login-hero-bg.jpg"
         mode="aspectFill"
         aria-hidden="true"
       />
@@ -218,11 +218,11 @@ function skipLogin() {
         </view>
         <view class="mt-20rpx flex items-center justify-center gap-18rpx text-25rpx text-[#0a82f7] font-500">
           <view class="h-60rpx w-188rpx flex items-center justify-center rounded-full bg-[rgba(255,255,255,0.8)]">
-            <image class="mr-10rpx h-34rpx w-34rpx" src="/static/auth/recruit-social.svg" mode="aspectFit" aria-hidden="true" />
+            <image class="mr-10rpx h-34rpx w-34rpx" src="https://static1.3sbio.com/assets/lingcai/recruit-social.svg" mode="aspectFit" aria-hidden="true" />
             <text>社会招聘</text>
           </view>
           <view class="h-60rpx w-188rpx flex items-center justify-center rounded-full bg-[rgba(255,255,255,0.8)]">
-            <image class="mr-10rpx h-34rpx w-34rpx" src="/static/auth/recruit-campus.svg" mode="aspectFit" aria-hidden="true" />
+            <image class="mr-10rpx h-34rpx w-34rpx" src="https://static1.3sbio.com/assets/lingcai/recruit-campus.svg" mode="aspectFit" aria-hidden="true" />
             <text>校园招聘</text>
           </view>
         </view>
@@ -230,7 +230,7 @@ function skipLogin() {
 
       <image
         class="login-mascot absolute bottom-0 right-68rpx z-3"
-        src="/static/auth/login-mascot.png"
+        src="https://static1.3sbio.com/assets/lingcai/%E7%94%9F%E7%94%9F%E7%99%BD%E5%A4%A7%E8%A4%82-%E5%85%A8%E8%BA%AB.gif"
         mode="aspectFit"
         aria-label="生生智家卡通形象挥手欢迎"
       />

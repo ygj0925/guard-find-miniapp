@@ -81,7 +81,7 @@ export interface PositionDetail extends PositionListItem {
   requirements?: string[] | string
   /** 是否已投递；未返回时视为未投递，兼容旧版后端响应。 */
   applied?: boolean
-  applyRecordId?: number
+  applyRecordId?: string | number
 }
 
 export interface PositionApplyForm {
@@ -93,12 +93,13 @@ export interface PositionApplyForm {
 
 export interface PositionApplyResult {
   status: string
+  /** 投递记录可能是雪花 ID，必须保持字符串语义。 */
   applyId: string
   message: string
 }
 
 export interface PositionApplyRecord {
-  id: number
+  id: string | number
   resumeId: string
   positionId: string
   importStatus: string
@@ -146,6 +147,6 @@ export function getPositionApplies() {
   return http.get<PositionApplyRecord[]>('/miniapp/position-applies')
 }
 
-export function getPositionApplyProgress(id: number) {
-  return http.get<PositionApplyProgress>(`/miniapp/position-applies/${id}/progress`)
+export function getPositionApplyProgress(id: string | number) {
+  return http.get<PositionApplyProgress>(`/miniapp/position-applies/${encodeURIComponent(String(id))}/progress`)
 }

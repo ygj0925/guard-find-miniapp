@@ -45,7 +45,7 @@ function handleScroll(event: { detail: { scrollTop?: number } }) {
   <view class="h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] flex flex-col overflow-hidden text-app-ink font-sans bg-blue-white-gradient" :class="h5DesktopClasses.root">
     <!-- #ifdef H5 -->
     <view class="relative box-border hidden w-48% flex-col justify-center overflow-hidden bg-[linear-gradient(180deg,#247cf0_0%,#43a9ef_62%,#9dd5f7_100%)] px-12 py-12 text-white md:flex lg:px-20">
-      <image class="relative z-1 mb-9 h-120rpx w-120rpx brightness-0 invert" src="/static/logo.svg" mode="aspectFit" />
+      <image class="relative z-1 mb-9 h-120rpx w-120rpx brightness-0 invert" src="https://static1.3sbio.com/assets/lingcai/logo.png" mode="aspectFit" />
       <view class="relative z-1 flex flex-col">
         <text class="text-2xs font-700 tracking-5rpx opacity-75">SSS RECRUITMENT</text>
         <text class="mt-3.5 block text-3xl font-700 leading-[1.25]">遇见更好的职业机会</text>
@@ -117,7 +117,7 @@ function handleScroll(event: { detail: { scrollTop?: number } }) {
 
         <view class="relative z-1 mx-auto mt-5.5 box-border max-w-680rpx w-[calc(100%-48rpx)] border-1rpx border-[rgba(232,237,247,0.92)] rounded-36rpx bg-white/96 px-5 pb-7 pt-5 shadow-[0_24rpx_60rpx_rgba(54,82,145,0.12)] backdrop-blur-10rpx" :class="h5DesktopClasses.card">
           <slot name="brand">
-            <image class="mx-auto mb-4 block h-92rpx w-92rpx" :class="h5DesktopClasses.logo" src="/static/logo.svg" mode="aspectFit" />
+            <image class="mx-auto mb-4 block h-92rpx w-92rpx" :class="h5DesktopClasses.logo" src="https://static1.3sbio.com/assets/lingcai/logo.png" mode="aspectFit" />
           </slot>
           <view class="mb-7 flex flex-col items-center text-center">
             <text class="text-xl text-app-ink font-700 leading-[1.35]">{{ title }}</text>

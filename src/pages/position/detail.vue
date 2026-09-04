@@ -41,7 +41,7 @@ interface PositionDetailView {
   responsibilities: string[]
   requirements: string[]
   applied: boolean
-  applyRecordId?: number
+  applyRecordId?: string | number
 }
 
 const EMPTY_POSITION: PositionDetailView = {
@@ -214,13 +214,26 @@ async function confirmApply() {
 
   isApplying.value = true
   try {
-    await applyPosition(position.value.id, {
+    const positionId = position.value.id
+    const applyResult = await applyPosition(positionId, {
       resumeId: selectedResumeId.value,
       jobId: position.value.jobId,
     })
-    position.value = toPositionDetail(await getPositionDetail(position.value.id))
+    const applyRecordId = applyResult.applyId || position.value.applyRecordId
+    position.value = { ...position.value, applied: true, applyRecordId }
     isResumePickerVisible.value = false
     uni.showToast({ title: '简历投递成功', icon: 'success' })
+
+    void getPositionDetail(positionId)
+      .then((detail) => {
+        const refreshedPosition = toPositionDetail(detail)
+        position.value = {
+          ...refreshedPosition,
+          applied: true,
+          applyRecordId: refreshedPosition.applyRecordId ?? applyRecordId,
+        }
+      })
+      .catch(error => console.warn('投递成功，但刷新职位详情失败:', error))
   }
   finally {
     isApplying.value = false
@@ -232,7 +245,9 @@ function openApplyProgress() {
     uni.showToast({ title: '投递记录加载中，请稍后重试', icon: 'none' })
     return
   }
-  uni.navigateTo({ url: `${POSITION_PROGRESS_PATH}?id=${position.value.applyRecordId}` })
+  uni.navigateTo({
+    url: `${POSITION_PROGRESS_PATH}?id=${encodeURIComponent(String(position.value.applyRecordId))}`,
+  })
 }
 </script>
 

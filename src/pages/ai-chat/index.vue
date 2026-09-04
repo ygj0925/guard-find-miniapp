@@ -23,6 +23,9 @@ import {
   resolveAgentToolAsk,
   streamAgentChat,
 } from '@/api/agent'
+import { useTokenStore } from '@/store/token'
+import { useUserStore } from '@/store/user'
+import { toLoginPage } from '@/utils/toLoginPage'
 import { safeAreaInsets, systemInfo } from '@/utils/systemInfo'
 import {
   clearNewConversationRequest,
@@ -42,6 +45,7 @@ defineOptions({
 })
 
 definePage({
+  excludeLoginPath: true,
   style: {
     navigationStyle: 'custom',
     navigationBarTitleText: '生生智家',
@@ -72,6 +76,9 @@ interface ActiveStream {
   cancel: () => void
 }
 
+const AI_PAGE_PATH = '/pages/ai-chat/index'
+const tokenStore = useTokenStore()
+const userStore = useUserStore()
 const quickQuestions = ref<QuickQuestion[]>([
   { id: 1, tag: '岗位推荐', displayQuestion: '帮我找上海的研发岗位', sendContent: '帮我推荐上海的生物药研发岗位' },
   { id: 2, tag: '简历优化', displayQuestion: '怎样突出我的项目经历？', sendContent: '怎样在简历中突出我的项目经历？' },
@@ -117,6 +124,7 @@ let messageSequence = 0
 let extensionSequence = 0
 let restoreSequence = 0
 let activeStream: ActiveStream | null = null
+let conversationOwnerId: string | null = null
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
 
 const speech = useSpeechRecognition({
@@ -209,26 +217,66 @@ function openHistory() {
   })
 }
 
-function startNewConversation() {
+function resetConversationState(started: boolean) {
   restoreSequence += 1
-  if (isReplying.value)
+  if (isReplying.value || activeStream)
     cancelReply()
   clearNewConversationRequest()
-  hasStarted.value = true
+  hasStarted.value = started
   currentConversation.value = null
   inputValue.value = ''
   isReplying.value = false
   isRestoringHistory.value = false
+  isOpeningHistory.value = false
   isFollowingLatest.value = true
   streamStatusText.value = ''
   expandedReasoningIds.value = []
   scrollIntoView.value = ''
+  scrollWithAnimation.value = false
+  if (autoScrollTimer) {
+    clearTimeout(autoScrollTimer)
+    autoScrollTimer = null
+  }
+}
+
+function currentUserId() {
+  const userId = String(userStore.userInfo.userId ?? '').trim()
+  return userId && userId !== '-1' ? userId : null
+}
+
+function ensureAuthenticatedAiSession() {
+  const currentTokenStore = tokenStore.updateNowTime()
+  if (!currentTokenStore.hasLogin || !currentTokenStore.validToken) {
+    // 登录页会覆盖当前页面；保留已建立的流和消息，避免网络仍在返回时销毁渲染状态。
+    speech.cancel()
+    toLoginPage({
+      queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
+    })
+    return false
+  }
+
+  const authenticatedUserId = currentUserId()
+  if (
+    conversationOwnerId !== null
+    && authenticatedUserId !== null
+    && conversationOwnerId !== authenticatedUserId
+  ) {
+    resetConversationState(false)
+  }
+  conversationOwnerId = authenticatedUserId
+  return true
+}
+
+function startNewConversation() {
+  resetConversationState(true)
   void measureContentViewport()
 }
 
 function sendMessage(content = inputValue.value) {
   const question = content.trim()
   if (!question || isReplying.value || isRestoringHistory.value)
+    return
+  if (!ensureAuthenticatedAiSession())
     return
 
   if (!currentConversation.value) {
@@ -329,12 +377,16 @@ function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChat
       scheduleAutoScroll()
       break
     case 'done':
-      if (event.reply !== undefined)
+      // 空的最终 reply 不能覆盖前面已经累计的 delta 正文。
+      if (event.reply?.trim())
         assistantMessage.content = event.reply
       if (event.reasoningContent !== undefined)
         assistantMessage.reasoningContent = event.reasoningContent
-      if (!assistantMessage.content && !assistantMessage.extensions.length)
-        assistantMessage.content = '本次任务已处理完成。'
+      if (!assistantMessage.content.trim()) {
+        assistantMessage.content = assistantMessage.extensions.length
+          ? '相关操作已处理完成，请查看上方结果。'
+          : '本次任务已处理完成。'
+      }
       assistantMessage.status = 'complete'
       finishReply()
       break
@@ -662,10 +714,16 @@ async function restoreConversation(sessionId: string) {
   isFollowingLatest.value = true
   currentConversation.value = null
   try {
+    const askHistoryPromise = listAgentChatAsks(sessionId, { limit: 100 })
+      .then(result => result.items)
+      .catch((error) => {
+        console.warn('历史工具确认记录加载失败，继续展示对话正文:', error)
+        return [] as AgentChatAskRecord[]
+      })
     const [detail, historyResult, askHistory] = await Promise.all([
       getAgentChatSession(sessionId),
       loadHistoryMessages(sessionId),
-      listAgentChatAsks(sessionId, { limit: 100 }),
+      askHistoryPromise,
     ])
     if (sequence !== restoreSequence)
       return
@@ -675,7 +733,7 @@ async function restoreConversation(sessionId: string) {
       title: session.title || '历史对话',
       createdAt: parseDate(session.createTime),
       updatedAt: parseDate(session.lastMessageTime || session.updateTime || session.createTime),
-      messages: mapHistoryMessages(historyResult.records, askHistory.items),
+      messages: mapHistoryMessages(historyResult.records, askHistory),
     }
     if (historyResult.truncated) {
       uni.showToast({
@@ -1001,6 +1059,8 @@ function handleRecordCancel() {
 }
 
 onShow(() => {
+  if (!ensureAuthenticatedAiSession())
+    return
   void restoreHistorySelection()
   if (hasStarted.value)
     void measureContentViewport()
@@ -1039,7 +1099,7 @@ onUnmounted(() => {
 
         <image
           class="splash-hero"
-          src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B%E5%85%A8%E6%99%AF.gif"
+          src="https://static1.3sbio.com/assets/lingcai/%E7%94%9F%E7%94%9F%2B2%E4%BD%8D%E7%99%BD%E5%A4%A7%E8%A4%82.gif"
           mode="aspectFit"
           :style="splashHeroStyle"
         />
@@ -1100,7 +1160,7 @@ onUnmounted(() => {
               <text>我是您的数智伙伴，</text>
               <text>有任何问题欢迎与我交流！</text>
             </view>
-            <image class="welcome-character" src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
+            <image class="welcome-character" src="https://static1.3sbio.com/assets/lingcai/%E7%94%9F%E7%94%9F%E7%99%BD%E5%A4%A7%E8%A4%82-%E5%8D%8A%E8%BA%AB.gif" mode="aspectFit" />
           </view>
 
           <view class="quick-list">

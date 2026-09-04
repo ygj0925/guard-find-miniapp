@@ -312,8 +312,14 @@ export function streamAgentChat(payload: AgentChatRequest, listeners: AgentChatS
       if (cancelled)
         return
       if (response.statusCode === 401) {
-        useTokenStore().clearLoginState()
-        toLoginPage()
+        const currentToken = String(uni.getStorageSync<string>(AUTH_TOKEN_STORAGE_KEY) || '')
+          .replace(/^Bearer\s+/i, '')
+          .trim()
+        // 只允许该请求使用的旧 token 清理自身；迟到的 401 不能撤销刚续期或重新登录的新凭据。
+        if (currentToken === token) {
+          useTokenStore().clearLoginState()
+          toLoginPage()
+        }
         fail({ code: 'UNAUTHORIZED', message: '登录已过期，请重新登录' })
         return
       }

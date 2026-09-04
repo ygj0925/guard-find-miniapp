@@ -122,10 +122,16 @@ export const useTokenStore = defineStore(
      * 登录成功后处理逻辑
      * @param tokenInfo 登录返回的token信息
      */
-    async function _postLogin(tokenInfo: IAuthLoginRes) {
-      setTokenInfo(tokenInfo)
+    async function _postLogin(nextTokenInfo: IAuthLoginRes) {
+      setTokenInfo(nextTokenInfo)
       const userStore = useUserStore()
-      await userStore.fetchUserInfo()
+      try {
+        await userStore.fetchUserInfo()
+      }
+      catch (error) {
+        clearLoginState()
+        throw error
+      }
     }
 
     /**
@@ -185,7 +191,7 @@ export const useTokenStore = defineStore(
     /**
      * 退出登录 并 删除用户信息
      */
-    const clearLoginState = () => {
+    function clearLoginState() {
       updateNowTime()
       uni.removeStorageSync('accessTokenExpireTime')
       uni.removeStorageSync('refreshTokenExpireTime')
@@ -196,26 +202,15 @@ export const useTokenStore = defineStore(
     }
 
     const logout = async () => {
+      // 先发起带当前 token 的服务端退出请求，再立即清理本地登录态。
+      const logoutRequest = _logout()
+      clearLoginState()
       try {
-        // TODO 实现自己的退出登录逻辑
-        await _logout()
+        await logoutRequest
       }
       catch (error) {
-        console.error('退出登录失败:', error)
-      }
-      finally {
-        clearLoginState()
-        updateNowTime()
-
-        // 无论成功失败，都需要清除本地token信息
-        // 清除存储的过期时间
-        uni.removeStorageSync('accessTokenExpireTime')
-        uni.removeStorageSync('refreshTokenExpireTime')
-        console.log('退出登录-清除用户信息')
-        tokenInfo.value = { ...tokenInfoState }
-        uni.removeStorageSync('token')
-        const userStore = useUserStore()
-        userStore.clearUserInfo()
+        // 服务端退出失败不应阻止用户在当前设备退出。
+        console.error('服务端退出登录失败，本地登录态已清理:', error)
       }
     }
 

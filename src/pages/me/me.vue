@@ -40,6 +40,7 @@ const RESUME_PAGE = '/pages/resume/index'
 const CERTIFICATION_PAGE = '/pages/certification/index'
 
 onShow(() => {
+  tokenStore.updateNowTime()
   console.log('userInfo', userInfo.value)
 })
 
@@ -52,7 +53,7 @@ function handleLogin() {
 }
 
 function handleProfileTap() {
-  if (!tokenStore.hasLogin) {
+  if (!tokenStore.updateNowTime().hasLogin) {
     handleLogin()
   }
 }
@@ -62,7 +63,7 @@ function handleNotificationTap() {
 }
 
 function handleCertification() {
-  if (!tokenStore.hasLogin) {
+  if (!tokenStore.updateNowTime().hasLogin) {
     handleLogin()
     return
   }
@@ -74,7 +75,7 @@ function handleLegalTap(url: string) {
 }
 
 function handleResumeShortcut(label: string) {
-  if (!tokenStore.hasLogin) {
+  if (!tokenStore.updateNowTime().hasLogin) {
     handleLogin()
     return
   }
@@ -95,7 +96,7 @@ function handleLogout() {
     content: '确定要退出登录吗？',
     success: (res) => {
       if (res.confirm) {
-        useTokenStore().logout()
+        void tokenStore.logout()
         uni.showToast({ title: '退出登录成功', icon: 'success' })
       }
     },
