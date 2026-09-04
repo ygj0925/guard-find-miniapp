@@ -29,7 +29,7 @@ const companyBase = {
   companyIndustry: '生物医药',
   companyStage: '已上市',
   companySize: '1000-9999人',
-  companyLogo: '/static/logo.svg',
+  companyLogo: 'https://static1.3sbio.com/assets/lingcai/logo.png',
 }
 
 const recruiterBase = {

@@ -15,7 +15,7 @@ import type {
   AiMessageExtensionType,
 } from './aiHistory'
 import { onHide, onShow } from '@dcloudio/uni-app'
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   getAgentChatSession,
   listAgentChatAsks,
@@ -23,6 +23,9 @@ import {
   resolveAgentToolAsk,
   streamAgentChat,
 } from '@/api/agent'
+import { useTokenStore } from '@/store/token'
+import { useUserStore } from '@/store/user'
+import { toLoginPage } from '@/utils/toLoginPage'
 import { safeAreaInsets, systemInfo } from '@/utils/systemInfo'
 import {
   clearNewConversationRequest,
@@ -42,6 +45,7 @@ defineOptions({
 })
 
 definePage({
+  excludeLoginPath: true,
   style: {
     navigationStyle: 'custom',
     navigationBarTitleText: '生生智家',
@@ -72,6 +76,9 @@ interface ActiveStream {
   cancel: () => void
 }
 
+const AI_PAGE_PATH = '/pages/ai-chat/index'
+const tokenStore = useTokenStore()
+const userStore = useUserStore()
 const quickQuestions = ref<QuickQuestion[]>([
   { id: 1, tag: '岗位推荐', displayQuestion: '帮我找上海的研发岗位', sendContent: '帮我推荐上海的生物药研发岗位' },
   { id: 2, tag: '简历优化', displayQuestion: '怎样突出我的项目经历？', sendContent: '怎样在简历中突出我的项目经历？' },
@@ -117,6 +124,7 @@ let messageSequence = 0
 let extensionSequence = 0
 let restoreSequence = 0
 let activeStream: ActiveStream | null = null
+let conversationOwnerId: string | null = null
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
 
 const speech = useSpeechRecognition({
@@ -209,26 +217,94 @@ function openHistory() {
   })
 }
 
-function startNewConversation() {
+function resetConversationState(started: boolean) {
   restoreSequence += 1
-  if (isReplying.value)
+  if (isReplying.value || activeStream)
     cancelReply()
   clearNewConversationRequest()
-  hasStarted.value = true
+  hasStarted.value = started
   currentConversation.value = null
   inputValue.value = ''
   isReplying.value = false
   isRestoringHistory.value = false
+  isOpeningHistory.value = false
   isFollowingLatest.value = true
   streamStatusText.value = ''
   expandedReasoningIds.value = []
   scrollIntoView.value = ''
+  scrollWithAnimation.value = false
+  if (autoScrollTimer) {
+    clearTimeout(autoScrollTimer)
+    autoScrollTimer = null
+  }
+}
+
+function currentUserId() {
+  const userId = String(userStore.userInfo.userId ?? '').trim()
+  return userId && userId !== '-1' ? userId : null
+}
+
+function leaveAuthenticatedAiSession() {
+  speech.cancel()
+  resetConversationState(false)
+  conversationOwnerId = null
+  toLoginPage({
+    queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
+  })
+}
+
+function isAuthenticationError(error: unknown) {
+  const details = readRecord(error)
+  const code = readString(details.code)
+  return details.type === 'auth' || code === 'LOGIN_REQUIRED' || code === 'UNAUTHORIZED'
+}
+
+function handleAsyncAuthLoss(error: unknown) {
+  if (!isAuthenticationError(error))
+    return false
+
+  const currentTokenStore = tokenStore.updateNowTime()
+  if (currentTokenStore.hasLogin && currentTokenStore.validToken) {
+    // 迟到的旧请求不得退出新账号，但旧账号会话也不能继续显示或写入。
+    speech.cancel()
+    resetConversationState(false)
+    conversationOwnerId = currentUserId()
+    return true
+  }
+
+  leaveAuthenticatedAiSession()
+  return true
+}
+
+function ensureAuthenticatedAiSession() {
+  const currentTokenStore = tokenStore.updateNowTime()
+  if (!currentTokenStore.hasLogin || !currentTokenStore.validToken) {
+    leaveAuthenticatedAiSession()
+    return false
+  }
+
+  const authenticatedUserId = currentUserId()
+  if (
+    conversationOwnerId !== null
+    && authenticatedUserId !== null
+    && conversationOwnerId !== authenticatedUserId
+  ) {
+    resetConversationState(false)
+  }
+  conversationOwnerId = authenticatedUserId
+  return true
+}
+
+function startNewConversation() {
+  resetConversationState(true)
   void measureContentViewport()
 }
 
 function sendMessage(content = inputValue.value) {
   const question = content.trim()
   if (!question || isReplying.value || isRestoringHistory.value)
+    return
+  if (!ensureAuthenticatedAiSession())
     return
 
   if (!currentConversation.value) {
@@ -262,6 +338,8 @@ function sendMessage(content = inputValue.value) {
     {
       onEvent: event => handleStreamEvent(event, assistantMessage),
       onError: (error) => {
+        if (handleAsyncAuthLoss(error))
+          return
         if (assistantMessage.status !== 'streaming')
           return
         if (!assistantMessage.content)
@@ -330,12 +408,17 @@ function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChat
       scheduleAutoScroll()
       break
     case 'done':
-      if (event.reply !== undefined)
+      // 空的最终 reply 不能覆盖前面已经累计的 delta 正文。
+      if (event.reply?.trim())
         assistantMessage.content = event.reply
       if (event.reasoningContent !== undefined)
         assistantMessage.reasoningContent = event.reasoningContent
-      if (!assistantMessage.content && !assistantMessage.extensions.length)
-        assistantMessage.content = '本次任务已处理完成。'
+      if (!assistantMessage.content.trim()) {
+        if (!assistantMessage.extensions.length)
+          assistantMessage.content = '本次任务已处理完成。'
+        else if (assistantMessage.extensions.every(item => item.state === 'success'))
+          assistantMessage.content = '相关操作已处理完成，请查看上方结果。'
+      }
       assistantMessage.status = 'complete'
       finishReply()
       break
@@ -500,13 +583,16 @@ async function handleAskResolution(
     if (result.toolResult)
       addAskToolResult(message, extension, result.toolResult, result.toolCode)
   }
-  catch {
+  catch (error) {
+    if (handleAsyncAuthLoss(error))
+      return
     extension.resolutionState = 'failed'
     extension.state = 'failed'
     extension.resolutionMessage = '提交失败，请检查网络后重试。'
   }
   finally {
-    scheduleAutoScroll()
+    if (currentConversation.value)
+      scheduleAutoScroll()
   }
 }
 
@@ -663,10 +749,18 @@ async function restoreConversation(sessionId: string) {
   isFollowingLatest.value = true
   currentConversation.value = null
   try {
+    const askHistoryPromise = listAgentChatAsks(sessionId, { limit: 100 })
+      .then(result => result.items)
+      .catch((error) => {
+        if (isAuthenticationError(error))
+          throw error
+        console.warn('历史工具确认记录加载失败，继续展示对话正文:', error)
+        return [] as AgentChatAskRecord[]
+      })
     const [detail, historyResult, askHistory] = await Promise.all([
       getAgentChatSession(sessionId),
       loadHistoryMessages(sessionId),
-      listAgentChatAsks(sessionId, { limit: 100 }),
+      askHistoryPromise,
     ])
     if (sequence !== restoreSequence)
       return
@@ -676,7 +770,7 @@ async function restoreConversation(sessionId: string) {
       title: session.title || '历史对话',
       createdAt: parseDate(session.createTime),
       updatedAt: parseDate(session.lastMessageTime || session.updateTime || session.createTime),
-      messages: mapHistoryMessages(historyResult.records, askHistory.items),
+      messages: mapHistoryMessages(historyResult.records, askHistory),
     }
     if (historyResult.truncated) {
       uni.showToast({
@@ -686,7 +780,9 @@ async function restoreConversation(sessionId: string) {
       })
     }
   }
-  catch {
+  catch (error) {
+    if (handleAsyncAuthLoss(error))
+      return
     if (sequence === restoreSequence) {
       currentConversation.value = null
       uni.showToast({ title: '历史对话加载失败，请稍后重试', icon: 'none' })
@@ -1001,7 +1097,18 @@ function handleRecordCancel() {
   speech.cancel()
 }
 
+watch(
+  () => tokenStore.tokenInfo,
+  () => {
+    const currentTokenStore = tokenStore.updateNowTime()
+    if (!currentTokenStore.hasLogin || !currentTokenStore.validToken)
+      leaveAuthenticatedAiSession()
+  },
+)
+
 onShow(() => {
+  if (!ensureAuthenticatedAiSession())
+    return
   void restoreHistorySelection()
   if (hasStarted.value)
     void measureContentViewport()
@@ -1009,6 +1116,7 @@ onShow(() => {
 onHide(() => speech.cancel())
 onMounted(() => uni.onKeyboardHeightChange(handleKeyboardHeightChange))
 onUnmounted(() => {
+  restoreSequence += 1
   if (activeStream)
     cancelReply()
   speech.dispose()

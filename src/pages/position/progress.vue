@@ -28,8 +28,8 @@ function handleBack() {
 }
 
 onLoad(async (options) => {
-  const applyId = Number(options?.id)
-  if (!Number.isSafeInteger(applyId) || applyId <= 0) {
+  const applyId = String(options?.id ?? '').trim()
+  if (!applyId) {
     isLoading.value = false
     uni.showToast({ title: '投递记录不存在', icon: 'none' })
     return

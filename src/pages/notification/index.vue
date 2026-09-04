@@ -252,7 +252,7 @@ onShow(() => {
         <view v-else class="empty-card min-h-820rpx flex flex-col items-center justify-center rounded-32rpx bg-white px-5 py-7">
           <image
             class="h-300rpx w-360rpx rounded-28rpx"
-            src="/static/notification/DjcLa.png"
+            src="https://static1.3sbio.com/assets/lingcai/DjcLa.png"
             mode="aspectFit"
             aria-label="蓝色消息盒插画"
           />
@@ -271,7 +271,7 @@ onShow(() => {
       <view v-else class="empty-card min-h-900rpx flex flex-col items-center justify-center rounded-32rpx bg-white px-4.5 py-7.5">
         <image
           class="h-308rpx w-368rpx rounded-28rpx"
-          src="/static/notification/DjcLa.png"
+          src="https://static1.3sbio.com/assets/lingcai/DjcLa.png"
           mode="aspectFit"
           aria-label="蓝色消息盒插画"
         />

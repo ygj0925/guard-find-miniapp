@@ -38,6 +38,7 @@ const area = ref<AreaCodeItem>(getAreaByIso(DEFAULT_AREA_ISO))
 const form = reactive({ phone: '', code: '' })
 const errors = reactive({ phone: '', code: '' })
 let timer: ReturnType<typeof setInterval> | undefined
+let activeLoginAttemptId: number | null = null
 const authClientId = import.meta.env.VITE_AUTH_CLIENT_ID || 'ef51c9a3e9046c4f2ea45142c8a8344a'
 const tokenStore = useTokenStore()
 
@@ -47,9 +48,17 @@ onLoad((options) => {
   redirectUrl.value = typeof options?.redirect === 'string' ? options.redirect : ''
 })
 onUnmounted(() => {
+  cancelPendingLogin()
   if (timer)
     clearInterval(timer)
 })
+
+function cancelPendingLogin() {
+  if (activeLoginAttemptId === null)
+    return
+  tokenStore.cancelLoginAttempt(activeLoginAttemptId)
+  activeLoginAttemptId = null
+}
 
 function goTo(url: string) {
   uni.navigateTo({ url })
@@ -128,6 +137,9 @@ async function sendCodeAfterCaptcha(captchaVerification: string) {
 async function performPhoneLogin() {
   if (loading.value)
     return
+
+  const attemptId = tokenStore.beginLoginAttempt()
+  activeLoginAttemptId = attemptId
   loading.value = true
   feedback.value = ''
   try {
@@ -137,13 +149,20 @@ async function performPhoneLogin() {
       phone: form.phone,
       captcha: form.code,
     })
-    await tokenStore.completeExternalLogin(token)
+    const committed = await tokenStore.completeExternalLogin(token, attemptId)
+    if (!committed)
+      return
+    if (activeLoginAttemptId === attemptId)
+      activeLoginAttemptId = null
     navigateAfterAuthenticated(redirectUrl.value)
   }
   catch (error) {
     feedback.value = error instanceof Error ? error.message : '登录失败，请稍后重试。'
   }
   finally {
+    tokenStore.cancelLoginAttempt(attemptId)
+    if (activeLoginAttemptId === attemptId)
+      activeLoginAttemptId = null
     loading.value = false
   }
 }
@@ -193,6 +212,7 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
 }
 
 function skipLogin() {
+  cancelPendingLogin()
   uni.reLaunch({ url: '/pages/index/index' })
 }
 </script>
@@ -202,7 +222,7 @@ function skipLogin() {
     <view class="login-hero relative overflow-hidden bg-[#dceeff]">
       <image
         class="absolute inset-0 h-full w-full"
-        src="/static/auth/login-hero-bg.jpg"
+        src="https://static1.3sbio.com/assets/lingcai/login-hero-bg.jpg"
         mode="aspectFill"
         aria-hidden="true"
       />
@@ -218,11 +238,11 @@ function skipLogin() {
         </view>
         <view class="mt-20rpx flex items-center justify-center gap-18rpx text-25rpx text-[#0a82f7] font-500">
           <view class="h-60rpx w-188rpx flex items-center justify-center rounded-full bg-[rgba(255,255,255,0.8)]">
-            <image class="mr-10rpx h-34rpx w-34rpx" src="/static/auth/recruit-social.svg" mode="aspectFit" aria-hidden="true" />
+            <image class="mr-10rpx h-34rpx w-34rpx" src="https://static1.3sbio.com/assets/lingcai/recruit-social.svg" mode="aspectFit" aria-hidden="true" />
             <text>社会招聘</text>
           </view>
           <view class="h-60rpx w-188rpx flex items-center justify-center rounded-full bg-[rgba(255,255,255,0.8)]">
-            <image class="mr-10rpx h-34rpx w-34rpx" src="/static/auth/recruit-campus.svg" mode="aspectFit" aria-hidden="true" />
+            <image class="mr-10rpx h-34rpx w-34rpx" src="https://static1.3sbio.com/assets/lingcai/recruit-campus.svg" mode="aspectFit" aria-hidden="true" />
             <text>校园招聘</text>
           </view>
         </view>
