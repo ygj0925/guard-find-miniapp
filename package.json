@@ -13,9 +13,7 @@
     "uiLibrary": "wot-ui-v2",
     "loginStrategy": true,
     "i18n": true,
-    "chartLibraries": [
-      "lime-echart"
-    ],
+    "chartLibraries": [],
     "cliVersion": "4.0.16",
     "unibestVersion": "4.4.1",
     "unibestUpdateTime": "2026-05-22",
@@ -147,6 +145,8 @@
     "dayjs": "1.11.10",
     "echarts": "^5.4.1",
     "lodash-es": "^4.17.21",
+    "markdown-it": "15.0.1",
+    "mp-html": "2.5.2",
     "pinia": "2.0.36",
     "pinia-plugin-persistedstate": "3.2.1",
     "vue": "^3.4.21",
@@ -165,6 +165,7 @@
     "@iconify-json/carbon": "^1.2.4",
     "@iconify/utils": "^3.0.2",
     "@types/crypto-js": "^4.2.2",
+    "@types/markdown-it": "14.2.0",
     "@types/node": "^20.17.9",
     "@uni-helper/eslint-config": "0.5.0",
     "@uni-helper/plugin-uni": "0.1.0",

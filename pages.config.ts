@@ -2,6 +2,12 @@ import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 import { tabBar } from './src/tabbar/config'
 
 export default defineUniPages({
+  plugins: {
+    WechatSI: {
+      version: '0.3.5',
+      provider: 'wx069ba97219f66d99',
+    },
+  },
   lazyCodeLoading: 'requiredComponents',
   globalStyle: {
     navigationStyle: 'default',

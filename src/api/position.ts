@@ -5,22 +5,28 @@ export interface PositionFilterOption {
   label: string
 }
 
+export interface PositionLocationOption extends PositionFilterOption {
+  children?: PositionLocationOption[]
+}
+
 export interface PositionFilterOptions {
   kinds: PositionFilterOption[]
   educationInfos: PositionFilterOption[]
   workExperiences: PositionFilterOption[]
-  locations: PositionFilterOption[]
+  locations: PositionLocationOption[]
 }
 
 export interface PositionListQuery {
   pageNum: number
   pageSize: number
+  /** 职位搜索关键字。 */
+  keyword?: string
   kinds?: number[]
-  /** 招聘类别文本，如 社招 / 校招，用于社会招聘、校园招聘的快捷过滤。 */
-  category?: string
   educationInfos?: string[]
   workExperiences?: string[]
   locIds?: string[]
+  /** 招聘分类编码列表，如 社招 / 校招。 */
+  categories?: string[]
 }
 
 export interface HotPositionListQuery {
@@ -33,8 +39,10 @@ export interface PositionListItem {
   /** 上游职位 jobId，投递时必须一并提交。 */
   jobId: string | number
   positionName: string
+  source?: string
   jobType: string
   recruitmentTargetType: string
+  categories?: string[]
   availableCityList: string[]
   edu: string
   salaryMin?: number

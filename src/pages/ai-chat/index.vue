@@ -1,19 +1,41 @@
 <script setup lang="ts">
-import type { AiChatConversation, AiChatMessage, AiChatMessageRole, AiChatMessageStatus } from './aiHistory'
-import { onShow } from '@dcloudio/uni-app'
+import type {
+  AgentChatAskRecord,
+  AgentChatMessageRecord,
+  AgentChatStreamEvent,
+  AgentToolAskAction,
+} from '@/api/agent'
+import type {
+  AiChatConversation,
+  AiChatMessage,
+  AiChatMessageRole,
+  AiChatMessageStatus,
+  AiMessageActivityState,
+  AiMessageExtension,
+  AiMessageExtensionType,
+} from './aiHistory'
+import { onHide, onShow } from '@dcloudio/uni-app'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import {
+  getAgentChatSession,
+  listAgentChatAsks,
+  listAgentChatMessages,
+  resolveAgentToolAsk,
+  streamAgentChat,
+} from '@/api/agent'
 import { safeAreaInsets, systemInfo } from '@/utils/systemInfo'
 import {
   clearNewConversationRequest,
   consumeActiveHistoryConversation,
   consumeDeletedConversationIds,
   consumeNewConversationRequest,
-  findHistoryConversation,
-  upsertHistoryConversation,
 } from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
 import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
+import AiMessageActivityGroup from './components/AiMessageActivityGroup.vue'
+import AiRichText from './components/AiRichText.vue'
+import { useSpeechRecognition } from './useSpeechRecognition'
 
 defineOptions({
   name: 'AiChat',
@@ -24,12 +46,11 @@ definePage({
     navigationStyle: 'custom',
     navigationBarTitleText: '生生智家',
     backgroundColor: '#EDF6FF',
+    disableScroll: true,
   },
 })
 
-type SpeechRecognitionState = 'idle' | 'recording' | 'recognizing'
-
-interface MockQuickQuestion {
+interface QuickQuestion {
   id: number
   tag: string
   displayQuestion: string
@@ -47,7 +68,11 @@ interface KeyboardHeightEvent {
   height: number
 }
 
-const quickQuestions = ref<MockQuickQuestion[]>([
+interface ActiveStream {
+  cancel: () => void
+}
+
+const quickQuestions = ref<QuickQuestion[]>([
   { id: 1, tag: '岗位推荐', displayQuestion: '帮我找上海的研发岗位', sendContent: '帮我推荐上海的生物药研发岗位' },
   { id: 2, tag: '简历优化', displayQuestion: '怎样突出我的项目经历？', sendContent: '怎样在简历中突出我的项目经历？' },
   { id: 3, tag: '面试准备', displayQuestion: '医学岗位面试会问什么？', sendContent: '医学相关岗位面试通常会问什么？' },
@@ -57,15 +82,17 @@ const hasStarted = ref(false)
 const inputValue = ref('')
 const currentConversation = ref<AiChatConversation | null>(null)
 const isReplying = ref(false)
+const isRestoringHistory = ref(false)
 const isOpeningHistory = ref(false)
 const isFollowingLatest = ref(true)
 const scrollIntoView = ref('')
 const scrollWithAnimation = ref(false)
 const keyboardHeight = ref(0)
-const speechState = ref<SpeechRecognitionState>('idle')
-const speechStateText = ref('')
+const streamStatusText = ref('')
+const expandedReasoningIds = ref<string[]>([])
 const safeBottom = safeAreaInsets?.bottom || 0
 const scrollViewportHeight = Number(systemInfo?.windowHeight || 844)
+const contentViewportHeight = ref(scrollViewportHeight)
 const scrollViewportWidth = Number(systemInfo?.windowWidth || 390)
 const rpxScale = scrollViewportWidth / 750
 const splashCopyHeight = (22 + 34 * 1.42 * 3) * rpxScale
@@ -87,8 +114,22 @@ const splashHeroWidth = Math.min(
   Math.round(splashHeroHeight * (590 / 714)),
 )
 let messageSequence = 0
-let replyTimer: ReturnType<typeof setTimeout> | null = null
-let voiceTimer: ReturnType<typeof setTimeout> | null = null
+let extensionSequence = 0
+let restoreSequence = 0
+let activeStream: ActiveStream | null = null
+let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
+
+const speech = useSpeechRecognition({
+  onResult(text) {
+    inputValue.value = text
+  },
+  onError(message) {
+    uni.showToast({ title: message, icon: 'none' })
+  },
+})
+
+const speechState = speech.state
+const speechStateText = speech.stateText
 
 const splashScrollStyle = computed(() => ({
   paddingTop: `${aiHeaderMetrics.height}px`,
@@ -133,6 +174,7 @@ function createMessage(
     content,
     createdAt: Date.now(),
     status,
+    extensions: [],
   }
 }
 
@@ -141,50 +183,16 @@ function formatMessageTime(timestamp: number) {
   return `${`${date.getHours()}`.padStart(2, '0')}:${`${date.getMinutes()}`.padStart(2, '0')}`
 }
 
-function getMockReply(question: string) {
-  if (question.includes('研发') || question.includes('上海')) {
-    return '根据你的方向，建议优先关注生物药研发、工艺开发和分析研究岗位。你可以继续告诉我学历、专业和工作年限，我会帮你进一步缩小范围。'
-  }
-  if (question.includes('简历') || question.includes('项目')) {
-    return '项目经历建议按“目标、行动、结果”来写：先说明项目阶段，再写你负责的实验或协作内容，最后补充可量化的结果与业务价值。'
-  }
-  if (question.includes('面试') || question.includes('医学')) {
-    return '医学岗位通常会关注疾病领域理解、文献解读、沟通协作和合规意识。建议准备一个专业沟通案例，并清楚说明你的判断过程。'
-  }
-  return '我已记录你的求职需求。你可以补充意向城市、目标岗位、专业背景和工作年限，我会根据演示职位数据给出更具体的建议。'
-}
-
-function clearReplyTimer() {
-  if (replyTimer) {
-    clearTimeout(replyTimer)
-    replyTimer = null
-  }
-}
-
-function clearVoiceTimer() {
-  if (voiceTimer) {
-    clearTimeout(voiceTimer)
-    voiceTimer = null
-  }
-}
-
 function createConversationTitle(question: string) {
   const title = question.replace(/\s+/g, ' ').trim()
   return title.length > 18 ? `${title.slice(0, 18)}…` : title
 }
 
-function persistCurrentConversation() {
-  const conversation = currentConversation.value
-  if (conversation?.messages.some(message => message.role === 'user')) {
-    upsertHistoryConversation(conversation)
-  }
-}
-
 function startExperience() {
   hasStarted.value = true
-  if (currentConversation.value) {
-    scrollToBottom(true, false)
-  }
+  void measureContentViewport()
+  if (currentConversation.value)
+    void scrollToBottom(true, false)
 }
 
 function openHistory() {
@@ -192,10 +200,8 @@ function openHistory() {
     uni.showToast({ title: '请先停止当前回复，再查看历史对话', icon: 'none' })
     return
   }
-  if (isOpeningHistory.value) {
+  if (isOpeningHistory.value || isRestoringHistory.value)
     return
-  }
-  persistCurrentConversation()
   isOpeningHistory.value = true
   uni.navigateTo({
     url: '/pages/ai-chat/history',
@@ -204,31 +210,31 @@ function openHistory() {
 }
 
 function startNewConversation() {
-  if (isReplying.value) {
+  restoreSequence += 1
+  if (isReplying.value)
     cancelReply()
-  }
-  else {
-    clearReplyTimer()
-  }
   clearNewConversationRequest()
   hasStarted.value = true
   currentConversation.value = null
   inputValue.value = ''
   isReplying.value = false
+  isRestoringHistory.value = false
   isFollowingLatest.value = true
+  streamStatusText.value = ''
+  expandedReasoningIds.value = []
   scrollIntoView.value = ''
+  void measureContentViewport()
 }
 
 function sendMessage(content = inputValue.value) {
   const question = content.trim()
-  if (!question || isReplying.value) {
+  if (!question || isReplying.value || isRestoringHistory.value)
     return
-  }
 
   if (!currentConversation.value) {
     const createdAt = Date.now()
     currentConversation.value = {
-      id: `conversation-${createdAt}`,
+      id: '',
       title: createConversationTitle(question),
       createdAt,
       updatedAt: createdAt,
@@ -242,43 +248,402 @@ function sendMessage(content = inputValue.value) {
   currentConversation.value.messages.push(assistantMessage)
   currentConversation.value.updatedAt = Date.now()
   isReplying.value = true
-  scrollToBottom(true, true)
+  isFollowingLatest.value = true
+  streamStatusText.value = '正在连接 AI 助手…'
+  void scrollToBottom(true, true)
 
-  clearReplyTimer()
-  replyTimer = setTimeout(() => {
-    assistantMessage.content = getMockReply(question)
-    assistantMessage.status = 'complete'
-    if (currentConversation.value) {
-      currentConversation.value.updatedAt = Date.now()
+  activeStream = streamAgentChat(
+    {
+      message: question,
+      stream: true,
+      sessionId: currentConversation.value.id || undefined,
+    },
+    {
+      onEvent: event => handleStreamEvent(event, assistantMessage),
+      onError: (error) => {
+        if (assistantMessage.status !== 'streaming')
+          return
+        if (!assistantMessage.content)
+          assistantMessage.content = error.message
+        assistantMessage.status = 'error'
+        finishReply()
+      },
+      onComplete: () => {
+        if (assistantMessage.status === 'streaming') {
+          if (!assistantMessage.content)
+            assistantMessage.content = 'AI 回复意外中断，请重试'
+          assistantMessage.status = 'error'
+          finishReply()
+        }
+      },
+    },
+  )
+}
+
+function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChatMessage) {
+  const conversation = currentConversation.value
+  if (!conversation || assistantMessage.status !== 'streaming')
+    return
+
+  if (event.sessionId)
+    conversation.id = event.sessionId
+  if (event.runId !== undefined)
+    assistantMessage.runId = event.runId
+
+  switch (event.type) {
+    case 'start':
+      streamStatusText.value = '正在思考…'
+      break
+    case 'status':
+      streamStatusText.value = readEventMessage(event) || '正在处理你的问题…'
+      break
+    case 'attachment':
+      addOrUpdateExtension(assistantMessage, event, 'attachment')
+      streamStatusText.value = attachmentStatusText(event)
+      scheduleAutoScroll()
+      break
+    case 'delta':
+      if (event.delta)
+        assistantMessage.content += event.delta
+      streamStatusText.value = ''
+      break
+    case 'reasoning_delta':
+      if (event.reasoningDelta)
+        assistantMessage.reasoningContent = `${assistantMessage.reasoningContent || ''}${event.reasoningDelta}`
+      if (expandedReasoningIds.value.includes(assistantMessage.id))
+        scheduleAutoScroll()
+      break
+    case 'tool_call':
+      addOrUpdateExtension(assistantMessage, event, 'tool_call')
+      streamStatusText.value = event.toolName ? `正在调用 ${event.toolName}…` : '正在调用工具…'
+      scheduleAutoScroll()
+      break
+    case 'tool_result':
+      addOrUpdateExtension(assistantMessage, event, 'tool_result')
+      streamStatusText.value = toolResultStatusText(event)
+      scheduleAutoScroll()
+      break
+    case 'ask':
+      addOrUpdateExtension(assistantMessage, event, 'ask')
+      streamStatusText.value = '需要你的进一步确认'
+      scheduleAutoScroll()
+      break
+    case 'done':
+      if (event.reply !== undefined)
+        assistantMessage.content = event.reply
+      if (event.reasoningContent !== undefined)
+        assistantMessage.reasoningContent = event.reasoningContent
+      if (!assistantMessage.content && !assistantMessage.extensions.length)
+        assistantMessage.content = '本次任务已处理完成。'
+      assistantMessage.status = 'complete'
+      finishReply()
+      break
+    case 'error':
+      if (!assistantMessage.content)
+        assistantMessage.content = userFacingStreamError(readEventMessage(event))
+      assistantMessage.status = 'error'
+      finishReply()
+      break
+  }
+
+  conversation.updatedAt = Date.now()
+}
+
+function addOrUpdateExtension(
+  message: AiChatMessage,
+  event: AgentChatStreamEvent,
+  type: AiMessageExtensionType,
+) {
+  const identifiedGroupId = extensionGroupIdentifier(event, type)
+  const stepId = identifiedGroupId ? `${identifiedGroupId}:${type}` : ''
+  const existingIndex = stepId
+    ? message.extensions.findIndex(item => item.id === stepId)
+    : -1
+  const existing = existingIndex >= 0 ? message.extensions[existingIndex] : undefined
+  const order = existing?.order ?? nextExtensionOrder()
+  const groupId = existing?.groupId || identifiedGroupId || `activity-${message.id}-${order}`
+  const nextState = extensionState(type, event.data)
+  const extension: AiMessageExtension = {
+    id: existing?.id || stepId || `${groupId}:${type}`,
+    type,
+    groupId,
+    order,
+    state: preserveTerminalState(existing?.state, nextState),
+    toolName: event.toolName || existing?.toolName,
+    toolCallId: event.toolCallId || existing?.toolCallId,
+    askTicketId: event.askTicketId || existing?.askTicketId,
+    resolutionState: type === 'ask' ? existing?.resolutionState || 'pending' : undefined,
+    resolutionMessage: type === 'ask' ? existing?.resolutionMessage : undefined,
+    data: { ...(existing?.data || {}), ...event.data },
+  }
+  if (existingIndex >= 0)
+    message.extensions.splice(existingIndex, 1, extension)
+  else
+    message.extensions.push(extension)
+
+  if (type === 'tool_result' || type === 'ask') {
+    message.extensions
+      .filter(item => item.groupId === groupId && item.type === 'tool_call')
+      .forEach((item) => {
+        item.state = extension.state
+      })
+  }
+}
+
+function extensionGroupIdentifier(event: AgentChatStreamEvent, type: AiMessageExtensionType) {
+  if (event.toolCallId)
+    return `tool-${event.toolCallId}`
+  if (event.askTicketId)
+    return `ask-${event.askTicketId}`
+  if (type !== 'attachment')
+    return ''
+  const attachment = readRecord(event.data.attachment)
+  const fileId = typeof attachment.fileId === 'number' ? String(attachment.fileId) : ''
+  const fileName = readString(attachment.fileName)
+  return fileId || fileName ? `attachment-${fileId || fileName}` : ''
+}
+
+function nextExtensionOrder() {
+  extensionSequence += 1
+  return extensionSequence
+}
+
+function extensionState(type: AiMessageExtensionType, data: Record<string, unknown>): AiMessageActivityState {
+  if (type === 'tool_call' || type === 'custom')
+    return 'running'
+  if (type === 'ask')
+    return statusState(data.status, 'waiting_user')
+  if (type === 'attachment')
+    return statusState(readRecord(data.attachment).status, 'running')
+  return statusState(data.status, 'success')
+}
+
+function statusState(value: unknown, fallback: AiMessageActivityState): AiMessageActivityState {
+  const status = readString(value).toUpperCase()
+  if (['ERROR', 'FAILED', 'DENIED', 'UNAVAILABLE'].includes(status))
+    return 'failed'
+  if (['CANCELED', 'CANCELLED'].includes(status))
+    return 'cancelled'
+  if (['INTERRUPTED', 'EXPIRED'].includes(status))
+    return 'interrupted'
+  if (['ASK_REQUIRED', 'PENDING'].includes(status))
+    return 'waiting_user'
+  if (['RUNNING', 'PARSING', 'PROCESSING'].includes(status))
+    return 'running'
+  if (['SUCCESS', 'SUCCEEDED', 'OK', 'COMPLETED', 'CONFIRMED', 'EXECUTED'].includes(status))
+    return 'success'
+  return fallback
+}
+
+function preserveTerminalState(
+  current: AiMessageActivityState | undefined,
+  next: AiMessageActivityState,
+): AiMessageActivityState {
+  if (current && !['running', 'waiting_user'].includes(current) && next === 'running')
+    return current
+  return next
+}
+
+async function handleAskResolution(
+  message: AiChatMessage,
+  extension: AiMessageExtension,
+  action: AgentToolAskAction,
+) {
+  if (extension.type !== 'ask'
+    || extension.resolutionState === 'resolving'
+    || extension.resolutionState === 'confirmed'
+    || extension.resolutionState === 'cancelled') {
+    return
+  }
+
+  const ticketId = extension.askTicketId || ''
+  const argsSnapshotHash = readString(extension.data.argsSnapshotHash)
+  if (!ticketId || !argsSnapshotHash) {
+    extension.resolutionState = 'failed'
+    extension.state = 'failed'
+    extension.resolutionMessage = '确认信息不完整，请重新发起该操作。'
+    return
+  }
+
+  extension.resolutionState = 'resolving'
+  extension.state = 'running'
+  extension.resolutionMessage = action === 'CONFIRM' ? '正在确认并继续执行…' : '正在取消本次操作…'
+  scheduleAutoScroll()
+  try {
+    const result = await resolveAgentToolAsk(ticketId, action, {
+      argsSnapshotHash,
+      operatorReason: action === 'CONFIRM' ? '用户在 AI 对话中确认操作' : '用户在 AI 对话中取消操作',
+    })
+    const status = readString(result.status).toUpperCase()
+    if (status === 'CONFIRMED') {
+      extension.resolutionState = 'confirmed'
+      extension.state = 'success'
+      extension.resolutionMessage = readableServiceMessage(result.message) || '已确认，系统将继续执行该操作。'
     }
-    isReplying.value = false
-    replyTimer = null
-    persistCurrentConversation()
-    scrollToBottom(true, true)
-  }, 760)
+    else if (status === 'CANCELED' || status === 'CANCELLED') {
+      extension.resolutionState = 'cancelled'
+      extension.state = 'cancelled'
+      extension.resolutionMessage = readableServiceMessage(result.message) || '已取消，本次操作不会继续执行。'
+    }
+    else if (status === 'EXECUTION_IN_PROGRESS') {
+      extension.resolutionState = 'confirmed'
+      extension.state = 'running'
+      extension.resolutionMessage = '该操作已在执行，请勿重复提交。'
+    }
+    else {
+      extension.resolutionState = 'failed'
+      extension.state = status === 'EXPIRED' ? 'interrupted' : 'failed'
+      extension.resolutionMessage = askResolutionFailureMessage(status, result.message)
+    }
+
+    if (result.toolResult)
+      addAskToolResult(message, extension, result.toolResult, result.toolCode)
+  }
+  catch {
+    extension.resolutionState = 'failed'
+    extension.state = 'failed'
+    extension.resolutionMessage = '提交失败，请检查网络后重试。'
+  }
+  finally {
+    scheduleAutoScroll()
+  }
+}
+
+function addAskToolResult(
+  message: AiChatMessage,
+  askExtension: AiMessageExtension,
+  toolResult: { status?: string, data?: unknown, message?: string, toolCode?: string },
+  fallbackToolCode?: string,
+) {
+  const groupId = askExtension.groupId
+  const id = `${groupId}:tool_result`
+  const existingIndex = message.extensions.findIndex(item => item.id === id)
+  const existing = existingIndex >= 0 ? message.extensions[existingIndex] : undefined
+  const extension: AiMessageExtension = {
+    id,
+    type: 'tool_result',
+    groupId,
+    order: existing?.order ?? nextExtensionOrder(),
+    state: statusState(toolResult.status, 'success'),
+    toolName: toolResult.toolCode || fallbackToolCode || askExtension.toolName,
+    toolCallId: askExtension.toolCallId,
+    data: {
+      status: toolResult.status,
+      message: readableServiceMessage(toolResult.message),
+      result: toolResult.data,
+    },
+  }
+  if (existingIndex >= 0)
+    message.extensions.splice(existingIndex, 1, extension)
+  else
+    message.extensions.push(extension)
+
+  message.extensions
+    .filter(item => item.groupId === groupId && item.type === 'tool_call')
+    .forEach((item) => {
+      item.state = extension.state
+    })
+}
+
+function askResolutionFailureMessage(status: string, serviceMessage?: string) {
+  const messages: Record<string, string> = {
+    NOT_FOUND: '确认请求不存在或已失效，请重新发起。',
+    ALREADY_RESOLVED: '该确认请求已被处理，请刷新对话状态。',
+    USER_MISMATCH: '当前账号无法处理该确认请求。',
+    CHANNEL_MISMATCH: '请在发起该操作的渠道中完成确认。',
+    ARGUMENT_HASH_MISMATCH: '操作参数已发生变化，请重新发起确认。',
+    EXPIRED: '确认请求已过期，请重新发起。',
+    EXECUTION_IN_PROGRESS: '该操作已在执行，请勿重复提交。',
+    PAYLOAD_UNAVAILABLE: '确认上下文已失效，请重新发起该操作。',
+  }
+  return messages[status] || readableServiceMessage(serviceMessage) || '确认处理失败，请稍后重试。'
+}
+
+function userFacingStreamError(value: unknown) {
+  const message = readString(value)
+  const messages: Record<string, string> = {
+    FILE_PARSE_FAILED: '附件解析失败，请重新上传或更换文件。',
+    FILE_NOT_FOUND: '未找到上传的附件，请重新上传。',
+    FILE_TOO_LARGE: '附件过大，请压缩后重新上传。',
+    UNSUPPORTED_FILE_TYPE: '暂不支持该附件类型，请更换文件。',
+  }
+  if (messages[message])
+    return messages[message]
+  if (!message || /^[A-Z0-9_]+$/.test(message))
+    return 'AI 服务暂时不可用，请稍后重试'
+  return message
+}
+
+function readableServiceMessage(value: unknown) {
+  const message = readString(value)
+  return message && !/^[A-Z0-9_]+$/.test(message) ? message : ''
+}
+
+function toolResultStatusText(event: AgentChatStreamEvent) {
+  const status = readString(event.data.status).toUpperCase()
+  if (['ERROR', 'FAILED', 'DENIED', 'UNAVAILABLE'].includes(status))
+    return '工具执行失败，正在整理结果…'
+  if (['INTERRUPTED', 'CANCELED', 'CANCELLED', 'EXPIRED'].includes(status))
+    return '工具执行已中断，正在整理结果…'
+  if (['SUCCESS', 'SUCCEEDED', 'OK', 'COMPLETED', 'CONFIRMED', 'EXECUTED'].includes(status))
+    return '工具执行完成，正在整理结果…'
+  return '工具已返回结果，正在整理…'
+}
+
+function attachmentStatusText(event: AgentChatStreamEvent) {
+  const status = readString(readRecord(event.data.attachment).status).toUpperCase()
+  if (status === 'PARSING')
+    return '正在解析附件…'
+  if (status === 'FAILED')
+    return '附件解析失败，正在继续处理…'
+  if (status === 'SUCCESS')
+    return '附件解析完成，正在分析…'
+  return '正在处理附件…'
+}
+
+function readEventMessage(event: AgentChatStreamEvent) {
+  return readString(event.data.message)
+}
+
+function readString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function readRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function finishReply() {
+  isReplying.value = false
+  activeStream = null
+  streamStatusText.value = ''
+  if (currentConversation.value)
+    currentConversation.value.updatedAt = Date.now()
+  void scrollToBottom(false, true)
 }
 
 function cancelReply() {
-  clearReplyTimer()
+  const stream = activeStream
+  activeStream = null
   const messages = currentConversation.value?.messages || []
   const pendingMessage = [...messages].reverse().find(message => message.status === 'streaming')
   if (pendingMessage) {
-    pendingMessage.content = '已停止回复'
-    pendingMessage.status = 'complete'
-  }
-  if (currentConversation.value) {
-    currentConversation.value.updatedAt = Date.now()
+    if (!pendingMessage.content)
+      pendingMessage.content = '已停止生成'
+    pendingMessage.status = 'stopped'
   }
   isReplying.value = false
-  persistCurrentConversation()
+  streamStatusText.value = ''
+  stream?.cancel()
 }
 
-function restoreHistorySelection() {
+async function restoreHistorySelection() {
   isOpeningHistory.value = false
   const deletedIds = consumeDeletedConversationIds()
-  if (currentConversation.value && deletedIds.includes(currentConversation.value.id)) {
+  if (currentConversation.value?.id && deletedIds.includes(currentConversation.value.id))
     startNewConversation()
-  }
 
   if (consumeNewConversationRequest()) {
     startNewConversation()
@@ -286,28 +651,281 @@ function restoreHistorySelection() {
   }
 
   const activeConversationId = consumeActiveHistoryConversation()
-  if (!activeConversationId) {
-    return
+  if (activeConversationId)
+    await restoreConversation(activeConversationId)
+}
+
+async function restoreConversation(sessionId: string) {
+  const sequence = ++restoreSequence
+  hasStarted.value = true
+  isRestoringHistory.value = true
+  isFollowingLatest.value = true
+  currentConversation.value = null
+  try {
+    const [detail, historyResult, askHistory] = await Promise.all([
+      getAgentChatSession(sessionId),
+      loadHistoryMessages(sessionId),
+      listAgentChatAsks(sessionId, { limit: 100 }),
+    ])
+    if (sequence !== restoreSequence)
+      return
+    const session = detail.session
+    currentConversation.value = {
+      id: session.sessionId,
+      title: session.title || '历史对话',
+      createdAt: parseDate(session.createTime),
+      updatedAt: parseDate(session.lastMessageTime || session.updateTime || session.createTime),
+      messages: mapHistoryMessages(historyResult.records, askHistory.items),
+    }
+    if (historyResult.truncated) {
+      uni.showToast({
+        title: `对话较长，仅展示最近 ${historyResult.records.length} 条消息`,
+        icon: 'none',
+        duration: 3000,
+      })
+    }
   }
-  const conversation = findHistoryConversation(activeConversationId)
-  if (!conversation) {
-    uni.showToast({ title: '该历史对话已不存在', icon: 'none' })
-    return
+  catch {
+    if (sequence === restoreSequence) {
+      currentConversation.value = null
+      uni.showToast({ title: '历史对话加载失败，请稍后重试', icon: 'none' })
+    }
+  }
+  finally {
+    if (sequence === restoreSequence) {
+      isRestoringHistory.value = false
+      if (currentConversation.value)
+        await scrollToBottom(true, false)
+    }
+  }
+}
+
+async function loadHistoryMessages(sessionId: string) {
+  const maxRecords = 2_000
+  const maxRequests = 22
+  const pageSize = 100
+  const recordsById = new Map<number, AgentChatMessageRecord>()
+  const seenCursors = new Set<number>()
+  let beforeMessageId: number | undefined
+  let hasMore = true
+  let loadedRecordCount = 0
+  let requestCount = 0
+  let truncated = false
+
+  while (hasMore && loadedRecordCount < maxRecords && requestCount < maxRequests) {
+    const limit = Math.min(pageSize, maxRecords - loadedRecordCount)
+    const response = await listAgentChatMessages(sessionId, { limit, beforeMessageId })
+    requestCount += 1
+    const acceptedRecords = response.items.slice(0, limit)
+    acceptedRecords.forEach(record => recordsById.set(record.messageId, record))
+    loadedRecordCount += acceptedRecords.length
+    truncated ||= response.items.length > acceptedRecords.length
+    hasMore = response.hasMore
+    if (!hasMore)
+      break
+
+    const nextCursor = response.nextBeforeMessageId
+    if (nextCursor === undefined || seenCursors.has(nextCursor))
+      throw new Error('历史消息分页游标异常')
+    seenCursors.add(nextCursor)
+    beforeMessageId = nextCursor
   }
 
-  clearReplyTimer()
-  currentConversation.value = conversation
-  hasStarted.value = true
-  isReplying.value = false
-  isFollowingLatest.value = true
-  scrollToBottom(true, false)
+  return {
+    records: Array.from(recordsById.values()).sort((left, right) => left.messageId - right.messageId),
+    truncated: truncated || hasMore,
+  }
+}
+
+function mapHistoryMessages(records: AgentChatMessageRecord[], asks: AgentChatAskRecord[]) {
+  const messages: AiChatMessage[] = []
+  const assistantByRunId = new Map<number, AiChatMessage>()
+
+  records.forEach((record) => {
+    const role = readString(record.role).toLowerCase()
+    const type = readString(record.type).toLowerCase() || 'text'
+    const toolRecord = role === 'tool' || type === 'tool_call' || type === 'tool_result'
+
+    if (role === 'user') {
+      if (type !== 'text')
+        return
+      messages.push({
+        id: `history-message-${record.messageId}`,
+        role: 'user',
+        content: record.content || '',
+        createdAt: parseDate(record.createdAt),
+        status: 'complete',
+        runId: record.runId,
+        extensions: createAttachmentExtensions(record),
+      })
+      return
+    }
+
+    if (role !== 'assistant' && !toolRecord)
+      return
+    if (role === 'assistant' && type !== 'text' && !toolRecord)
+      return
+
+    let message = record.runId === undefined ? undefined : assistantByRunId.get(record.runId)
+    if (!message) {
+      message = {
+        id: `history-message-${record.messageId}`,
+        role: 'assistant',
+        content: '',
+        reasoningContent: '',
+        createdAt: parseDate(record.createdAt),
+        status: 'complete',
+        runId: record.runId,
+        extensions: [],
+      }
+      messages.push(message)
+      if (record.runId !== undefined)
+        assistantByRunId.set(record.runId, message)
+    }
+
+    if (toolRecord) {
+      const groupId = record.toolCallId ? `tool-${record.toolCallId}` : `history-tool-${record.messageId}`
+      const extensionType: 'tool_call' | 'tool_result' = type === 'tool_call' ? 'tool_call' : 'tool_result'
+      message.extensions.push({
+        id: `${groupId}:${extensionType}`,
+        type: extensionType,
+        groupId,
+        order: nextExtensionOrder(),
+        state: statusState(record.data?.status, extensionType === 'tool_call' ? 'running' : 'success'),
+        toolName: record.toolName,
+        toolCallId: record.toolCallId,
+        data: record.data || {},
+      })
+      return
+    }
+
+    if (record.content)
+      message.content += record.content
+    if (record.reasoningContent)
+      message.reasoningContent = record.reasoningContent
+    message.extensions.push(...createAttachmentExtensions(record))
+  })
+
+  asks
+    .slice()
+    .sort((left, right) => parseDate(left.createdAt) - parseDate(right.createdAt) || left.askId - right.askId)
+    .forEach((ask) => {
+      let message = assistantByRunId.get(ask.runId)
+      if (!message) {
+        message = {
+          id: `history-ask-message-${ask.askId}`,
+          role: 'assistant',
+          content: '',
+          createdAt: parseDate(ask.createdAt),
+          status: 'complete',
+          runId: ask.runId,
+          extensions: [],
+        }
+        let insertAfter = -1
+        messages.forEach((item, index) => {
+          if (item.runId === ask.runId)
+            insertAfter = index
+        })
+        if (insertAfter >= 0)
+          messages.splice(insertAfter + 1, 0, message)
+        else
+          messages.push(message)
+        assistantByRunId.set(ask.runId, message)
+      }
+
+      const extension = createHistoryAskExtension(ask)
+      const existingIndex = message.extensions.findIndex(item => item.id === extension.id)
+      if (existingIndex >= 0)
+        message.extensions.splice(existingIndex, 1, extension)
+      else
+        message.extensions.push(extension)
+    })
+
+  return messages.filter(message => message.content || message.extensions.length || message.reasoningContent)
+}
+
+function createAttachmentExtensions(record: AgentChatMessageRecord): AiMessageExtension[] {
+  return record.attachments.map((attachment, index) => {
+    const groupId = `history-attachment-${record.messageId}-${index}`
+    return {
+      id: `${groupId}:attachment`,
+      type: 'attachment',
+      groupId,
+      order: nextExtensionOrder(),
+      state: statusState(attachment.status, 'running'),
+      data: { attachment },
+    }
+  })
+}
+
+function createHistoryAskExtension(ask: AgentChatAskRecord): AiMessageExtension {
+  const status = readString(ask.status).toUpperCase()
+  const pending = status === 'PENDING' && ask.resolvable
+  const recoverableConfirmed = status === 'CONFIRMED' && ask.resolvable
+  const confirmed = status === 'EXECUTED' || (status === 'CONFIRMED' && !ask.resolvable)
+  const executing = status === 'EXECUTING'
+  const cancelled = status === 'CANCELED' || status === 'CANCELLED'
+  const groupId = ask.toolCallId ? `tool-${ask.toolCallId}` : `ask-${ask.askTicketId}`
+  let state: AiMessageActivityState = 'failed'
+  let resolutionState: AiMessageExtension['resolutionState'] = 'failed'
+  let resolutionMessage = '确认请求状态异常，请重新发起该操作。'
+
+  if (pending || recoverableConfirmed) {
+    state = 'waiting_user'
+    resolutionState = 'pending'
+    resolutionMessage = recoverableConfirmed ? '该操作已确认，但执行尚未完成，可继续执行。' : ''
+  }
+  else if (executing) {
+    state = 'running'
+    resolutionState = 'confirmed'
+    resolutionMessage = '该操作已进入执行流程，请勿重复提交；如长时间无结果请联系管理员核对。'
+  }
+  else if (confirmed) {
+    state = 'success'
+    resolutionState = 'confirmed'
+    resolutionMessage = status === 'EXECUTED' ? '该操作已执行完成。' : '该操作已确认。'
+  }
+  else if (cancelled) {
+    state = 'cancelled'
+    resolutionState = 'cancelled'
+    resolutionMessage = '该操作已取消。'
+  }
+  else if (status === 'EXPIRED') {
+    state = 'interrupted'
+    resolutionMessage = '确认请求已过期，请重新发起该操作。'
+  }
+  else if (status === 'PENDING' && !ask.resolvable) {
+    state = 'interrupted'
+    resolutionMessage = '确认上下文已失效，请重新发起该操作。'
+  }
+
+  return {
+    id: `${groupId}:ask`,
+    type: 'ask',
+    groupId,
+    order: nextExtensionOrder(),
+    state,
+    toolName: ask.toolName || readString(ask.data.toolCode),
+    toolCallId: ask.toolCallId,
+    askTicketId: ask.askTicketId,
+    resolutionState,
+    resolutionMessage,
+    data: {
+      ...ask.data,
+      status,
+      resolvable: ask.resolvable,
+    },
+  }
+}
+
+function parseDate(value?: string) {
+  const timestamp = value ? Date.parse(value) : Number.NaN
+  return Number.isFinite(timestamp) ? timestamp : Date.now()
 }
 
 async function scrollToBottom(forceFollow = true, animated = true) {
-  if (!forceFollow && !isFollowingLatest.value) {
+  if (!forceFollow && !isFollowingLatest.value)
     return
-  }
-
   isFollowingLatest.value = true
   scrollWithAnimation.value = animated
   scrollIntoView.value = ''
@@ -315,12 +933,38 @@ async function scrollToBottom(forceFollow = true, animated = true) {
   scrollIntoView.value = 'message-bottom'
 }
 
-function handleContentScroll(event: ScrollEvent) {
-  if (!currentConversation.value || scrollViewportHeight <= 0) {
+async function measureContentViewport() {
+  await nextTick()
+  uni.createSelectorQuery()
+    .select('.content-scroll')
+    .boundingClientRect((rect) => {
+      const nodeInfo = Array.isArray(rect) ? rect[0] : rect
+      const height = Number(nodeInfo?.height || 0)
+      if (height > 0)
+        contentViewportHeight.value = height
+    })
+    .exec()
+}
+
+function scheduleAutoScroll() {
+  if (!isFollowingLatest.value || autoScrollTimer)
     return
-  }
-  const distanceToBottom = event.detail.scrollHeight - event.detail.scrollTop - scrollViewportHeight
-  isFollowingLatest.value = distanceToBottom <= 24
+  autoScrollTimer = setTimeout(() => {
+    autoScrollTimer = null
+    void scrollToBottom(false, false)
+  }, 100)
+}
+
+function handleRichTextRendered() {
+  scheduleAutoScroll()
+}
+
+function handleContentScroll(event: ScrollEvent) {
+  if (!currentConversation.value)
+    return
+  const viewportHeight = contentViewportHeight.value || scrollViewportHeight
+  const distanceToBottom = event.detail.scrollHeight - event.detail.scrollTop - viewportHeight
+  isFollowingLatest.value = distanceToBottom <= 48
 }
 
 function resumeAutoScroll() {
@@ -328,48 +972,47 @@ function resumeAutoScroll() {
 }
 
 function returnToLatest() {
-  scrollToBottom(true, true)
+  void scrollToBottom(true, true)
 }
 
 function handleKeyboardHeightChange(event: KeyboardHeightEvent) {
   keyboardHeight.value = Math.max(0, Number(event.height || 0))
-  if (keyboardHeight.value > 0) {
-    scrollToBottom(true, false)
-  }
+  void measureContentViewport()
+  if (keyboardHeight.value > 0)
+    void scrollToBottom(false, false)
+}
+
+function toggleReasoning(messageId: string) {
+  expandedReasoningIds.value = expandedReasoningIds.value.includes(messageId)
+    ? expandedReasoningIds.value.filter(id => id !== messageId)
+    : [...expandedReasoningIds.value, messageId]
 }
 
 function handleRecordStart() {
-  clearVoiceTimer()
-  speechState.value = 'recording'
-  speechStateText.value = '松开结束 · 00:00'
+  speech.start()
 }
 
 function handleRecordStop() {
-  if (speechState.value !== 'recording') {
-    return
-  }
-  speechState.value = 'recognizing'
-  speechStateText.value = '正在转成文字…'
-  voiceTimer = setTimeout(() => {
-    inputValue.value = '帮我推荐适合我的研发岗位'
-    speechState.value = 'idle'
-    speechStateText.value = ''
-    voiceTimer = null
-  }, 650)
+  speech.stop()
 }
 
 function handleRecordCancel() {
-  clearVoiceTimer()
-  speechState.value = 'idle'
-  speechStateText.value = ''
+  speech.cancel()
 }
 
-onShow(restoreHistorySelection)
+onShow(() => {
+  void restoreHistorySelection()
+  if (hasStarted.value)
+    void measureContentViewport()
+})
+onHide(() => speech.cancel())
 onMounted(() => uni.onKeyboardHeightChange(handleKeyboardHeightChange))
 onUnmounted(() => {
-  isReplying.value ? cancelReply() : persistCurrentConversation()
-  clearReplyTimer()
-  clearVoiceTimer()
+  if (activeStream)
+    cancelReply()
+  speech.dispose()
+  if (autoScrollTimer)
+    clearTimeout(autoScrollTimer)
   uni.offKeyboardHeightChange(handleKeyboardHeightChange)
 })
 </script>
@@ -377,7 +1020,7 @@ onUnmounted(() => {
 <template>
   <view class="ai-page">
     <view class="ai-header-fixed">
-      <AiBrandHeader @history="openHistory" />
+      <AiBrandHeader @history="openHistory" @new-chat="startNewConversation" />
     </view>
 
     <scroll-view
@@ -436,6 +1079,7 @@ onUnmounted(() => {
       <scroll-view
         class="page-scroll content-scroll"
         scroll-y
+        :show-scrollbar="false"
         :style="contentScrollStyle"
         :scroll-into-view="scrollIntoView"
         :scroll-with-animation="scrollWithAnimation"
@@ -443,50 +1087,98 @@ onUnmounted(() => {
         @scroll="handleContentScroll"
         @scrolltolower="resumeAutoScroll"
       >
-        <view class="welcome-card">
-          <view class="welcome-copy">
-            <text>hello~我是生生</text>
-            <text>欢迎来到生生智家，</text>
-            <text>我是您的数智伙伴，</text>
-            <text>有任何问题欢迎与我交流！</text>
-          </view>
-          <image class="welcome-character" src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
+        <view v-if="isRestoringHistory" class="conversation-loading">
+          <view class="conversation-loading-spinner" />
+          <text>正在恢复历史对话…</text>
         </view>
 
-        <view class="quick-list">
-          <view
-            v-for="item in quickQuestions"
-            :key="item.id"
-            class="quick-item"
-            :class="{ 'without-tag': !item.tag }"
-            @tap="sendMessage(item.sendContent)"
-          >
-            <view v-if="item.tag" class="quick-tag">
-              <text>{{ item.tag }}</text>
+        <template v-else>
+          <view class="welcome-card">
+            <view class="welcome-copy">
+              <text>hello~我是生生</text>
+              <text>欢迎来到生生智家，</text>
+              <text>我是您的数智伙伴，</text>
+              <text>有任何问题欢迎与我交流！</text>
             </view>
-            <view class="quick-question">
-              <text>{{ item.displayQuestion }}</text>
-            </view>
-            <view class="quick-arrow" />
+            <image class="welcome-character" src="https://static1.3sbio.com/assets/%E6%8C%A5%E6%89%8B.gif" mode="aspectFit" />
           </view>
-        </view>
+
+          <view class="quick-list">
+            <view
+              v-for="item in quickQuestions"
+              :key="item.id"
+              class="quick-item"
+              :class="{ 'without-tag': !item.tag }"
+              @tap="sendMessage(item.sendContent)"
+            >
+              <view v-if="item.tag" class="quick-tag">
+                <text>{{ item.tag }}</text>
+              </view>
+              <view class="quick-question">
+                <text>{{ item.displayQuestion }}</text>
+              </view>
+              <view class="quick-arrow" />
+            </view>
+          </view>
+        </template>
 
         <template v-if="currentConversation">
-          <view v-for="message in currentConversation.messages" :id="message.id" :key="message.id" class="message-row" :class="message.role">
+          <view
+            v-for="(message, messageIndex) in currentConversation.messages"
+            :id="message.id"
+            :key="message.id"
+            class="message-row"
+            :class="[message.role, { 'first-message-row': messageIndex === 0 }]"
+          >
             <text v-if="message.role === 'user'" class="message-time">{{ formatMessageTime(message.createdAt) }}</text>
             <view
-              v-if="message.content || (message.role === 'assistant' && message.status === 'streaming')"
+              v-if="message.content || message.extensions.length || message.reasoningContent || message.status === 'streaming'"
               class="message-bubble"
-              :class="{ 'typing-bubble': message.role === 'assistant' && message.status === 'streaming' && !message.content }"
+              :class="{
+                'typing-bubble': message.role === 'assistant' && message.status === 'streaming' && !message.content,
+                'error-bubble': message.status === 'error',
+              }"
             >
-              <template v-if="message.role === 'assistant' && message.status === 'streaming' && !message.content">
-                <view class="typing-dot" />
-                <view class="typing-dot" />
-                <view class="typing-dot" />
-              </template>
-              <template v-else>
-                {{ message.content }}
-              </template>
+              <view v-if="message.role === 'assistant' && message.status === 'streaming' && !message.content" class="typing-content">
+                <view class="typing-dots">
+                  <view class="typing-dot" />
+                  <view class="typing-dot" />
+                  <view class="typing-dot" />
+                </view>
+                <text class="typing-label">{{ streamStatusText || '正在思考…' }}</text>
+              </view>
+
+              <AiMessageActivityGroup
+                v-if="message.extensions.length"
+                :extensions="message.extensions"
+                @resolve="handleAskResolution(message, $event.extension, $event.action)"
+              />
+
+              <text v-if="message.role === 'user' && message.content" class="user-message-content">{{ message.content }}</text>
+              <AiRichText
+                v-else-if="message.role === 'assistant' && message.content"
+                :content="message.content"
+                :streaming="message.status === 'streaming'"
+                @rendered="handleRichTextRendered"
+              />
+
+              <view v-if="message.role === 'assistant' && message.reasoningContent" class="reasoning-section">
+                <button class="reasoning-toggle" @tap="toggleReasoning(message.id)">
+                  <view class="i-carbon-idea" />
+                  <text>{{ expandedReasoningIds.includes(message.id) ? '收起思考过程' : '查看思考过程' }}</text>
+                  <view class="i-carbon-chevron-down reasoning-arrow" :class="{ expanded: expandedReasoningIds.includes(message.id) }" />
+                </button>
+                <view v-if="expandedReasoningIds.includes(message.id)" class="reasoning-panel">
+                  <AiRichText
+                    :content="message.reasoningContent"
+                    :streaming="message.status === 'streaming'"
+                    @rendered="handleRichTextRendered"
+                  />
+                </view>
+              </view>
+
+              <text v-if="message.status === 'stopped'" class="message-state">回复已停止</text>
+              <text v-else-if="message.status === 'error'" class="message-state error">回复失败，可重新发送问题</text>
             </view>
           </view>
         </template>
@@ -497,6 +1189,8 @@ onUnmounted(() => {
         v-if="currentConversation && !isFollowingLatest"
         class="scroll-to-latest"
         :style="scrollLatestStyle"
+        role="button"
+        aria-label="回到最新消息"
         @tap="returnToLatest"
       >
         <view class="scroll-to-latest-arrow" />
@@ -505,7 +1199,7 @@ onUnmounted(() => {
       <view class="composer-fixed" :style="composerStyle">
         <AiComposer
           v-model="inputValue"
-          :disabled="isReplying"
+          :disabled="isReplying || isRestoringHistory"
           :replying="isReplying"
           :chat-mode="Boolean(currentConversation)"
           :speech-state="speechState"
@@ -836,10 +1530,35 @@ onUnmounted(() => {
   transform: rotate(45deg);
 }
 
+.conversation-loading {
+  min-height: 520rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22rpx;
+  color: #74839d;
+  font-size: 26rpx;
+}
+
+.conversation-loading-spinner {
+  box-sizing: border-box;
+  width: 46rpx;
+  height: 46rpx;
+  border: 5rpx solid rgba(82, 126, 219, 0.18);
+  border-top-color: #527edb;
+  border-radius: 50%;
+  animation: conversation-loading 0.8s linear infinite;
+}
+
 .message-row {
   display: flex;
   flex-direction: column;
   margin-bottom: 28rpx;
+}
+
+.message-row.first-message-row {
+  margin-top: 32rpx;
 }
 
 .message-row.user {
@@ -851,44 +1570,86 @@ onUnmounted(() => {
 }
 
 .message-time {
-  margin-bottom: 14rpx;
+  margin-bottom: 12rpx;
   color: var(--app-muted);
-  font-size: 24rpx;
+  font-size: 23rpx;
 }
 
 .message-bubble {
   box-sizing: border-box;
-  max-width: 88%;
-  padding: 28rpx 30rpx;
-  border-radius: 30rpx;
+  max-width: 90%;
+  padding: 26rpx 28rpx;
+  overflow: hidden;
+  border-radius: 28rpx;
   font-size: 29rpx;
   line-height: 1.75;
-  white-space: pre-wrap;
 }
 
 .user .message-bubble {
+  max-width: 84%;
   border-bottom-right-radius: 8rpx;
   background: linear-gradient(135deg, #4d89ff, #5b7ff3);
   box-shadow: 0 10rpx 24rpx rgba(66, 111, 224, 0.2);
   color: #fff;
 }
 
+.user-message-content {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .assistant .message-bubble {
+  width: auto;
+  min-width: 112rpx;
+  border: 1rpx solid rgba(219, 228, 243, 0.7);
   border-bottom-left-radius: 8rpx;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 12rpx 28rpx rgba(77, 101, 155, 0.12);
   color: var(--app-ink);
 }
 
+.assistant .message-bubble.error-bubble {
+  border-color: rgba(216, 75, 62, 0.22);
+  background: rgba(255, 250, 249, 0.98);
+}
+
+.assistant .message-bubble :deep(.ai-rich-text p:last-child) {
+  margin-bottom: 0 !important;
+}
+
 .typing-bubble {
+  min-width: 250rpx;
+  padding: 24rpx 28rpx;
+}
+
+.typing-content {
   display: flex;
-  gap: 10rpx;
-  padding: 24rpx 30rpx;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.typing-dots {
+  height: 22rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.typing-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: #687894;
+  font-size: 24rpx;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .typing-dot {
-  width: 12rpx;
-  height: 12rpx;
+  width: 10rpx;
+  height: 10rpx;
   border-radius: 50%;
   background: #6592f2;
   animation: typing 1.1s infinite ease-in-out;
@@ -900,6 +1661,62 @@ onUnmounted(() => {
 
 .typing-dot:nth-child(3) {
   animation-delay: 0.3s;
+}
+
+.reasoning-section {
+  margin-top: 16rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid #e8edf5;
+}
+
+.reasoning-toggle {
+  width: 100%;
+  min-height: 54rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #71819c;
+  font-size: 23rpx;
+  line-height: 1;
+  text-align: left;
+}
+
+.reasoning-toggle::after {
+  border: 0;
+}
+
+.reasoning-arrow {
+  margin-left: auto;
+  transition: transform 0.18s ease;
+}
+
+.reasoning-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.reasoning-panel {
+  margin-top: 6rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  background: #f5f7fb;
+  color: #68758a;
+  font-size: 25rpx;
+}
+
+.message-state {
+  display: block;
+  margin-top: 14rpx;
+  color: #8b96a8;
+  font-size: 21rpx;
+  line-height: 1.4;
+}
+
+.message-state.error {
+  color: #c45a4f;
 }
 
 .message-bottom {
@@ -948,6 +1765,12 @@ onUnmounted(() => {
 
 .composer-fixed :deep(.composer-shell) {
   pointer-events: auto;
+}
+
+@keyframes conversation-loading {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes typing {
