@@ -244,8 +244,9 @@ function sendMessage(content = inputValue.value) {
 
   inputValue.value = ''
   currentConversation.value.messages.push(createMessage('user', question))
-  const assistantMessage = createMessage('assistant', '', 'streaming')
-  currentConversation.value.messages.push(assistantMessage)
+  currentConversation.value.messages.push(createMessage('assistant', '', 'streaming'))
+  // Keep the proxy returned by the reactive array; mutating the raw object would not update the view.
+  const assistantMessage = currentConversation.value.messages[currentConversation.value.messages.length - 1]
   currentConversation.value.updatedAt = Date.now()
   isReplying.value = true
   isFollowingLatest.value = true

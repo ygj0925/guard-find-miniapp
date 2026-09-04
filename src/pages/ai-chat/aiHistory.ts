@@ -30,7 +30,7 @@ export interface AiChatMessage {
   reasoningContent?: string
   createdAt: number
   status: AiChatMessageStatus
-  runId?: number
+  runId?: string | number
   extensions: AiMessageExtension[]
 }
 

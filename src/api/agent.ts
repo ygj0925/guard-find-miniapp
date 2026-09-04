@@ -29,7 +29,7 @@ export interface AgentChatRequest {
 export interface AgentChatStreamEvent {
   type: AgentChatStreamEventType | string
   sessionId?: string
-  runId?: number
+  runId?: string | number
   delta?: string
   reply?: string
   reasoningDelta?: string
@@ -360,7 +360,7 @@ function normalizeStreamEvent(eventName: string, value: Record<string, unknown>)
   return {
     type: readString(value.type) || eventName,
     sessionId: readOptionalString(value.sessionId),
-    runId: readOptionalNumber(value.runId),
+    runId: readOptionalString(value.runId).trim() || readOptionalNumber(value.runId),
     delta: readOptionalString(value.delta),
     reply: readOptionalString(value.reply),
     reasoningDelta: readOptionalString(value.reasoningDelta),
