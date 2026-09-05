@@ -72,7 +72,7 @@ const positionStore = usePositionStore()
 const activeCategories = ref<string[]>([])
 const recruitmentCategories = [
   {
-    value: '社招',
+    value: '1',
     label: '社会招聘',
     description: '经验人才 · 全职机会',
     icon: 'https://static1.3sbio.com/assets/%E7%A4%BE%E4%BC%9A%E6%8B%9B%E8%81%98.png',
@@ -81,7 +81,7 @@ const recruitmentCategories = [
     activeGlow: '0 16rpx 32rpx rgba(47,111,232,0.28)',
   },
   {
-    value: '校招',
+    value: '2',
     label: '校园招聘',
     description: '应届启航 · 培养计划',
     icon: 'https://static1.3sbio.com/assets/%E6%A0%A1%E5%9B%AD%E6%8B%9B%E8%81%98.png',

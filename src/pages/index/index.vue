@@ -43,7 +43,7 @@ interface QuickEntry {
   gradient: string
   glow: string
   pagePath: string
-  /** 跳转职位页时携带的招聘类别（如 社招 / 校招），用于自动选中并过滤。 */
+  /** 跳转职位页时携带的招聘分类编码（1=社会招聘，2=校园招聘），用于自动选中并过滤。 */
   category?: string
 }
 
@@ -81,8 +81,8 @@ const fallbackBanners: HomeBanner[] = [
 
 const quickEntryPages: QuickEntry[][] = [
   [
-    { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '社招' },
-    { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '校招' },
+    { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
+    { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
     { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #ff7a2f 0%, #ffab3d 100%)', glow: '0 10rpx 20rpx rgba(255,122,47,0.24)', pagePath: 'pages/position/index' },
     { title: '求职工作台', iconClass: 'i-carbon-dashboard', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
     { title: '我的投递', iconClass: 'i-carbon-send-alt', gradient: 'linear-gradient(140deg, #6a63ef 0%, #9a7cf3 100%)', glow: '0 10rpx 20rpx rgba(106,99,239,0.24)', pagePath: 'pages/me/me' },

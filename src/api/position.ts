@@ -25,7 +25,7 @@ export interface PositionListQuery {
   educationInfos?: string[]
   workExperiences?: string[]
   locIds?: string[]
-  /** 招聘分类编码列表，如 社招 / 校招。 */
+  /** 招聘分类编码列表：1=社会招聘，2=校园招聘。 */
   categories?: string[]
 }
 
