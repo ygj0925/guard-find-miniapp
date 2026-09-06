@@ -40,6 +40,12 @@ page {
     linear-gradient(180deg, #d8ecff 0%, #e6f3ff 46%, #edf6ff 100%);
 }
 
+page,
+button,
+navigator {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* #ifdef H5 */
 @supports (height: 100dvh) {
   :root,
@@ -48,7 +54,24 @@ page {
   }
 }
 
-page {
+html,
+body,
+uni-app,
+uni-page,
+uni-page-wrapper,
+uni-page-body,
+uni-view,
+uni-text,
+uni-image,
+uni-button,
+uni-navigator,
+uni-scroll-view,
+uni-swiper,
+button,
+a,
+input,
+textarea,
+[role="button"] {
   -webkit-tap-highlight-color: transparent;
 }
 /* #endif */

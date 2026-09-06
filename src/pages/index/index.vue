@@ -83,20 +83,10 @@ const quickEntryPages: QuickEntry[][] = [
   [
     { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
     { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
-    { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #ff7a2f 0%, #ffab3d 100%)', glow: '0 10rpx 20rpx rgba(255,122,47,0.24)', pagePath: 'pages/position/index' },
     { title: '求职工作台', iconClass: 'i-carbon-dashboard', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
-    { title: '我的投递', iconClass: 'i-carbon-send-alt', gradient: 'linear-gradient(140deg, #6a63ef 0%, #9a7cf3 100%)', glow: '0 10rpx 20rpx rgba(106,99,239,0.24)', pagePath: 'pages/me/me' },
-    { title: '面试安排', iconClass: 'i-carbon-calendar', gradient: 'linear-gradient(140deg, #f0603d 0%, #ff8f6b 100%)', glow: '0 10rpx 20rpx rgba(240,96,61,0.24)', pagePath: 'pages/me/me' },
-    { title: '岗位收藏', iconClass: 'i-carbon-favorite', gradient: 'linear-gradient(140deg, #ff5c8a 0%, #ff96b2 100%)', glow: '0 10rpx 20rpx rgba(255,92,138,0.24)', pagePath: 'pages/me/me' },
     { title: '消息通知', iconClass: 'i-carbon-notification', gradient: 'linear-gradient(140deg, #5f7ce8 0%, #86a4ff 100%)', glow: '0 10rpx 20rpx rgba(95,124,232,0.24)', pagePath: 'pages/notification/index' },
-  ],
-  [
     { title: '简历完善', iconClass: 'i-carbon-user-profile', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
-    { title: '生生 AI', iconClass: 'i-carbon-ai-status', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
-    { title: '薪酬福利', iconClass: 'i-carbon-wallet', gradient: 'linear-gradient(140deg, #f2a13c 0%, #ffc768 100%)', glow: '0 10rpx 20rpx rgba(242,161,60,0.24)', pagePath: 'pages/about/about' },
-    { title: '企业介绍', iconClass: 'i-carbon-building', gradient: 'linear-gradient(140deg, #1f9ab0 0%, #47c3cc 100%)', glow: '0 10rpx 20rpx rgba(31,154,176,0.24)', pagePath: 'pages/about/about' },
-    { title: '常见问题', iconClass: 'i-carbon-help', gradient: 'linear-gradient(140deg, #6b7fa8 0%, #98abc9 100%)', glow: '0 10rpx 20rpx rgba(107,127,168,0.22)', pagePath: 'pages/about/about' },
-    { title: '全部岗位', iconClass: 'i-carbon-apps', gradient: 'linear-gradient(140deg, #d2568f 0%, #f083b8 100%)', glow: '0 10rpx 20rpx rgba(210,86,143,0.24)', pagePath: 'pages/position/index' },
+    { title: '生生AI', iconClass: 'i-carbon-ai-status', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
   ],
 ]
 
@@ -392,7 +382,7 @@ onPageScroll(({ scrollTop }) => {
           </swiper-item>
         </swiper>
 
-        <view class="mt-1 flex items-center justify-center gap-1">
+        <view v-if="quickEntryPages.length > 1" class="mt-1 flex items-center justify-center gap-1">
           <view
             v-for="(entryPage, pageIndex) in quickEntryPages"
             :key="pageIndex"
