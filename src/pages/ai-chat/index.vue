@@ -749,7 +749,7 @@ async function restoreConversation(sessionId: string) {
   isFollowingLatest.value = true
   currentConversation.value = null
   try {
-    const askHistoryPromise = listAgentChatAsks(sessionId, { limit: 100 })
+    const askHistoryPromise = listAgentChatAsks(sessionId, { limit: 30 })
       .then(result => result.items)
       .catch((error) => {
         if (isAuthenticationError(error))
@@ -799,8 +799,8 @@ async function restoreConversation(sessionId: string) {
 
 async function loadHistoryMessages(sessionId: string) {
   const maxRecords = 2_000
-  const maxRequests = 22
-  const pageSize = 100
+  const maxRequests = 69
+  const pageSize = 30
   const recordsById = new Map<number, AgentChatMessageRecord>()
   const seenCursors = new Set<number>()
   let beforeMessageId: number | undefined

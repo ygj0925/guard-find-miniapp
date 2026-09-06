@@ -41,6 +41,7 @@ export interface AgentChatStreamEvent {
   createdAt?: string
 }
 
+export type AgentChatCursor = string | number
 export type AgentChatAttachmentStatus = 'PARSING' | 'SUCCESS' | 'FAILED'
 
 export interface AgentChatAttachment {
@@ -58,7 +59,7 @@ export interface AgentChatSession {
   sessionId: string
   title: string
   channel?: string
-  lastMessageId?: number
+  lastMessageId?: AgentChatCursor
   lastMessageTime?: string
   createTime?: string
   updateTime?: string
@@ -68,8 +69,8 @@ export interface AgentChatSession {
 export interface AgentChatSessionPage {
   items: AgentChatSession[]
   hasMore: boolean
-  nextBeforeLastMessageId?: number
-  snapshotLastMessageId?: number
+  nextBeforeLastMessageId?: AgentChatCursor
+  snapshotLastMessageId?: AgentChatCursor
 }
 
 export interface AgentChatMessageRecord {
@@ -186,8 +187,8 @@ interface ChunkedRequestTask {
 
 export function listAgentChatSessions(query: {
   limit?: number
-  beforeLastMessageId?: number
-  snapshotLastMessageId?: number
+  beforeLastMessageId?: AgentChatCursor
+  snapshotLastMessageId?: AgentChatCursor
   keyword?: string
 } = {}) {
   return http.get<AgentChatSessionPage>('/portal/agent/sessions', query)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AgentChatSession } from '@/api/agent'
+import type { AgentChatCursor, AgentChatSession } from '@/api/agent'
 import { onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { batchDeleteAgentChatSessions, listAgentChatSessions } from '@/api/agent'
@@ -15,7 +15,7 @@ import { aiHeaderMetrics } from './aiLayout'
 definePage({
   style: {
     navigationStyle: 'custom',
-    navigationBarTitleText: '历史对话',
+    navigationBarTitleText: '对话记录',
     disableScroll: true,
   },
 })
@@ -23,7 +23,6 @@ definePage({
 interface HistoryConversation {
   id: string
   title: string
-  summary: string
   updatedAt: number
 }
 
@@ -35,8 +34,8 @@ const loadedKeyword = ref('')
 const isEditing = ref(false)
 const selectedIds = ref<string[]>([])
 const hasMore = ref(false)
-const nextBeforeLastMessageId = ref<number>()
-const snapshotLastMessageId = ref<number>()
+const nextBeforeLastMessageId = ref<AgentChatCursor>()
+const snapshotLastMessageId = ref<AgentChatCursor>()
 const isInitialLoading = ref(false)
 const isRefreshing = ref(false)
 const isLoadingMore = ref(false)
@@ -46,21 +45,31 @@ const isNavigatingBack = ref(false)
 const safeBottom = safeAreaInsets?.bottom || 0
 let requestSequence = 0
 
-const headerStyle = {
+const brandHeaderStyle = {
+  height: `${aiHeaderMetrics.height}px`,
   paddingTop: `${aiHeaderMetrics.statusBarHeight}px`,
   paddingRight: `${aiHeaderMetrics.rightPadding}px`,
 }
 const historyContentStyle = computed(() => ({
   paddingBottom: `${isEditing.value ? 12 : safeBottom + 12}px`,
 }))
+const conversationCountLabel = computed(() => (
+  `${hasMore.value ? '已加载' : '共'} ${conversations.value.length} 条`
+))
 const groupedConversations = computed(() => {
-  const groups: Array<{ label: string, items: HistoryConversation[] }> = []
-  conversations.value.forEach((conversation) => {
-    const label = formatDateLabel(conversation.updatedAt)
-    const group = groups.find(item => item.label === label)
-    group ? group.items.push(conversation) : groups.push({ label, items: [conversation] })
-  })
-  return groups
+  const groups = new Map<string, HistoryConversation[]>()
+  conversations.value
+    .slice()
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .forEach((conversation) => {
+      const label = formatDateLabel(conversation.updatedAt)
+      const items = groups.get(label) || []
+      items.push(conversation)
+      groups.set(label, items)
+    })
+  return ['7天内', '更早']
+    .filter(label => groups.has(label))
+    .map(label => ({ label, items: groups.get(label) || [] }))
 })
 const isAllSelected = computed(() => conversations.value.length > 0
   && conversations.value.every(item => selectedIds.value.includes(item.id)))
@@ -130,7 +139,7 @@ async function loadConversations(mode: 'initial' | 'refresh' | 'more' = 'initial
       loadError.value = true
       if (mode !== 'more')
         appliedKeyword.value = loadedKeyword.value
-      uni.showToast({ title: '历史对话加载失败，请稍后重试', icon: 'none' })
+      uni.showToast({ title: '对话记录加载失败，请稍后重试', icon: 'none' })
     }
     return false
   }
@@ -289,38 +298,32 @@ function toHistoryConversation(session: AgentChatSession): HistoryConversation {
   return {
     id: session.sessionId,
     title: session.title || '未命名对话',
-    summary: session.firstAssistantMessage || '暂无回复摘要',
     updatedAt: parseDate(session.lastMessageTime || session.updateTime || session.createTime),
   }
 }
 
 function parseDate(value?: string) {
   const timestamp = value ? Date.parse(value) : Number.NaN
-  return Number.isFinite(timestamp) ? timestamp : Date.now()
+  return Number.isFinite(timestamp) ? timestamp : 0
 }
 
 function formatDateLabel(timestamp: number) {
+  if (timestamp <= 0)
+    return '更早'
   const date = new Date(timestamp)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const dateStart = new Date(date)
   dateStart.setHours(0, 0, 0, 0)
   const diffDays = Math.floor((today.getTime() - dateStart.getTime()) / 86_400_000)
-  if (diffDays === 0)
-    return '今天'
-  if (diffDays === 1)
-    return '昨天'
-  if (diffDays <= 7)
-    return '7 天内'
-  return '更早'
+  return diffDays <= 7 ? '7天内' : '更早'
 }
 
 function formatTime(timestamp: number) {
+  if (timestamp <= 0)
+    return '--:--'
   const date = new Date(timestamp)
-  const today = new Date()
-  if (date.toDateString() === today.toDateString())
-    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-  return `${date.getMonth() + 1}/${date.getDate()}`
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 onShow(() => {
@@ -330,53 +333,72 @@ onShow(() => {
 
 <template>
   <view class="history-page">
-    <view class="history-header" :style="headerStyle">
-      <button class="header-button back-button" aria-label="返回 AI 对话" @tap="goBack">
-        <view class="i-carbon-chevron-left" />
-        <text>返回</text>
-      </button>
-      <text class="header-title">历史对话</text>
-      <button class="header-button edit-button" :aria-label="isEditing ? '退出编辑' : '编辑对话'" @tap="toggleEditing">
-        {{ isEditing ? '完成' : '编辑' }}
-      </button>
-    </view>
+    <view class="history-top-shell">
+      <view class="brand-header" :style="brandHeaderStyle">
+        <view class="brand-identity">
+          <image
+            class="brand-logo"
+            src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/%E4%B8%89%E7%94%9F%E7%9B%8A%E5%AE%B6logo.png"
+            mode="aspectFit"
+            aria-hidden="true"
+          />
+          <text class="brand-name">三生益家</text>
+        </view>
+      </view>
 
-    <view class="history-actions">
-      <view class="search-field">
-        <view class="i-carbon-search search-icon" />
-        <input
-          v-model="keyword"
-          confirm-type="search"
-          placeholder="搜索对话标题或内容"
-          placeholder-class="search-placeholder"
-          @confirm="submitSearch"
+      <view class="history-nav">
+        <button class="nav-button back-button" aria-label="返回 AI 对话" @tap="goBack">
+          <view class="i-carbon-arrow-left nav-icon" aria-hidden="true" />
+          <text>返回</text>
+        </button>
+        <button
+          v-if="!isEditing"
+          class="nav-button new-conversation-button"
+          aria-label="新建对话"
+          @tap="startNewConversationFromHistory"
         >
-        <button v-if="keyword" class="clear-button" aria-label="清空搜索" @tap="clearSearch">
-          <view class="i-carbon-close-filled" />
+          <view class="i-carbon-add nav-icon" aria-hidden="true" />
+          <text>新建对话</text>
+        </button>
+        <view v-else class="nav-placeholder" aria-hidden="true" />
+        <button class="nav-button edit-button" :aria-label="isEditing ? '完成编辑' : '编辑对话'" @tap="toggleEditing">
+          {{ isEditing ? '完成' : '编辑' }}
         </button>
       </view>
-      <button class="search-button" @tap="submitSearch">
-        搜索
-      </button>
+
+      <view class="search-row">
+        <view class="search-field">
+          <view class="i-carbon-search search-icon" aria-hidden="true" />
+          <input
+            v-model="keyword"
+            confirm-type="search"
+            placeholder="搜索历史对话"
+            placeholder-class="search-placeholder"
+            aria-label="搜索历史对话"
+            @confirm="submitSearch"
+          >
+          <button v-if="keyword" class="clear-button" aria-label="清空搜索" @tap="clearSearch">
+            <view class="i-carbon-close-filled" aria-hidden="true" />
+          </button>
+        </view>
+        <button class="search-button" aria-label="搜索对话" @tap="submitSearch">
+          <view class="i-carbon-search" aria-hidden="true" />
+          <text>搜索</text>
+        </button>
+      </view>
     </view>
 
     <view class="history-content" :style="historyContentStyle">
       <view class="history-panel">
         <view class="panel-heading">
-          <view>
-            <text class="panel-title">对话记录</text>
-            <text class="panel-count">{{ conversations.length }} 条{{ hasMore ? '，可继续加载' : '' }}</text>
-          </view>
-          <button v-if="!isEditing" class="new-conversation-button" @tap="startNewConversationFromHistory">
-            <view class="i-carbon-add" />
-            <text>新建对话</text>
-          </button>
+          <text class="panel-title">对话记录</text>
+          <text class="panel-count">{{ conversationCountLabel }}</text>
         </view>
 
         <scroll-view
           class="history-scroll"
           scroll-y
-          show-scrollbar
+          :show-scrollbar="false"
           refresher-enabled
           :refresher-triggered="isRefreshing"
           :lower-threshold="80"
@@ -386,14 +408,14 @@ onShow(() => {
           <view class="history-list-content">
             <view v-if="isInitialLoading" class="empty-state">
               <view class="history-loading-dot" />
-              <text class="empty-title">正在加载历史对话</text>
+              <text class="empty-title">正在加载对话记录</text>
             </view>
 
             <view v-else-if="loadError && !groupedConversations.length" class="empty-state">
               <view class="empty-icon error">
-                <view class="i-carbon-warning-alt" />
+                <view class="i-carbon-warning-alt" aria-hidden="true" />
               </view>
-              <text class="empty-title">历史对话加载失败</text>
+              <text class="empty-title">对话记录加载失败</text>
               <text class="empty-copy">请检查网络后重新加载</text>
               <button class="empty-retry-button" @tap="loadConversations('initial')">
                 重新加载
@@ -402,38 +424,44 @@ onShow(() => {
 
             <view v-else-if="!groupedConversations.length" class="empty-state">
               <view class="empty-icon">
-                <view class="i-carbon-chat" />
+                <view class="i-carbon-chat" aria-hidden="true" />
               </view>
-              <text class="empty-title">{{ appliedKeyword ? '没有找到匹配的对话' : '还没有历史对话' }}</text>
+              <text class="empty-title">{{ appliedKeyword ? '没有找到匹配的对话' : '还没有对话记录' }}</text>
               <text class="empty-copy">{{ appliedKeyword ? '换个关键词再试试' : '新建对话，开始你的求职咨询' }}</text>
             </view>
 
-            <view v-for="group in groupedConversations" :key="group.label" class="history-group">
+            <view v-for="(group, groupIndex) in groupedConversations" :key="group.label" class="history-group">
+              <view v-if="groupIndex" class="group-divider" />
               <text class="group-title">{{ group.label }}</text>
               <view
                 v-for="conversation in group.items"
                 :key="conversation.id"
                 class="conversation-row"
                 :class="{ selected: selectedIds.includes(conversation.id) }"
-                role="button"
+                :role="isEditing ? 'checkbox' : 'button'"
+                :aria-checked="isEditing ? selectedIds.includes(conversation.id) : undefined"
                 :aria-label="`${conversation.title}，${formatTime(conversation.updatedAt)}`"
                 @tap="openConversation(conversation.id)"
               >
-                <view v-if="isEditing" class="selection-circle" :class="{ selected: selectedIds.includes(conversation.id) }">
-                  <view v-if="selectedIds.includes(conversation.id)" class="i-carbon-checkmark" />
+                <view
+                  v-if="isEditing"
+                  class="selection-circle"
+                  :class="{ selected: selectedIds.includes(conversation.id) }"
+                >
+                  <view
+                    v-if="selectedIds.includes(conversation.id)"
+                    class="i-carbon-checkmark"
+                    aria-hidden="true"
+                  />
                 </view>
-                <view class="conversation-copy">
-                  <text class="conversation-title">{{ conversation.title }}</text>
-                  <text class="conversation-summary">{{ conversation.summary }}</text>
-                </view>
+                <text class="conversation-title">{{ conversation.title }}</text>
                 <text class="conversation-time">{{ formatTime(conversation.updatedAt) }}</text>
-                <view v-if="!isEditing" class="i-carbon-chevron-right conversation-arrow" />
               </view>
             </view>
 
             <view v-if="groupedConversations.length" class="load-state">
               <view v-if="isLoadingMore" class="mini-loading" />
-              <text>{{ isLoadingMore ? '正在加载' : hasMore ? '上滑加载更多' : '已经到底了' }}</text>
+              <text>{{ isLoadingMore ? '正在加载更多' : hasMore ? '继续上滑加载更多' : '已经到底了' }}</text>
             </view>
           </view>
         </scroll-view>
@@ -466,6 +494,11 @@ onShow(() => {
   color: #202a3d;
 }
 
+:global(page) {
+  background: #edf6ff url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg') center / cover
+    no-repeat;
+}
+
 button {
   margin: 0;
   padding: 0;
@@ -478,51 +511,120 @@ button::after {
   border: 0;
 }
 
-.history-header {
-  box-sizing: border-box;
-  min-height: 92rpx;
+.history-top-shell {
+  position: relative;
+  z-index: 2;
   flex: none;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding-left: 24rpx;
 }
 
-.header-title {
-  color: #172033;
+.brand-header {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding-left: 28rpx;
+}
+
+.brand-identity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.brand-logo {
+  width: 60rpx;
+  height: 60rpx;
+  flex: 0 0 60rpx;
+}
+
+.brand-name {
+  overflow: hidden;
+  color: #162136;
   font-size: 34rpx;
   font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.header-button {
-  min-width: 88rpx;
-  height: 64rpx;
+.history-nav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14rpx;
+  padding: 8rpx 24rpx 0;
+}
+
+.nav-button {
+  box-sizing: border-box;
+  height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
-  border-radius: 32rpx;
-  background: rgba(255, 255, 255, 0.9);
-  color: #34415a;
-  font-size: 26rpx;
+  gap: 8rpx;
+  border: 1rpx solid rgba(113, 145, 211, 0.18);
+  border-radius: 44rpx;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6rpx 18rpx rgba(61, 89, 148, 0.09);
+  color: #2d374a;
+  font-size: 27rpx;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.nav-button:active {
+  background: #eef4ff;
+  opacity: 0.78;
+}
+
+.nav-icon {
+  flex: none;
+  font-size: 28rpx;
 }
 
 .back-button {
+  min-width: 142rpx;
   justify-self: start;
-  padding: 0 18rpx 0 12rpx;
+  padding: 0 22rpx;
 }
 
 .edit-button {
+  min-width: 112rpx;
+  grid-column: 3;
   justify-self: end;
   padding: 0 22rpx;
 }
 
-.history-actions {
-  height: 76rpx;
-  flex: none;
+.new-conversation-button,
+.nav-placeholder {
+  min-width: 220rpx;
+  grid-column: 2;
+}
+
+.new-conversation-button {
+  padding: 0 30rpx;
+  border-color: rgba(84, 128, 232, 0.45);
+  background: linear-gradient(110deg, #6d96ff, #4c7ff4);
+  box-shadow: 0 10rpx 24rpx rgba(68, 105, 192, 0.22);
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.new-conversation-button:active {
+  background: linear-gradient(110deg, #5f8af4, #406fdf);
+}
+
+.search-row {
+  box-sizing: border-box;
+  height: 88rpx;
   display: flex;
-  gap: 12rpx;
-  margin: 20rpx 24rpx 0;
+  margin: 24rpx 24rpx 0;
+  overflow: hidden;
+  border: 1rpx solid rgba(112, 143, 205, 0.18);
+  border-radius: 44rpx;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8rpx 22rpx rgba(65, 98, 166, 0.12);
 }
 
 .search-field {
@@ -530,51 +632,55 @@ button::after {
   flex: 1;
   display: flex;
   align-items: center;
-  padding: 0 18rpx 0 24rpx;
-  border: 1rpx solid rgba(116, 148, 212, 0.24);
-  border-radius: 38rpx;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 8rpx 22rpx rgba(65, 98, 166, 0.1);
+  padding-left: 24rpx;
 }
 
 .search-icon {
   flex: none;
   margin-right: 14rpx;
-  color: #7e91b4;
+  color: #7f91b1;
   font-size: 30rpx;
 }
 
 .search-field input {
   min-width: 0;
+  height: 88rpx;
   flex: 1;
   color: #29354c;
-  font-size: 27rpx;
-}
-
-:deep(.search-placeholder) {
-  color: #a8b1c2;
-}
-
-.clear-button {
-  width: 52rpx;
-  height: 52rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #a6b0c1;
   font-size: 28rpx;
 }
 
+:deep(.search-placeholder) {
+  color: #a5afc0;
+}
+
+.clear-button {
+  width: 72rpx;
+  height: 88rpx;
+  flex: 0 0 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca8ba;
+  font-size: 27rpx;
+}
+
 .search-button {
-  width: 112rpx;
-  height: 76rpx;
-  flex: none;
-  border-radius: 38rpx;
-  background: linear-gradient(105deg, #5e8eff, #4779ef);
-  box-shadow: 0 8rpx 20rpx rgba(65, 106, 205, 0.2);
+  width: 132rpx;
+  height: 88rpx;
+  flex: 0 0 132rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  background: linear-gradient(105deg, #668fff, #4d80f3);
   color: #fff;
   font-size: 27rpx;
   font-weight: 600;
+}
+
+.search-button:active {
+  opacity: 0.78;
 }
 
 .history-content {
@@ -586,54 +692,43 @@ button::after {
 }
 
 .history-panel {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  border-radius: 34rpx;
-  background: rgba(255, 255, 255, 0.86);
+  border: 1rpx solid rgba(255, 255, 255, 0.92);
+  border-radius: 36rpx;
+  background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 12rpx 32rpx rgba(68, 99, 168, 0.1);
 }
 
 .panel-heading {
+  position: relative;
+  min-height: 92rpx;
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 26rpx 28rpx 20rpx;
-}
-
-.panel-heading > view:first-child {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+  justify-content: center;
+  padding: 0 28rpx;
 }
 
 .panel-title {
-  color: #26324a;
+  color: #30394a;
   font-size: 31rpx;
-  font-weight: 650;
+  font-weight: 600;
+  text-align: center;
 }
 
 .panel-count {
-  margin-top: 6rpx;
-  color: #939eb2;
+  position: absolute;
+  right: 28rpx;
+  color: #8b96a9;
   font-size: 22rpx;
-}
-
-.new-conversation-button {
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 0 22rpx;
-  border-radius: 32rpx;
-  background: #edf3ff;
-  color: #3f72db;
-  font-size: 25rpx;
-  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .history-scroll {
@@ -646,104 +741,87 @@ button::after {
 .history-list-content {
   box-sizing: border-box;
   min-height: 100%;
-  padding: 8rpx 20rpx 28rpx;
+  padding: 4rpx 26rpx 28rpx;
 }
 
-.history-group + .history-group {
-  margin-top: 22rpx;
+.history-group {
+  margin-bottom: 24rpx;
+}
+
+.group-divider {
+  height: 1rpx;
+  margin: 10rpx 0 28rpx;
+  background: rgba(145, 157, 179, 0.22);
 }
 
 .group-title {
   display: block;
-  padding: 0 10rpx 12rpx;
-  color: #7e899d;
-  font-size: 24rpx;
+  margin: 0 8rpx 10rpx;
+  color: #30394a;
+  font-size: 29rpx;
   font-weight: 600;
 }
 
 .conversation-row {
-  min-height: 120rpx;
+  box-sizing: border-box;
+  min-height: 88rpx;
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  margin-bottom: 12rpx;
-  padding: 18rpx 18rpx 18rpx 20rpx;
-  border: 1rpx solid rgba(220, 228, 242, 0.86);
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.92);
+  gap: 14rpx;
+  padding: 10rpx 8rpx;
+  border-radius: 16rpx;
   transition:
-    transform 0.18s ease,
-    border-color 0.18s ease;
+    background-color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .conversation-row:active {
-  transform: scale(0.992);
+  background: #edf4ff;
+  opacity: 0.82;
 }
 
 .conversation-row.selected {
-  border-color: rgba(68, 119, 224, 0.48);
-  background: #f5f8ff;
+  background: #edf4ff;
 }
 
 .selection-circle {
-  width: 38rpx;
-  height: 38rpx;
-  flex: 0 0 38rpx;
+  width: 36rpx;
+  height: 36rpx;
+  flex: 0 0 36rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3rpx solid #b2bccd;
+  border: 3rpx solid #9aa8bd;
   border-radius: 50%;
   color: #fff;
-  font-size: 24rpx;
+  font-size: 23rpx;
 }
 
 .selection-circle.selected {
-  border-color: #4779ef;
-  background: #4779ef;
+  border-color: #4d7ee8;
+  background: #4d7ee8;
 }
 
-.conversation-copy {
+.conversation-title {
   min-width: 0;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.conversation-title,
-.conversation-summary {
   overflow: hidden;
+  color: #657085;
+  font-size: 27rpx;
+  line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.conversation-title {
-  color: #2b354b;
-  font-size: 28rpx;
-  font-weight: 600;
-}
-
-.conversation-summary {
-  margin-top: 10rpx;
-  color: #8b96a9;
-  font-size: 23rpx;
-}
-
 .conversation-time {
   flex: none;
-  color: #9ca6b6;
-  font-size: 22rpx;
+  color: #7f899b;
+  font-size: 26rpx;
   font-variant-numeric: tabular-nums;
 }
 
-.conversation-arrow {
-  flex: none;
-  color: #a6b2c7;
-  font-size: 26rpx;
-}
-
 .empty-state {
-  min-height: 520rpx;
+  min-height: 500rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -776,7 +854,7 @@ button::after {
 
 .empty-copy {
   margin-top: 10rpx;
-  color: #96a0b3;
+  color: #7f8ba0;
   font-size: 24rpx;
 }
 
@@ -793,17 +871,13 @@ button::after {
   line-height: 88rpx;
 }
 
-.empty-retry-button::after {
-  border: 0;
-}
-
 .load-state {
   min-height: 72rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-  color: #9ca5b5;
+  color: #8c97a9;
   font-size: 22rpx;
 }
 
@@ -847,25 +921,25 @@ button::after {
 }
 
 .toolbar-button {
-  height: 64rpx;
-  padding: 0 22rpx;
-  border-radius: 32rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 36rpx;
   background: #eef3fb;
   color: #405071;
   font-size: 26rpx;
 }
 
 .selection-count {
-  color: #8a95a8;
+  color: #667388;
   font-size: 24rpx;
 }
 
 .delete-button {
-  height: 64rpx;
-  padding: 0 28rpx;
-  border-radius: 32rpx;
+  height: 72rpx;
+  padding: 0 30rpx;
+  border-radius: 36rpx;
   background: #fff0ee;
-  color: #d34c3f;
+  color: #c94034;
   font-size: 26rpx;
   font-weight: 600;
 }
@@ -880,7 +954,23 @@ button::after {
   }
 }
 
+@media (max-width: 360px) {
+  .brand-name {
+    font-size: 31rpx;
+  }
+
+  .new-conversation-button,
+  .nav-placeholder {
+    min-width: 198rpx;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .nav-button,
+  .conversation-row {
+    transition: none;
+  }
+
   .history-loading-dot,
   .mini-loading {
     animation: none;
