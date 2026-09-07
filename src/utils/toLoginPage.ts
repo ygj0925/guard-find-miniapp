@@ -35,9 +35,10 @@ function getRedirectQuery(queryString: string) {
 // 登录页由 router/config 统一维护，避免 Token 失效时跳往已删除的旧路径。
 
 /**
- * 跳转到登录页, 带防抖处理
+ * 跳转到登录页。
  *
- * 如果要立即跳转，不做延时，可以使用 `toLoginPage.flush()` 方法
+ * 首次调用立即生效，并在 500ms 内忽略后续调用，确保用户当前操作产生的
+ * redirect 不会被隐藏页面或并发请求的登录跳转覆盖。
  */
 export const toLoginPage = debounce((options: ToLoginPageOptions = {}) => {
   const { mode = 'navigateTo', queryString = '' } = options
@@ -58,4 +59,4 @@ export const toLoginPage = debounce((options: ToLoginPageOptions = {}) => {
   else {
     uni.reLaunch({ url })
   }
-}, 500)
+}, 500, { edges: ['leading'] })

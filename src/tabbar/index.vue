@@ -4,7 +4,7 @@ import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { customTabbarEnable, needHideNativeTabbar } from './config'
 import { setTabbarItem } from './i18n'
-import { normalizeRoutePath, tabbarList, tabbarStore } from './store'
+import { isPageTabbar, normalizeRoutePath, tabbarList, tabbarStore } from './store'
 import TabbarItem from './TabbarItem.vue'
 
 // #ifdef MP-WEIXIN
@@ -20,7 +20,8 @@ const shouldShowTabbar = ref(true)
 function syncTabbarVisibility() {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1]
-  shouldShowTabbar.value = normalizeRoutePath(currentPage?.route) !== AI_PAGE_PATH
+  const currentPath = normalizeRoutePath(currentPage?.route)
+  shouldShowTabbar.value = currentPath !== AI_PAGE_PATH && isPageTabbar(currentPath)
 }
 
 function handleClickBulge(index: number) {
