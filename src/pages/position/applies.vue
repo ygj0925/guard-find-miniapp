@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { getPositionApplies } from '@/api/position'
 import type { PositionApplyRecord } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { formatPositionSalary } from '@/utils/positionSalary'
 
 definePage({
   style: {
@@ -163,28 +164,29 @@ onLoad(() => load())
             :key="record.id"
             class="active:bg-[#f7f9fd]"
             role="button"
-            :aria-label="`查看 ${record.jobTitle} 投递进度`"
+            :aria-label="`查看 ${record.positionName || record.jobTitle} 投递进度`"
             @tap="handleTapRecord(record)"
           >
             <!-- 分割线（非首项） -->
             <view v-if="idx > 0" class="mx-4 h-px bg-[#f0f4fa]" />
 
             <view class="px-4 py-4">
-              <!-- 第一行：职位名 + 状态 -->
+              <!-- 第一行：职位名 + 薪资 -->
               <view class="flex items-start justify-between gap-3">
                 <text class="min-w-0 flex-1 text-base text-[#1a2640] font-700 leading-[1.4]">
-                  {{ record.jobTitle }}
+                  {{ record.positionName || record.jobTitle }}
                 </text>
-                <text class="flex-none pt-px text-sm leading-[1.5]" :class="statusColor(record.statusName)">
-                  {{ record.statusName }}
+                <text class="flex-none pt-px text-sm text-brand-blue font-700 leading-[1.5]">
+                  {{ formatPositionSalary(record) }}
                 </text>
               </view>
 
-              <!-- 第二行：流程阶段 -->
-              <view class="mt-1.5 flex items-center gap-1 text-sm text-[#6b7a8d]">
+              <!-- 第二行：流程名称 + 状态 -->
+              <view class="mt-1.5 flex items-center justify-between gap-3 text-sm text-[#6b7a8d]">
                 <text>{{ record.processName }}</text>
-                <text v-if="record.phaseName" class="text-[#c8d0dc]">·</text>
-                <text v-if="record.phaseName">{{ record.phaseName }}</text>
+                <text class="flex-none text-xs leading-[1.5]" :class="statusColor(record.statusName)">
+                  {{ record.statusName }}
+                </text>
               </view>
 
               <!-- 失败原因 -->
@@ -193,12 +195,8 @@ onLoad(() => load())
                 <text class="leading-[1.5]">{{ record.failedReason }}</text>
               </view>
 
-              <!-- 第三行：投递时间 -->
-              <view class="mt-3 flex items-center justify-between">
-                <view class="flex items-center gap-1.5 text-xs text-[#9aa5b5]">
-                  <view class="i-carbon-document flex-none text-sm leading-none" />
-                  <text>已投递简历</text>
-                </view>
+              <!-- 第三行：时间 -->
+              <view class="mt-3 flex items-center justify-end">
                 <text class="text-xs text-[#b0bac8]">{{ toTime(record.createTime) }}</text>
               </view>
             </view>

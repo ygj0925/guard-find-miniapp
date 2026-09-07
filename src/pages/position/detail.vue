@@ -140,11 +140,13 @@ onReady(() => {
   // #ifdef MP-WEIXIN
   // 延迟截图避免与 map 原生组件初始化竞争，防止模拟器卡顿
   setTimeout(() => {
-    wx.takeScreenshot({
-      success: (res: { tempImagePath: string }) => {
-        screenshotPath.value = res.tempImagePath
-      },
-    })
+    if (typeof wx.takeScreenshot === 'function') {
+      wx.takeScreenshot({
+        success: (res: { tempImagePath: string }) => {
+          screenshotPath.value = res.tempImagePath
+        },
+      })
+    }
   }, 800)
   // #endif
 })

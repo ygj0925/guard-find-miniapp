@@ -44,10 +44,25 @@ export interface PositionAppliesItem {
   resumeName: string
   importStatus: string
   failedReason: string
+  /**
+   * 招聘职位名称
+   */
   jobTitle: string
+  /**
+   * 招聘流程名称
+   */
   processName: string
+  /**
+   * 当前流程阶段名称
+   */
   phaseName: string
+  /**
+   * 当前阶段状态名称
+   */
   statusName: string
+  /**
+   * 投递时间
+   */
   createTime: string
 }
 
@@ -121,11 +136,16 @@ export interface PositionApplyRecord {
   positionId: string
   importStatus: string
   failedReason?: string
-  jobTitle: string
+  /** 招聘职位名称（部分接口返回 positionName，兼容两种字段名） */
+  jobTitle?: string
+  positionName?: string
   processName: string
   phaseName: string
   statusName: string
   createTime: string
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit?: string
 }
 
 export interface PositionApplyProgressItem {
