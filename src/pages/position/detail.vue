@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { getPositionDetail, type PositionDetail as PositionDetailResponse } from '@/api/position'
+import { getPositionDetail } from '@/api/position'
+import type { PositionDetail as PositionDetailResponse } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { useTokenStore } from '@/store/token'
@@ -46,13 +47,31 @@ interface PositionDetailView {
 }
 
 const EMPTY_POSITION: PositionDetailView = {
-  id: '', title: '', company: '', companyIndustry: '', companyStage: '', companySize: '', companyLogo: '/static/logo.svg', salary: '', location: '', address: '', longitude: 0, latitude: 0, education: '', experience: '', tags: [], recruiter: { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' }, responsibilities: [], requirements: [],
+  id: '',
+  title: '',
+  company: '',
+  companyIndustry: '',
+  companyStage: '',
+  companySize: '',
+  companyLogo: '/static/logo.svg',
+  salary: '',
+  location: '',
+  address: '',
+  longitude: 0,
+  latitude: 0,
+  education: '',
+  experience: '',
+  tags: [],
+  recruiter: { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
+  responsibilities: [],
+  requirements: [],
 }
 const positionStore = usePositionStore()
 const tokenStore = useTokenStore()
 const position = ref<PositionDetailView>(EMPTY_POSITION)
 const isLoading = ref(true)
 const isApplying = ref(false)
+const screenshotPath = ref('')
 let applyingTimer: ReturnType<typeof setTimeout> | undefined
 
 const isFavorite = computed(() => positionStore.isFavorite(position.value.id))
@@ -62,7 +81,7 @@ const shareTitle = computed(() => `${position.value.title}｜${position.value.co
 const hasLocation = computed(() => position.value.longitude !== 0 && position.value.latitude !== 0)
 
 function normalizeTextList(value?: string[] | string) {
-  const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/(?:\\r?\\n|\r?\n)/) : []
+  const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\\r?\\n|\r?\n/) : []
   return entries
     .map(item => item.trim().replace(/^\d+[.、]\s*/, ''))
     .filter(Boolean)
@@ -107,6 +126,16 @@ onLoad(async (options) => {
   }
 })
 
+onReady(() => {
+  // #ifdef MP-WEIXIN
+  wx.takeScreenshot({
+    success: (res: { tempImagePath: string }) => {
+      screenshotPath.value = res.tempImagePath
+    },
+  })
+  // #endif
+})
+
 onUnload(() => {
   if (applyingTimer)
     clearTimeout(applyingTimer)
@@ -115,7 +144,7 @@ onUnload(() => {
 onShareAppMessage(() => ({
   title: shareTitle.value,
   path: sharePath.value,
-  imageUrl: 'https://my.3sbio.com/agents/logo.png',
+  imageUrl: screenshotPath.value || 'https://static1.3sbio.com/logo/2.png',
 }))
 
 onShareTimeline(() => ({
@@ -325,7 +354,9 @@ function openCompanyLocation() {
             <view class="i-carbon-location-filled" />
           </view>
         </view>
-        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">暂未提供工作地点坐标</view>
+        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">
+          暂未提供工作地点坐标
+        </view>
       </view>
 
       <view class="h-36" />
