@@ -42,13 +42,6 @@ interface PositionDetailView {
   requirements: string[]
   applied: boolean
   applyRecordId?: string | number
-  companyLogo?: string
-  companyIndustry?: string
-  companyStage?: string
-  companySize?: string
-  address?: string
-  longitude?: number
-  latitude?: number
 }
 
 const EMPTY_POSITION: PositionDetailView = {
@@ -64,13 +57,6 @@ const EMPTY_POSITION: PositionDetailView = {
   responsibilities: [],
   requirements: [],
   applied: false,
-  companyLogo: undefined,
-  companyIndustry: undefined,
-  companyStage: undefined,
-  companySize: undefined,
-  address: undefined,
-  longitude: undefined,
-  latitude: undefined,
 }
 const tokenStore = useTokenStore()
 const position = ref<PositionDetailView>(EMPTY_POSITION)
@@ -85,7 +71,6 @@ const screenshotPath = ref('')
 const isApplied = computed(() => position.value.applied)
 const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
 const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
-const hasLocation = computed(() => position.value.latitude != null && position.value.longitude != null)
 
 function normalizeTextList(value?: string[] | string) {
   const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\\r?\\n|\r?\n/) : []
@@ -109,13 +94,6 @@ function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
     requirements: normalizeTextList(source.requirements),
     applied: Boolean(source.applied),
     applyRecordId: source.applyRecordId,
-    companyLogo: source.companyLogo,
-    companyIndustry: source.companyIndustry,
-    companyStage: source.companyStage,
-    companySize: source.companySize,
-    address: source.address,
-    longitude: source.longitude,
-    latitude: source.latitude,
   }
 }
 
@@ -154,17 +132,6 @@ onShareTimeline(() => ({
   title: shareTitle.value,
   query: `id=${encodeURIComponent(position.value.id)}`,
 }))
-
-function openCompanyLocation() {
-  if (!hasLocation.value)
-    return
-  uni.openLocation({
-    latitude: position.value.latitude!,
-    longitude: position.value.longitude!,
-    name: position.value.company,
-    address: position.value.address || position.value.location,
-  })
-}
 
 function handleBack() {
   if (getCurrentPages().length > 1) {
@@ -365,35 +332,6 @@ function openApplyProgress() {
           <text v-for="(item, index) in position.requirements" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
-        </view>
-      </view>
-
-      <view class="mt-2 bg-white px-4 py-5">
-        <view class="flex cursor-pointer items-center active:opacity-75" role="button" aria-label="查看公司地址" @tap="openCompanyLocation">
-          <view class="h-16 w-16 flex flex-none items-center justify-center overflow-hidden rounded-2xl bg-[#edf5ff]">
-            <image class="h-12 w-12" :src="position.companyLogo" mode="aspectFit" />
-          </view>
-          <view class="ml-3 min-w-0 flex-1">
-            <text class="block overflow-hidden text-ellipsis whitespace-nowrap text-lg text-[#202938] font-700">{{ position.company }}</text>
-            <text class="mt-1 block text-sm text-[#667085]">{{ position.companyIndustry }} · {{ position.companyStage }} · {{ position.companySize }}</text>
-          </view>
-          <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
-        </view>
-
-        <view v-if="hasLocation" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
-          <map class="h-full w-full" :latitude="position.latitude" :longitude="position.longitude" :scale="15" :enable-scroll="false" :enable-zoom="false" />
-          <view class="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
-            <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-[#263249] shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
-              <view class="i-carbon-location-filled mr-1.5 flex-none text-base text-brand-blue leading-none" />
-              <text class="overflow-hidden text-ellipsis whitespace-nowrap">{{ position.address }}</text>
-            </view>
-          </view>
-          <view class="pointer-events-none absolute left-1/2 top-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-brand-blue text-xl text-white shadow-[0_8rpx_20rpx_rgba(45,111,230,0.28)] -translate-x-1/2 -translate-y-full">
-            <view class="i-carbon-location-filled" />
-          </view>
-        </view>
-        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">
-          暂未提供工作地点坐标
         </view>
       </view>
 

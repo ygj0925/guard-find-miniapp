@@ -87,16 +87,20 @@ function latestOfType(items: AiMessageExtension[], type: AiMessageExtension['typ
 }
 
 function resolveGroupTitle(items: AiMessageExtension[]) {
+  if (items.some(item => item.type === 'ask'))
+    return '需要你的确认'
+
+  const attachmentItem = items.find(item => item.type === 'attachment')
+  if (attachmentItem) {
+    const attachment = readRecord(attachmentItem.data.attachment)
+    return readString(attachment.fileName) || '附件处理'
+  }
+
   const toolName = [...items]
     .sort((left, right) => left.order - right.order)
     .map(item => item.toolName?.trim())
     .find(Boolean)
-  if (toolName)
-    return toolName
-
-  const attachmentItem = items.find(item => item.type === 'attachment')
-  const attachment = readRecord(attachmentItem?.data.attachment)
-  return readString(attachment.fileName) || (attachmentItem ? '附件处理' : '工具任务')
+  return toolName || '处理进度'
 }
 
 function isForcedOpen(group: ActivityGroup) {
@@ -155,7 +159,7 @@ function readRecord(value: unknown): Record<string, unknown> {
 </script>
 
 <template>
-  <view class="activity-groups" aria-label="工具执行链">
+  <view class="activity-groups" aria-label="处理进度">
     <view
       v-for="(group, groupIndex) in groups"
       :key="group.id"

@@ -77,6 +77,7 @@ interface ActiveStream {
 }
 
 const AI_PAGE_PATH = '/pages/ai-chat/index'
+const PROCESSING_STATUS_TEXT = '正在处理你的问题…'
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const quickQuestions = ref<QuickQuestion[]>([
@@ -169,6 +170,32 @@ const composerStyle = computed(() => ({
 const scrollLatestStyle = computed(() => ({
   bottom: `${keyboardHeight.value + (keyboardHeight.value > 0 ? 82 : safeBottom + 82)}px`,
 }))
+
+const visibleMessages = computed(() => (currentConversation.value?.messages || [])
+  .map((message) => {
+    const visibleExtensions = message.extensions.filter(isVisibleExtension)
+    return { message, visibleExtensions }
+  })
+  .filter(({ message, visibleExtensions }) => Boolean(
+    message.content
+    || visibleExtensions.length
+    || message.reasoningContent
+    || message.status === 'streaming',
+  )))
+
+function isVisibleExtension(extension: AiMessageExtension) {
+  return extension.type === 'attachment' || extension.type === 'ask'
+}
+
+function shouldShowStreamingActivity(message: AiChatMessage) {
+  const hasWaitingUserAsk = message.extensions.some(
+    extension => extension.type === 'ask' && extension.state === 'waiting_user',
+  )
+  return message.role === 'assistant'
+    && message.status === 'streaming'
+    && !hasWaitingUserAsk
+    && (!message.content || Boolean(streamStatusText.value))
+}
 
 function createMessage(
   role: AiChatMessageRole,
@@ -374,7 +401,7 @@ function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChat
       streamStatusText.value = '正在思考…'
       break
     case 'status':
-      streamStatusText.value = readEventMessage(event) || '正在处理你的问题…'
+      streamStatusText.value = PROCESSING_STATUS_TEXT
       break
     case 'attachment':
       addOrUpdateExtension(assistantMessage, event, 'attachment')
@@ -394,12 +421,12 @@ function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChat
       break
     case 'tool_call':
       addOrUpdateExtension(assistantMessage, event, 'tool_call')
-      streamStatusText.value = event.toolName ? `正在调用 ${event.toolName}…` : '正在调用工具…'
+      streamStatusText.value = PROCESSING_STATUS_TEXT
       scheduleAutoScroll()
       break
     case 'tool_result':
       addOrUpdateExtension(assistantMessage, event, 'tool_result')
-      streamStatusText.value = toolResultStatusText(event)
+      streamStatusText.value = PROCESSING_STATUS_TEXT
       scheduleAutoScroll()
       break
     case 'ask':
@@ -413,12 +440,8 @@ function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChat
         assistantMessage.content = event.reply
       if (event.reasoningContent !== undefined)
         assistantMessage.reasoningContent = event.reasoningContent
-      if (!assistantMessage.content.trim()) {
-        if (!assistantMessage.extensions.length)
-          assistantMessage.content = '本次任务已处理完成。'
-        else if (assistantMessage.extensions.every(item => item.state === 'success'))
-          assistantMessage.content = '相关操作已处理完成，请查看上方结果。'
-      }
+      if (!assistantMessage.content.trim())
+        assistantMessage.content = emptyReplyFallback(assistantMessage.extensions)
       assistantMessage.status = 'complete'
       finishReply()
       break
@@ -666,15 +689,14 @@ function readableServiceMessage(value: unknown) {
   return message && !/^[A-Z0-9_]+$/.test(message) ? message : ''
 }
 
-function toolResultStatusText(event: AgentChatStreamEvent) {
-  const status = readString(event.data.status).toUpperCase()
-  if (['ERROR', 'FAILED', 'DENIED', 'UNAVAILABLE'].includes(status))
-    return '工具执行失败，正在整理结果…'
-  if (['INTERRUPTED', 'CANCELED', 'CANCELLED', 'EXPIRED'].includes(status))
-    return '工具执行已中断，正在整理结果…'
-  if (['SUCCESS', 'SUCCEEDED', 'OK', 'COMPLETED', 'CONFIRMED', 'EXECUTED'].includes(status))
-    return '工具执行完成，正在整理结果…'
-  return '工具已返回结果，正在整理…'
+function emptyReplyFallback(extensions: AiMessageExtension[]) {
+  if (extensions.some(item => item.state === 'failed'))
+    return '本次请求处理失败，请稍后重试。'
+  if (extensions.some(item => item.state === 'waiting_user'))
+    return '需要你的确认后才能继续处理。'
+  if (extensions.some(item => ['cancelled', 'interrupted', 'running'].includes(item.state)))
+    return '本次请求已中断，请稍后重试。'
+  return '本次请求已处理完成。'
 }
 
 function attachmentStatusText(event: AgentChatStreamEvent) {
@@ -1240,7 +1262,7 @@ onUnmounted(() => {
 
         <template v-if="currentConversation">
           <view
-            v-for="(message, messageIndex) in currentConversation.messages"
+            v-for="({ message, visibleExtensions }, messageIndex) in visibleMessages"
             :id="message.id"
             :key="message.id"
             class="message-row"
@@ -1248,25 +1270,15 @@ onUnmounted(() => {
           >
             <text v-if="message.role === 'user'" class="message-time">{{ formatMessageTime(message.createdAt) }}</text>
             <view
-              v-if="message.content || message.extensions.length || message.reasoningContent || message.status === 'streaming'"
               class="message-bubble"
               :class="{
-                'typing-bubble': message.role === 'assistant' && message.status === 'streaming' && !message.content,
+                'typing-bubble': shouldShowStreamingActivity(message) && !message.content,
                 'error-bubble': message.status === 'error',
               }"
             >
-              <view v-if="message.role === 'assistant' && message.status === 'streaming' && !message.content" class="typing-content">
-                <view class="typing-dots">
-                  <view class="typing-dot" />
-                  <view class="typing-dot" />
-                  <view class="typing-dot" />
-                </view>
-                <text class="typing-label">{{ streamStatusText || '正在思考…' }}</text>
-              </view>
-
               <AiMessageActivityGroup
-                v-if="message.extensions.length"
-                :extensions="message.extensions"
+                v-if="visibleExtensions.length"
+                :extensions="visibleExtensions"
                 @resolve="handleAskResolution(message, $event.extension, $event.action)"
               />
 
@@ -1277,6 +1289,19 @@ onUnmounted(() => {
                 :streaming="message.status === 'streaming'"
                 @rendered="handleRichTextRendered"
               />
+
+              <view
+                v-if="shouldShowStreamingActivity(message)"
+                class="typing-content"
+                :class="{ 'has-content': Boolean(message.content) }"
+              >
+                <view class="typing-dots">
+                  <view class="typing-dot" />
+                  <view class="typing-dot" />
+                  <view class="typing-dot" />
+                </view>
+                <text class="typing-label">{{ streamStatusText || '正在思考…' }}</text>
+              </view>
 
               <view v-if="message.role === 'assistant' && message.reasoningContent" class="reasoning-section">
                 <button class="reasoning-toggle" @tap="toggleReasoning(message.id)">
@@ -1743,6 +1768,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 18rpx;
+}
+
+.typing-content.has-content {
+  margin-top: 16rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid #e8edf5;
 }
 
 .typing-dots {
