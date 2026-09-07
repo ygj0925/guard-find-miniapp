@@ -33,8 +33,15 @@ interface PositionDetailView {
   jobId: string | number
   title: string
   company: string
+  companyLogo?: string
+  companyIndustry?: string
+  companyStage?: string
+  companySize?: string
   salary: string
   location: string
+  address?: string
+  latitude?: number
+  longitude?: number
   education: string
   experience: string
   tags: string[]
@@ -67,8 +74,10 @@ const isResumesLoading = ref(false)
 const resumes = ref<ResumeItem[]>([])
 const selectedResumeId = ref<string>()
 const screenshotPath = ref('')
+const isMapRevealed = ref(false)
 
 const isApplied = computed(() => position.value.applied)
+const hasLocation = computed(() => typeof position.value.latitude === 'number' && typeof position.value.longitude === 'number')
 const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
 const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
 
@@ -85,8 +94,15 @@ function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
     jobId: source.jobId,
     title: source.positionName,
     company: source.company || '招聘企业',
+    companyLogo: source.companyLogo,
+    companyIndustry: source.companyIndustry,
+    companyStage: source.companyStage,
+    companySize: source.companySize,
     salary: formatPositionSalary(source),
     location: source.location,
+    address: source.address,
+    latitude: source.latitude,
+    longitude: source.longitude,
     education: source.edu,
     experience: source.experience,
     tags: source.tags || [],
@@ -115,11 +131,16 @@ onLoad(async (options) => {
 
 onReady(() => {
   // #ifdef MP-WEIXIN
-  wx.takeScreenshot({
-    success: (res: { tempImagePath: string }) => {
-      screenshotPath.value = res.tempImagePath
-    },
-  })
+  // 延迟截图避免与 map 原生组件初始化竞争，防止模拟器卡顿
+  setTimeout(() => {
+    if (typeof wx.takeScreenshot === 'function') {
+      wx.takeScreenshot({
+        success: (res: { tempImagePath: string }) => {
+          screenshotPath.value = res.tempImagePath
+        },
+      })
+    }
+  }, 800)
   // #endif
 })
 onShareAppMessage(() => ({
@@ -132,6 +153,21 @@ onShareTimeline(() => ({
   title: shareTitle.value,
   query: `id=${encodeURIComponent(position.value.id)}`,
 }))
+
+function openCompanyLocation() {
+  if (!hasLocation.value)
+    return
+  if (!isMapRevealed.value) {
+    isMapRevealed.value = true
+    return
+  }
+  uni.openLocation({
+    latitude: position.value.latitude!,
+    longitude: position.value.longitude!,
+    name: position.value.company,
+    address: position.value.address || position.value.location,
+  })
+}
 
 function handleBack() {
   if (getCurrentPages().length > 1) {
@@ -332,6 +368,39 @@ function openApplyProgress() {
           <text v-for="(item, index) in position.requirements" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
+        </view>
+      </view>
+
+      <view class="mt-2 bg-white px-4 py-5">
+        <view class="flex cursor-pointer items-center active:opacity-75" role="button" aria-label="查看公司地址" @tap="openCompanyLocation">
+          <view class="h-16 w-16 flex flex-none items-center justify-center overflow-hidden rounded-2xl bg-[#edf5ff]">
+            <image class="h-12 w-12" :src="position.companyLogo" mode="aspectFit" />
+          </view>
+          <view class="ml-3 min-w-0 flex-1">
+            <text class="block overflow-hidden text-ellipsis whitespace-nowrap text-lg text-[#202938] font-700">{{ position.company }}</text>
+            <text class="mt-1 block text-sm text-[#667085]">{{ position.companyIndustry }} · {{ position.companyStage }} · {{ position.companySize }}</text>
+          </view>
+          <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
+        </view>
+
+        <view v-if="hasLocation && isMapRevealed" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
+          <map class="h-full w-full" :latitude="position.latitude" :longitude="position.longitude" :scale="15" :enable-scroll="false" :enable-zoom="false" />
+          <view class="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
+            <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-[#263249] shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
+              <view class="i-carbon-location-filled mr-1.5 flex-none text-base text-brand-blue leading-none" />
+              <text class="overflow-hidden text-ellipsis whitespace-nowrap">{{ position.address }}</text>
+            </view>
+          </view>
+          <view class="pointer-events-none absolute left-1/2 top-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-brand-blue text-xl text-white shadow-[0_8rpx_20rpx_rgba(45,111,230,0.28)] -translate-x-1/2 -translate-y-full">
+            <view class="i-carbon-location-filled" />
+          </view>
+        </view>
+        <view v-else-if="hasLocation" class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#edf4ff] px-4 py-5 text-sm text-brand-blue active:opacity-75" role="button" aria-label="点击显示地图" @tap="openCompanyLocation">
+          <view class="i-carbon-map text-base leading-none" />
+          <text>点击查看地图</text>
+        </view>
+        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">
+          暂未提供工作地点坐标
         </view>
       </view>
 

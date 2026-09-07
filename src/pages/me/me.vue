@@ -33,6 +33,7 @@ const headerScrolled = ref(false)
 const profileScrolledBackground = 'var(--app-header-surface, rgba(255,255,255,0.98))'
 const resumeShortcuts = [
   { label: '附件简历', icon: 'i-carbon-attachment' },
+  { label: '投递记录', icon: 'i-carbon-send-alt' },
   { label: '我的分享', icon: 'i-carbon-share' },
 ]
 
@@ -85,6 +86,10 @@ function handleResumeShortcut(label: string) {
   }
   if (label === '附件简历') {
     uni.navigateTo({ url: RESUME_PAGE })
+    return
+  }
+  if (label === '投递记录') {
+    uni.navigateTo({ url: '/pages/position/applies' })
     return
   }
   if (label === '我的分享') {
@@ -162,7 +167,7 @@ function handleLogout() {
     <view class="relative z-1 mx-4 mt-4">
       <text class="mx-1 mb-2 block text-base text-[#263249] font-700">常用功能</text>
       <view class="rounded-2xl bg-white px-0.5 py-2 shadow-[0_4rpx_20rpx_rgba(42,92,178,0.08)]">
-        <view class="grid grid-cols-2">
+        <view class="grid grid-cols-3">
           <view
             v-for="shortcut in resumeShortcuts"
             :key="shortcut.label"
