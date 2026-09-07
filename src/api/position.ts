@@ -21,6 +21,23 @@ export interface PositionListQuery {
   locIds?: string[]
 }
 
+export interface PositionAppliesItem {
+  id: string
+  resumeId: string
+  positionId: string
+  jobId: string
+  applicantName: string
+  applicantPhone: string
+  resumeName: string
+  importStatus: string
+  failedReason: string
+  jobTitle: string
+  processName: string
+  phaseName: string
+  statusName: string
+  createTime: string
+}
+
 export interface PositionListItem {
   positionId: string
   positionName: string
@@ -74,4 +91,8 @@ export function getPositions(query: PositionListQuery) {
 
 export function getPositionDetail(positionId: string) {
   return http.get<PositionDetail>(`/miniapp/positions/${encodeURIComponent(positionId)}`)
+}
+
+export function getPositionApplies() {
+  return http.get<PositionAppliesItem[]>(`/miniapp/position-applies`)
 }

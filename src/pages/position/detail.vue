@@ -72,6 +72,7 @@ const position = ref<PositionDetailView>(EMPTY_POSITION)
 const isLoading = ref(true)
 const isApplying = ref(false)
 const screenshotPath = ref('')
+const isMapRevealed = ref(false)
 let applyingTimer: ReturnType<typeof setTimeout> | undefined
 
 const isFavorite = computed(() => positionStore.isFavorite(position.value.id))
@@ -128,11 +129,14 @@ onLoad(async (options) => {
 
 onReady(() => {
   // #ifdef MP-WEIXIN
-  wx.takeScreenshot({
-    success: (res: { tempImagePath: string }) => {
-      screenshotPath.value = res.tempImagePath
-    },
-  })
+  // 延迟截图避免与 map 原生组件初始化竞争，防止模拟器卡顿
+  setTimeout(() => {
+    wx.takeScreenshot({
+      success: (res: { tempImagePath: string }) => {
+        screenshotPath.value = res.tempImagePath
+      },
+    })
+  }, 800)
   // #endif
 })
 
@@ -221,6 +225,10 @@ function handleApply() {
 function openCompanyLocation() {
   if (!hasLocation.value) {
     uni.showToast({ title: '暂未提供工作地点坐标', icon: 'none' })
+    return
+  }
+  if (!isMapRevealed.value) {
+    isMapRevealed.value = true
     return
   }
   uni.openLocation({
@@ -342,7 +350,7 @@ function openCompanyLocation() {
           <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
         </view>
 
-        <view v-if="hasLocation" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
+        <view v-if="hasLocation && isMapRevealed" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
           <map class="h-full w-full" :latitude="position.latitude" :longitude="position.longitude" :scale="15" :enable-scroll="false" :enable-zoom="false" />
           <view class="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
             <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-[#263249] shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
@@ -353,6 +361,10 @@ function openCompanyLocation() {
           <view class="pointer-events-none absolute left-1/2 top-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-brand-blue text-xl text-white shadow-[0_8rpx_20rpx_rgba(45,111,230,0.28)] -translate-x-1/2 -translate-y-full">
             <view class="i-carbon-location-filled" />
           </view>
+        </view>
+        <view v-else-if="hasLocation" class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#edf4ff] px-4 py-5 text-sm text-brand-blue active:opacity-75" role="button" aria-label="点击显示地图" @tap="openCompanyLocation">
+          <view class="i-carbon-map text-base leading-none" />
+          <text>点击查看地图</text>
         </view>
         <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">
           暂未提供工作地点坐标
