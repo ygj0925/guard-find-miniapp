@@ -20,7 +20,7 @@ const emit = defineEmits<{
         <text class="h-52rpx w-52rpx flex items-center justify-center rounded-18rpx bg-[#4f8cf4] text-xs text-white font-700">Q</text>
       </view>
       <view class="h-82rpx w-82rpx flex cursor-pointer items-center justify-center border-1rpx border-[#e1e9f5] rounded-26rpx bg-white/88 shadow-[0_10rpx_24rpx_rgba(54,82,145,0.06)] transition-[background-color,transform,box-shadow] duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-94 active:bg-white motion-reduce:transition-none" role="button" aria-label="Apple 登录" @tap="emit('unavailable', 'Apple')">
-        <text class="h-52rpx w-52rpx flex items-center justify-center rounded-18rpx bg-[#263249] text-3xs text-white font-700">●</text>
+        <text class="h-52rpx w-52rpx flex items-center justify-center rounded-18rpx bg-app-ink text-3xs text-white font-700">●</text>
       </view>
     </view>
   </view>

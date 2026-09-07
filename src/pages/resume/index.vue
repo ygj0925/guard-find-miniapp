@@ -181,9 +181,16 @@ async function makeDefault(item: ResumeItem) {
   if (item.isDefault)
     return
   loading.value = true
-  try { await setDefaultResume(item.id); await loadResumes() }
-  catch (error) { uni.showToast({ title: error instanceof Error ? error.message : '设置失败', icon: 'none' }) }
-  finally { loading.value = false }
+  try {
+    await setDefaultResume(item.id)
+    await loadResumes()
+  }
+  catch (error) {
+    uni.showToast({ title: error instanceof Error ? error.message : '设置失败', icon: 'none' })
+  }
+  finally {
+    loading.value = false
+  }
 }
 
 onShow(loadResumes)

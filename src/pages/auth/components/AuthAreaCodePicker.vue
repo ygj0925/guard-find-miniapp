@@ -50,7 +50,9 @@ function pick(area: AreaCodeItem) {
               v-for="area in HOT_AREA_CODES" :key="`hot-${area.iso}`" class="area-row"
               :class="{ active: area.iso === props.selectedIso }" @tap="pick(area)"
             >
-              <text class="area-name">{{ area.name }}</text>
+              <view class="area-name">
+                <text class="area-name-primary">{{ area.name }}</text>
+              </view>
               <text class="area-code">+{{ area.code }}</text>
             </view>
           </view>
@@ -63,7 +65,10 @@ function pick(area: AreaCodeItem) {
               v-for="area in group.items" :key="area.iso" class="area-row"
               :class="{ active: area.iso === props.selectedIso }" @tap="pick(area)"
             >
-              <text class="area-name">{{ area.name }}<text class="area-en">{{ area.enName }}</text></text>
+              <view class="area-name">
+                <text class="area-name-primary">{{ area.name }}</text>
+                <text class="area-en">{{ area.enName }}</text>
+              </view>
               <text class="area-code">+{{ area.code }}</text>
             </view>
           </view>
@@ -167,30 +172,45 @@ function pick(area: AreaCodeItem) {
   font-size: 24rpx;
 }
 .area-row {
+  box-sizing: border-box;
+  min-height: 104rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx 60rpx 24rpx 32rpx;
+  gap: 20rpx;
+  padding: 0 60rpx 0 32rpx;
   border-bottom: 1rpx solid #f2f2f2;
 }
 .area-name {
+  min-width: 0;
+  flex: 1;
   display: flex;
-  flex-direction: column;
-  color: #222;
+  align-items: baseline;
+  gap: 16rpx;
+}
+.area-name-primary {
+  flex: none;
+  color: var(--app-ink);
   font-size: 32rpx;
+  line-height: 1.4;
 }
 .area-en {
-  margin-top: 4rpx;
-  color: #a6abb3;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--app-muted);
   font-size: 22rpx;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .area-code {
-  color: #666;
+  flex: none;
+  color: var(--app-ink-soft);
   font-size: 30rpx;
 }
-.area-row.active .area-name,
+.area-row.active .area-name-primary,
 .area-row.active .area-code {
-  color: #1677df;
+  color: var(--app-brand-blue);
   font-weight: 600;
 }
 .empty {

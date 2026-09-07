@@ -2,10 +2,16 @@ import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 import { tabBar } from './src/tabbar/config'
 
 export default defineUniPages({
+  plugins: {
+    WechatSI: {
+      version: '0.3.5',
+      provider: 'wx069ba97219f66d99',
+    },
+  },
   lazyCodeLoading: 'requiredComponents',
   globalStyle: {
     navigationStyle: 'default',
-    navigationBarTitleText: '三生制药招聘',
+    navigationBarTitleText: '生生智家',
     navigationBarBackgroundColor: '#EDF6FF',
     navigationBarTextStyle: 'black',
     backgroundColor: '#EDF6FF',

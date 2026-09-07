@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { getPositionDetail } from '@/api/position'
+import { applyPosition, getPositionDetail } from '@/api/position'
 import type { PositionDetail as PositionDetailResponse } from '@/api/position'
+import { getResumes } from '@/api/resume'
+import type { ResumeItem } from '@/api/resume'
 import AppPageHeader from '@/components/AppPageHeader.vue'
-import { usePositionStore } from '@/store/position'
 import { useTokenStore } from '@/store/token'
+import { formatPositionSalary } from '@/utils/positionSalary'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 defineOptions({
@@ -25,61 +27,66 @@ definePage({
 
 const POSITION_LIST_PATH = '/pages/position/index'
 const DETAIL_PATH = '/pages/position/detail'
+const POSITION_PROGRESS_PATH = '/pages/position/progress'
 interface PositionDetailView {
   id: string
+  jobId: string | number
   title: string
   company: string
-  companyIndustry: string
-  companyStage: string
-  companySize: string
-  companyLogo: string
   salary: string
   location: string
-  address: string
-  longitude: number
-  latitude: number
   education: string
   experience: string
   tags: string[]
-  recruiter: { name: string, role: string, avatar: string, activeText: string }
   responsibilities: string[]
   requirements: string[]
+  applied: boolean
+  applyRecordId?: string | number
+  companyLogo?: string
+  companyIndustry?: string
+  companyStage?: string
+  companySize?: string
+  address?: string
+  longitude?: number
+  latitude?: number
 }
 
 const EMPTY_POSITION: PositionDetailView = {
   id: '',
+  jobId: '',
   title: '',
   company: '',
-  companyIndustry: '',
-  companyStage: '',
-  companySize: '',
-  companyLogo: '/static/logo.svg',
   salary: '',
   location: '',
-  address: '',
-  longitude: 0,
-  latitude: 0,
   education: '',
   experience: '',
   tags: [],
-  recruiter: { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
   responsibilities: [],
   requirements: [],
+  applied: false,
+  companyLogo: undefined,
+  companyIndustry: undefined,
+  companyStage: undefined,
+  companySize: undefined,
+  address: undefined,
+  longitude: undefined,
+  latitude: undefined,
 }
-const positionStore = usePositionStore()
 const tokenStore = useTokenStore()
 const position = ref<PositionDetailView>(EMPTY_POSITION)
 const isLoading = ref(true)
 const isApplying = ref(false)
+const isResumePickerVisible = ref(false)
+const isResumesLoading = ref(false)
+const resumes = ref<ResumeItem[]>([])
+const selectedResumeId = ref<string>()
 const screenshotPath = ref('')
 const isMapRevealed = ref(false)
-let applyingTimer: ReturnType<typeof setTimeout> | undefined
 
-const isFavorite = computed(() => positionStore.isFavorite(position.value.id))
-const isApplied = computed(() => positionStore.isApplied(position.value.id))
+const isApplied = computed(() => position.value.applied)
 const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
 const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
-const hasLocation = computed(() => position.value.longitude !== 0 && position.value.latitude !== 0)
+const hasLocation = computed(() => position.value.latitude != null && position.value.longitude != null)
 
 function normalizeTextList(value?: string[] | string) {
   const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\\r?\\n|\r?\n/) : []
@@ -91,23 +98,25 @@ function normalizeTextList(value?: string[] | string) {
 function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
   return {
     id: source.positionId,
+    jobId: source.jobId,
     title: source.positionName,
     company: source.company || '招聘企业',
-    companyIndustry: source.companyIndustry || '',
-    companyStage: source.companyStage || '',
-    companySize: source.companySize || '',
-    companyLogo: source.companyLogo || '/static/logo.svg',
-    salary: source.salaryMin != null && source.salaryMax != null ? `${Math.round(source.salaryMin / 1000)}K-${Math.round(source.salaryMax / 1000)}K` : source.salaryUnit || '面议',
+    salary: formatPositionSalary(source),
     location: source.location,
-    address: source.address || source.location || '',
-    longitude: Number(source.longitude || 0),
-    latitude: Number(source.latitude || 0),
     education: source.edu,
     experience: source.experience,
     tags: source.tags || [],
-    recruiter: source.recruiter || { name: '招聘团队', role: '', avatar: '/static/images/default-avatar.png', activeText: '' },
     responsibilities: normalizeTextList(source.responsibilities),
     requirements: normalizeTextList(source.requirements),
+    applied: Boolean(source.applied),
+    applyRecordId: source.applyRecordId,
+    companyLogo: source.companyLogo,
+    companyIndustry: source.companyIndustry,
+    companyStage: source.companyStage,
+    companySize: source.companySize,
+    address: source.address,
+    longitude: source.longitude,
+    latitude: source.latitude,
   }
 }
 
@@ -139,12 +148,6 @@ onReady(() => {
   }, 800)
   // #endif
 })
-
-onUnload(() => {
-  if (applyingTimer)
-    clearTimeout(applyingTimer)
-})
-
 onShareAppMessage(() => ({
   title: shareTitle.value,
   path: sharePath.value,
@@ -156,20 +159,27 @@ onShareTimeline(() => ({
   query: `id=${encodeURIComponent(position.value.id)}`,
 }))
 
+function openCompanyLocation() {
+  if (!hasLocation.value)
+    return
+  if (!isMapRevealed.value) {
+    isMapRevealed.value = true
+    return
+  }
+  uni.openLocation({
+    latitude: position.value.latitude!,
+    longitude: position.value.longitude!,
+    name: position.value.company,
+    address: position.value.address || position.value.location,
+  })
+}
+
 function handleBack() {
   if (getCurrentPages().length > 1) {
     uni.navigateBack()
     return
   }
   uni.switchTab({ url: POSITION_LIST_PATH })
-}
-
-function handleFavorite() {
-  const active = positionStore.toggleFavorite(position.value.id)
-  uni.showToast({
-    title: active ? '已收藏职位' : '已取消收藏',
-    icon: 'none',
-  })
 }
 
 async function handleShare() {
@@ -198,7 +208,7 @@ async function handleShare() {
   })
 }
 
-function handleApply() {
+async function handleApply() {
   if (isApplied.value) {
     uni.showToast({ title: '该职位已投递', icon: 'none' })
     return
@@ -214,39 +224,91 @@ function handleApply() {
   if (isApplying.value)
     return
 
-  isApplying.value = true
-  applyingTimer = setTimeout(() => {
-    positionStore.markApplied(position.value.id)
-    isApplying.value = false
-    uni.showToast({ title: '简历投递成功', icon: 'success' })
-  }, 650)
+  isResumePickerVisible.value = true
+  isResumesLoading.value = true
+  selectedResumeId.value = undefined
+  try {
+    resumes.value = await getResumes()
+    selectedResumeId.value = resumes.value.find(item => item.isDefault)?.id ?? resumes.value[0]?.id
+  }
+  catch {
+    resumes.value = []
+    isResumePickerVisible.value = false
+  }
+  finally {
+    isResumesLoading.value = false
+  }
 }
 
-function openCompanyLocation() {
-  if (!hasLocation.value) {
-    uni.showToast({ title: '暂未提供工作地点坐标', icon: 'none' })
+function closeResumePicker() {
+  if (!isApplying.value)
+    isResumePickerVisible.value = false
+}
+
+function selectResume(resumeId: string) {
+  if (!isApplying.value)
+    selectedResumeId.value = resumeId
+}
+
+function goToResumePage() {
+  isResumePickerVisible.value = false
+  uni.navigateTo({ url: '/pages/resume/index' })
+}
+
+async function confirmApply() {
+  if (!selectedResumeId.value || isApplying.value)
+    return
+
+  if (position.value.jobId === '' || position.value.jobId == null) {
+    uni.showToast({ title: '职位 jobId 缺失，暂时无法投递', icon: 'none' })
     return
   }
-  if (!isMapRevealed.value) {
-    isMapRevealed.value = true
+
+  isApplying.value = true
+  try {
+    const positionId = position.value.id
+    const applyResult = await applyPosition(positionId, {
+      resumeId: selectedResumeId.value,
+      jobId: position.value.jobId,
+    })
+    const applyRecordId = applyResult.applyId || position.value.applyRecordId
+    position.value = { ...position.value, applied: true, applyRecordId }
+    isResumePickerVisible.value = false
+    uni.showToast({ title: '简历投递成功', icon: 'success' })
+
+    void getPositionDetail(positionId)
+      .then((detail) => {
+        const refreshedPosition = toPositionDetail(detail)
+        position.value = {
+          ...refreshedPosition,
+          applied: true,
+          applyRecordId: refreshedPosition.applyRecordId ?? applyRecordId,
+        }
+      })
+      .catch(error => console.warn('投递成功，但刷新职位详情失败:', error))
+  }
+  finally {
+    isApplying.value = false
+  }
+}
+
+function openApplyProgress() {
+  if (!position.value.applyRecordId) {
+    uni.showToast({ title: '投递记录加载中，请稍后重试', icon: 'none' })
     return
   }
-  uni.openLocation({
-    latitude: position.value.latitude,
-    longitude: position.value.longitude,
-    name: position.value.company,
-    address: position.value.address,
-    scale: 16,
+  uni.navigateTo({
+    url: `${POSITION_PROGRESS_PATH}?id=${encodeURIComponent(String(position.value.applyRecordId))}`,
   })
 }
 </script>
 
 <template>
-  <view class="min-h-[var(--app-viewport-height)] bg-[#f5f7fa] text-app-ink font-[Noto_Sans_SC,Microsoft_YaHei,sans-serif]">
+  <view class="min-h-[var(--app-viewport-height)] bg-app-surface text-app-ink">
     <AppPageHeader title="职位详情" background="#ffffff" scrolled-background="#ffffff">
       <template #left>
         <button
-          class="plain-button h-12 w-12 flex cursor-pointer items-center justify-center border-0 rounded-full bg-transparent p-0 text-xl text-[#17233d] leading-none active:bg-[#eef4ff]"
+          class="plain-button h-12 w-12 flex cursor-pointer items-center justify-center border-0 rounded-full bg-transparent p-0 text-xl text-app-ink leading-none active:bg-[#eef4ff]"
           aria-label="返回职位列表"
           @tap="handleBack"
         >
@@ -263,14 +325,6 @@ function openCompanyLocation() {
           <view class="skeleton-block h-6 w-20 rounded-lg" />
           <view class="skeleton-block h-6 w-20 rounded-lg" />
         </view>
-        <view class="mt-5 h-px bg-[#edf0f4]" />
-        <view class="mt-4 flex items-center gap-3">
-          <view class="skeleton-block h-14 w-14 flex-none rounded-full" />
-          <view class="min-w-0 flex-1">
-            <view class="skeleton-block h-6 w-1/3 rounded-lg" />
-            <view class="skeleton-block mt-2 h-5 w-1/2 rounded-lg" />
-          </view>
-        </view>
       </view>
       <view class="mt-2 bg-white px-4 py-5">
         <view class="skeleton-block h-7 w-28 rounded-lg" />
@@ -278,60 +332,44 @@ function openCompanyLocation() {
           <view v-for="index in 7" :key="index" class="skeleton-block h-5 rounded-lg" :class="index === 7 ? 'w-3/4' : 'w-full'" />
         </view>
       </view>
-      <view class="mt-2 bg-white px-4 py-5">
-        <view class="skeleton-block h-16 w-3/4 rounded-xl" />
-        <view class="skeleton-block mt-4 h-52 w-full rounded-2xl" />
-      </view>
     </view>
 
     <template v-else>
       <view class="bg-white px-4 pb-5 pt-4">
         <view class="flex items-start justify-between gap-3">
-          <text class="min-w-0 flex-1 text-2xl text-[#202938] font-700 leading-[1.3]">{{ position.title }}</text>
+          <text class="min-w-0 flex-1 text-2xl text-app-ink font-700 leading-[1.3]">{{ position.title }}</text>
           <text class="flex-none pt-1 text-xl text-brand-blue font-700 leading-none">{{ position.salary }}</text>
         </view>
-        <view class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#4b5565]">
-          <view class="flex items-center gap-1.5">
-            <view class="i-carbon-location text-base text-[#667085] leading-none" />
+        <view v-if="position.location || position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-app-ink-soft">
+          <view v-if="position.location" class="flex items-center gap-1.5">
+            <view class="i-carbon-location text-base text-app-muted leading-none" />
             <text>{{ position.location }}</text>
           </view>
-          <view class="flex items-center gap-1.5">
-            <view class="i-carbon-portfolio text-base text-[#667085] leading-none" />
+          <view v-if="position.experience" class="flex items-center gap-1.5">
+            <view class="i-carbon-portfolio text-base text-app-muted leading-none" />
             <text>{{ position.experience }}</text>
           </view>
-          <view class="flex items-center gap-1.5">
-            <view class="i-carbon-education text-base text-[#667085] leading-none" />
+          <view v-if="position.education" class="flex items-center gap-1.5">
+            <view class="i-carbon-education text-base text-app-muted leading-none" />
             <text>{{ position.education }}</text>
           </view>
-        </view>
-
-        <view class="mt-4 h-px bg-[#edf0f4]" />
-
-        <view class="mt-4 flex cursor-pointer items-center active:opacity-75" role="button" aria-label="查看招聘者信息">
-          <image class="h-14 w-14 flex-none rounded-full bg-[#eef4ff]" :src="position.recruiter.avatar" mode="aspectFill" />
-          <view class="ml-3 min-w-0 flex-1">
-            <text class="block text-base text-[#252d3d] font-700">{{ position.recruiter.name }}</text>
-            <text class="mt-1 block text-sm text-[#596579]">{{ position.company }} · {{ position.recruiter.role }}</text>
-            <text class="mt-0.5 block text-xs text-[#a0a8b5]">{{ position.recruiter.activeText }}</text>
-          </view>
-          <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
         </view>
       </view>
 
       <view class="mt-2 bg-white px-4 py-5">
-        <text class="block text-xl text-[#202938] font-700">职位详情</text>
-        <view class="mt-3 flex flex-wrap gap-2">
-          <text v-for="tag in position.tags" :key="tag" class="rounded-lg bg-[#f2f6fb] px-2.5 py-1.5 text-xs text-[#5f6b7d]">{{ tag }}</text>
+        <text class="block text-xl text-app-ink font-700">职位详情</text>
+        <view v-if="position.tags.some(Boolean)" class="mt-3 flex flex-wrap gap-2">
+          <text v-for="tag in position.tags.filter(Boolean)" :key="tag" class="rounded-lg bg-[#f2f6fb] px-2.5 py-1.5 text-xs text-app-ink-soft">{{ tag }}</text>
         </view>
 
-        <view class="mt-4 flex flex-col gap-2.5 text-base text-[#5b6472] leading-[1.8]">
+        <view class="mt-4 flex flex-col gap-2.5 text-base text-app-ink-soft leading-[1.8]">
           <text v-for="(item, index) in position.responsibilities" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
         </view>
 
-        <text class="mt-5 block text-lg text-[#202938] font-700">任职要求</text>
-        <view class="mt-3 flex flex-col gap-2.5 text-base text-[#5b6472] leading-[1.8]">
+        <text class="mt-5 block text-lg text-app-ink font-700">任职要求</text>
+        <view class="mt-3 flex flex-col gap-2.5 text-base text-app-ink-soft leading-[1.8]">
           <text v-for="(item, index) in position.requirements" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
@@ -374,40 +412,124 @@ function openCompanyLocation() {
       <view class="h-36" />
     </template>
 
-    <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-3 pt-2 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
-      <view class="flex items-center gap-2">
+    <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-4 pt-2.5 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
+      <view class="flex items-center gap-3">
         <!-- #ifdef MP-WEIXIN -->
-        <button class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs text-[#586579] leading-none active:opacity-65" open-type="share" aria-label="分享职位">
-          <view class="i-carbon-share mb-1 text-xl text-[#202938] leading-none" />
+        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位">
+          <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
         <!-- #endif -->
         <!-- #ifndef MP-WEIXIN -->
-        <button class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs text-[#586579] leading-none active:opacity-65" aria-label="分享职位" @tap="handleShare">
-          <view class="i-carbon-share mb-1 text-xl text-[#202938] leading-none" />
+        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" aria-label="分享职位" @tap="handleShare">
+          <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
         <!-- #endif -->
 
         <button
-          class="plain-button h-14 w-14 flex flex-none flex-col items-center justify-center border-0 bg-transparent p-0 text-xs leading-none active:opacity-65"
-          :class="isFavorite ? 'text-brand-blue' : 'text-[#586579]'"
-          :aria-label="isFavorite ? '取消收藏职位' : '收藏职位'"
-          @tap="handleFavorite"
+          class="plain-button h-12 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_8rpx_20rpx_rgba(45,111,230,0.2)] transition-[transform,opacity,background-color] duration-180 ease-out active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[#9bb8e8] disabled:shadow-none motion-reduce:transition-none"
+          :disabled="isApplying"
+          :aria-label="isApplied ? '查看投递进度' : '投递简历'"
+          @tap="isApplied ? openApplyProgress() : handleApply()"
         >
-          <view class="mb-1 text-xl leading-none" :class="isFavorite ? 'i-carbon-star-filled text-brand-blue' : 'i-carbon-star text-[#202938]'" />
-          <text>{{ isFavorite ? '已收藏' : '收藏' }}</text>
+          <view v-if="isApplying" class="apply-spinner mr-2 h-4.5 w-4.5 border-2 border-white/35 border-t-white rounded-full" />
+          <text>{{ isApplying ? '正在投递' : isApplied ? '查看投递进度' : '投递简历' }}</text>
         </button>
+      </view>
+    </view>
 
-        <button
-          class="plain-button ml-1 h-14 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_10rpx_24rpx_rgba(45,111,230,0.22)] transition-[opacity,background-color] duration-180 ease-out disabled:cursor-not-allowed disabled:bg-[#8fb4ef] active:opacity-86 motion-reduce:transition-none"
-          :disabled="isApplying || isApplied"
-          :aria-label="isApplied ? '简历已投递' : '一键投递简历'"
-          @tap="handleApply"
-        >
-          <view v-if="isApplying" class="apply-spinner mr-2 h-5 w-5 border-2 border-white/35 border-t-white rounded-full" />
-          <text>{{ isApplying ? '正在投递' : isApplied ? '已投递' : '一键投递简历' }}</text>
-        </button>
+    <view v-if="isResumePickerVisible" class="fixed inset-0 z-200 flex items-end bg-black/42" @tap="closeResumePicker">
+      <view class="max-h-[78vh] w-full overflow-hidden rounded-t-[28rpx] bg-white shadow-[0_-18rpx_56rpx_rgba(26,48,86,0.16)] pb-safe" @tap.stop>
+        <view class="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#d7dee8]" />
+
+        <view class="flex items-start justify-between px-5 pb-3 pt-2.5">
+          <view class="min-w-0 flex-1 pr-4">
+            <text class="block text-lg text-app-ink font-700 leading-tight">选择投递简历</text>
+            <text class="mt-1 block text-sm text-app-muted leading-relaxed">请选择一份附件简历完成投递</text>
+          </view>
+          <button class="plain-button h-10 w-10 flex flex-none items-center justify-center border-0 rounded-full bg-[#f3f5f8] p-0 text-lg text-app-ink-soft transition-colors duration-180 active:bg-[#e5eaf1] disabled:opacity-45 motion-reduce:transition-none" aria-label="关闭简历选择" :disabled="isApplying" @tap="closeResumePicker">
+            <view class="i-carbon-close leading-none" />
+          </button>
+        </view>
+
+        <view class="bg-[#f7f9fc] pt-3">
+          <view v-if="isResumesLoading" class="mx-4 mb-3 flex items-center rounded-xl bg-white px-3.5 py-3.5 shadow-[0_6rpx_18rpx_rgba(36,58,91,0.06)]">
+            <view class="skeleton-block h-11 w-11 flex-none rounded-xl" />
+            <view class="ml-3 min-w-0 flex-1">
+              <view class="skeleton-block h-5 w-2/5 rounded-lg" />
+              <view class="skeleton-block mt-2 h-4 w-3/5 rounded-lg" />
+            </view>
+            <view class="skeleton-block ml-3 h-5.5 w-5.5 flex-none rounded-full" />
+          </view>
+
+          <scroll-view v-else-if="resumes.length" scroll-y class="max-h-[40vh] px-4" role="radiogroup" aria-label="可投递简历">
+            <view
+              v-for="resume in resumes"
+              :key="resume.id"
+              class="mb-2.5 flex cursor-pointer items-center border rounded-xl border-solid px-3.5 py-3.5 transition-[transform,background-color,border-color,box-shadow] duration-180 ease-out active:scale-[0.99] motion-reduce:transition-none"
+              :class="selectedResumeId === resume.id
+                ? 'border-[rgba(45,111,230,0.45)] bg-white shadow-[0_8rpx_22rpx_rgba(45,111,230,0.11)]'
+                : 'border-[#edf0f4] bg-white shadow-[0_4rpx_14rpx_rgba(36,58,91,0.05)]'"
+              role="radio"
+              :aria-checked="selectedResumeId === resume.id"
+              :aria-label="`选择简历 ${resume.name}`"
+              @tap="selectResume(resume.id)"
+            >
+              <view
+                class="h-11 w-11 flex flex-none items-center justify-center rounded-xl text-xl transition-colors duration-180 motion-reduce:transition-none"
+                :class="selectedResumeId === resume.id
+                  ? 'bg-brand-blue text-white shadow-[0_6rpx_16rpx_rgba(45,111,230,0.2)]'
+                  : 'bg-[#edf4ff] text-brand-blue'"
+              >
+                <view class="i-carbon-document-pdf leading-none" />
+              </view>
+
+              <view class="ml-3 min-w-0 flex-1">
+                <view class="flex items-center gap-2">
+                  <text class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-base text-app-ink font-650">{{ resume.name }}</text>
+                  <text v-if="resume.isDefault" class="flex-none rounded-md bg-[#e8f1ff] px-2 py-0.5 text-2xs text-brand-blue font-600">默认</text>
+                </view>
+                <view class="mt-1 flex items-center text-xs text-app-muted">
+                  <view class="i-carbon-time mr-1 flex-none text-sm leading-none" />
+                  <text class="overflow-hidden text-ellipsis whitespace-nowrap">上传于 {{ resume.uploadedAt }}</text>
+                </view>
+              </view>
+
+              <view
+                class="ml-3 h-5.5 w-5.5 flex flex-none items-center justify-center border-2 rounded-full transition-colors duration-180 motion-reduce:transition-none"
+                :class="selectedResumeId === resume.id
+                  ? 'border-brand-blue bg-brand-blue text-white'
+                  : 'border-[#cbd5e1] bg-white'"
+              >
+                <view v-if="selectedResumeId === resume.id" class="i-carbon-checkmark text-xs leading-none" />
+              </view>
+            </view>
+          </scroll-view>
+
+          <view v-else class="mx-4 mb-3 flex flex-col items-center border border-[#edf0f4] rounded-xl border-solid bg-white px-6 py-7 text-center shadow-[0_4rpx_14rpx_rgba(36,58,91,0.05)]">
+            <view class="h-12 w-12 flex items-center justify-center rounded-xl bg-[#edf4ff] text-2xl text-brand-blue">
+              <view class="i-carbon-document-add leading-none" />
+            </view>
+            <text class="mt-3 block text-base text-app-ink font-650">还没有附件简历</text>
+            <text class="mt-1 block text-sm text-app-muted leading-relaxed">先上传简历，再回来投递当前职位</text>
+            <button class="plain-button mt-4 h-11 flex items-center justify-center border border-[rgba(45,111,230,0.2)] rounded-xl border-solid bg-[#edf4ff] px-5 text-sm text-brand-blue font-650 transition-colors duration-180 active:bg-[#dce9ff] motion-reduce:transition-none" @tap="goToResumePage">
+              <view class="i-carbon-upload mr-2 text-base leading-none" />
+              <text>上传简历</text>
+            </button>
+          </view>
+        </view>
+
+        <view v-if="!isResumesLoading && resumes.length" class="flex items-center gap-3 border-t border-[#e7ebf1] bg-white px-4 py-3">
+          <button class="plain-button h-12 w-24 flex flex-none items-center justify-center border border-[#dce2ea] rounded-xl border-solid bg-white text-base text-app-ink-soft font-600 transition-colors duration-180 active:bg-[#f1f4f8] disabled:opacity-45 motion-reduce:transition-none" :disabled="isApplying" @tap="closeResumePicker">
+            取消
+          </button>
+          <button class="plain-button h-12 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_8rpx_20rpx_rgba(45,111,230,0.2)] transition-[transform,opacity,background-color] duration-180 active:scale-[0.99] disabled:bg-[#9bb8e8] disabled:shadow-none motion-reduce:transition-none" :disabled="!selectedResumeId || isApplying" @tap="confirmApply">
+            <view v-if="isApplying" class="apply-spinner mr-2 h-4 w-4 border-2 border-white/35 border-t-white rounded-full" />
+            <view v-else class="i-carbon-send-alt mr-2 text-lg leading-none" />
+            <text>{{ isApplying ? '正在投递' : '确认投递' }}</text>
+          </button>
+        </view>
       </view>
     </view>
   </view>

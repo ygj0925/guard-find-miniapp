@@ -31,7 +31,6 @@ const profileSubtitle = computed(() => {
 })
 const headerScrolled = ref(false)
 const profileScrolledBackground = 'var(--app-header-surface, rgba(255,255,255,0.98))'
-
 const resumeShortcuts = [
   { label: '附件简历', icon: 'i-carbon-attachment' },
   { label: '投递记录', icon: 'i-carbon-send-alt' },
@@ -42,6 +41,7 @@ const RESUME_PAGE = '/pages/resume/index'
 const CERTIFICATION_PAGE = '/pages/certification/index'
 
 onShow(() => {
+  tokenStore.updateNowTime()
   console.log('userInfo', userInfo.value)
 })
 
@@ -54,7 +54,7 @@ function handleLogin() {
 }
 
 function handleProfileTap() {
-  if (!tokenStore.hasLogin) {
+  if (!tokenStore.updateNowTime().hasLogin) {
     handleLogin()
   }
 }
@@ -68,7 +68,7 @@ function handleProfileSettings() {
 }
 
 function handleCertification() {
-  if (!tokenStore.hasLogin) {
+  if (!tokenStore.updateNowTime().hasLogin) {
     handleLogin()
     return
   }
@@ -80,7 +80,7 @@ function handleLegalTap(url: string) {
 }
 
 function handleResumeShortcut(label: string) {
-  if (!tokenStore.hasLogin) {
+  if (!tokenStore.updateNowTime().hasLogin) {
     handleLogin()
     return
   }
@@ -105,7 +105,7 @@ function handleLogout() {
     content: '确定要退出登录吗？',
     success: (res) => {
       if (res.confirm) {
-        useTokenStore().logout()
+        void tokenStore.logout()
         uni.showToast({ title: '退出登录成功', icon: 'success' })
       }
     },
@@ -135,7 +135,7 @@ function handleLogout() {
         @tap="handleProfileTap"
       >
         <!-- 头像 -->
-        <view class="mr-3.5 h-120rpx w-120rpx flex flex-shrink-0 overflow-hidden items-center justify-center border-2rpx border-solid border-[rgba(45,111,230,0.2)] rounded-full bg-[rgba(45,111,230,0.12)] shadow-[0_4rpx_16rpx_rgba(42,92,178,0.12)]">
+        <view class="mr-3.5 h-120rpx w-120rpx flex flex-shrink-0 items-center justify-center overflow-hidden border-2rpx border-[rgba(45,111,230,0.2)] rounded-full border-solid bg-[rgba(45,111,230,0.12)] shadow-[0_4rpx_16rpx_rgba(42,92,178,0.12)]">
           <image v-if="tokenStore.hasLogin && userInfo.avatar" class="h-full w-full" :src="userInfo.avatar" mode="aspectFill" />
           <text v-else-if="tokenStore.hasLogin" class="text-2xl text-brand-blue font-700 leading-none">{{ profileInitial }}</text>
           <view v-else class="i-carbon-user-avatar text-4xl text-brand-blue leading-none" />

@@ -24,6 +24,7 @@ const loading = ref(false)
 const shouldBindWechat = ref(false)
 const redirectUrl = ref('')
 let timer: ReturnType<typeof setInterval> | undefined
+let activeLoginAttemptId: number | null = null
 const canBind = computed(() => !validatePhone(form.phone) && !validateVerificationCode(form.code))
 const authClientId = import.meta.env.VITE_AUTH_CLIENT_ID || 'ef51c9a3e9046c4f2ea45142c8a8344a'
 const tokenStore = useTokenStore()
@@ -33,7 +34,15 @@ onLoad((options) => {
   redirectUrl.value = typeof options?.redirect === 'string' ? options.redirect : ''
 })
 
+function cancelPendingLogin() {
+  if (activeLoginAttemptId === null)
+    return
+  tokenStore.cancelLoginAttempt(activeLoginAttemptId)
+  activeLoginAttemptId = null
+}
+
 function goBack() {
+  cancelPendingLogin()
   uni.navigateBack()
 }
 
@@ -96,6 +105,9 @@ async function submit() {
   if (!canBind.value || loading.value) {
     return
   }
+
+  const attemptId = tokenStore.beginLoginAttempt()
+  activeLoginAttemptId = attemptId
   loading.value = true
   feedback.value = ''
   try {
@@ -115,18 +127,26 @@ async function submit() {
       captcha: form.code,
       wxLoginCode,
     })
-    await tokenStore.completeExternalLogin(token)
+    const committed = await tokenStore.completeExternalLogin(token, attemptId)
+    if (!committed)
+      return
+    if (activeLoginAttemptId === attemptId)
+      activeLoginAttemptId = null
     navigateAfterAuthenticated(redirectUrl.value)
   }
   catch (error) {
     feedback.value = error instanceof Error ? error.message : '登录失败，请稍后重试。'
   }
   finally {
+    tokenStore.cancelLoginAttempt(attemptId)
+    if (activeLoginAttemptId === attemptId)
+      activeLoginAttemptId = null
     loading.value = false
   }
 }
 
 onUnmounted(() => {
+  cancelPendingLogin()
   if (timer) {
     clearInterval(timer)
   }

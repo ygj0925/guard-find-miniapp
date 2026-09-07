@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import type { MiniappBanner } from '@/api/banner'
+import { getMiniappBanners } from '@/api/banner'
+import type { PositionListItem } from '@/api/position'
+import { getHotPositions } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { usePositionStore } from '@/store/position'
+import { normalizeTrustedBannerUrl } from '@/utils/bannerTarget'
+import { formatPositionSalary } from '@/utils/positionSalary'
 
 defineOptions({
   name: 'Home',
@@ -19,12 +26,25 @@ interface SwiperChangeEvent {
   detail: { current: number }
 }
 
+interface HomeBanner {
+  id: string
+  imageUrl?: string
+  hoverText?: string
+  targetUrl?: string
+  tag: string
+  title: string
+  description: string
+  background: string
+}
+
 interface QuickEntry {
   title: string
   iconClass: string
   gradient: string
   glow: string
   pagePath: string
+  /** 跳转职位页时携带的招聘分类编码（1=社会招聘，2=校园招聘），用于自动选中并过滤。 */
+  category?: string
 }
 
 const TAB_PAGES = [
@@ -35,20 +55,23 @@ const TAB_PAGES = [
   'pages/me/me',
 ]
 
-const banners = [
+const fallbackBanners: HomeBanner[] = [
   {
+    id: 'fallback-global-recruitment',
     tag: '2026 全球招聘',
     title: '加入三生 · 共创新生',
     description: '构建你与三生的每一次相遇',
     background: 'linear-gradient(122deg, #1b62e0 0%, #2f7ff2 52%, #46a4f8 100%)',
   },
   {
+    id: 'fallback-growth',
     tag: '专业成长',
     title: '遇见更好的职业机会',
     description: '与优秀的人一起，成就专业价值',
     background: 'linear-gradient(122deg, #4a5ce8 0%, #6f63ef 52%, #9576f0 100%)',
   },
   {
+    id: 'fallback-campus',
     tag: '校招启航',
     title: '应届生启航计划',
     description: '导师带练 · 双通道晋升 · 全球视野',
@@ -58,42 +81,145 @@ const banners = [
 
 const quickEntryPages: QuickEntry[][] = [
   [
-    { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index' },
-    { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index' },
-    { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #ff7a2f 0%, #ffab3d 100%)', glow: '0 10rpx 20rpx rgba(255,122,47,0.24)', pagePath: 'pages/position/index' },
+    { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
+    { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
     { title: '求职工作台', iconClass: 'i-carbon-dashboard', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
-    { title: '我的投递', iconClass: 'i-carbon-send-alt', gradient: 'linear-gradient(140deg, #6a63ef 0%, #9a7cf3 100%)', glow: '0 10rpx 20rpx rgba(106,99,239,0.24)', pagePath: 'pages/me/me' },
-    { title: '面试安排', iconClass: 'i-carbon-calendar', gradient: 'linear-gradient(140deg, #f0603d 0%, #ff8f6b 100%)', glow: '0 10rpx 20rpx rgba(240,96,61,0.24)', pagePath: 'pages/me/me' },
-    { title: '岗位收藏', iconClass: 'i-carbon-favorite', gradient: 'linear-gradient(140deg, #ff5c8a 0%, #ff96b2 100%)', glow: '0 10rpx 20rpx rgba(255,92,138,0.24)', pagePath: 'pages/me/me' },
     { title: '消息通知', iconClass: 'i-carbon-notification', gradient: 'linear-gradient(140deg, #5f7ce8 0%, #86a4ff 100%)', glow: '0 10rpx 20rpx rgba(95,124,232,0.24)', pagePath: 'pages/notification/index' },
-  ],
-  [
     { title: '简历完善', iconClass: 'i-carbon-user-profile', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
-    { title: '麟才 AI', iconClass: 'i-carbon-ai-status', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
-    { title: '薪酬福利', iconClass: 'i-carbon-wallet', gradient: 'linear-gradient(140deg, #f2a13c 0%, #ffc768 100%)', glow: '0 10rpx 20rpx rgba(242,161,60,0.24)', pagePath: 'pages/about/about' },
-    { title: '企业介绍', iconClass: 'i-carbon-building', gradient: 'linear-gradient(140deg, #1f9ab0 0%, #47c3cc 100%)', glow: '0 10rpx 20rpx rgba(31,154,176,0.24)', pagePath: 'pages/about/about' },
-    { title: '常见问题', iconClass: 'i-carbon-help', gradient: 'linear-gradient(140deg, #6b7fa8 0%, #98abc9 100%)', glow: '0 10rpx 20rpx rgba(107,127,168,0.22)', pagePath: 'pages/about/about' },
-    { title: '全部岗位', iconClass: 'i-carbon-apps', gradient: 'linear-gradient(140deg, #d2568f 0%, #f083b8 100%)', glow: '0 10rpx 20rpx rgba(210,86,143,0.24)', pagePath: 'pages/position/index' },
+    { title: '生生AI', iconClass: 'i-carbon-ai-status', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
   ],
 ]
 
-const popularJobs = [
-  { title: '生物药研发高级研究员', tags: ['上海', '硕士', '3-5年'], salary: '25-40K' },
-  { title: '医学联络官（MSL）', tags: ['北京', '本科', '1-3年'], salary: '20-35K' },
-  { title: '质量注册专员', tags: ['沈阳', '本科', '经验不限'], salary: '12-18K' },
-]
-
+const HOT_POSITION_LIMIT = 10
+const remoteBanners = ref<MiniappBanner[]>([])
+const bannersLoading = ref(false)
+const bannersFailed = ref(false)
+const bannerImageErrors = reactive<Record<string, boolean>>({})
+const hotPositions = ref<PositionListItem[]>([])
+const hotPositionsLoading = ref(false)
+const hotPositionsFailed = ref(false)
 const headerScrolled = ref(false)
 const bannerIndex = ref(0)
 const entryPageIndex = ref(0)
 
+const banners = computed<HomeBanner[]>(() => {
+  const normalizedBanners = remoteBanners.value
+    .filter(banner => Boolean(banner.imageUrl?.trim()))
+    .map((banner, index) => ({
+      id: `remote-${banner.id}-${index}`,
+      imageUrl: banner.imageUrl?.trim(),
+      hoverText: banner.hoverText?.trim(),
+      targetUrl: banner.targetUrl?.trim(),
+      tag: '三生招聘',
+      title: banner.hoverText?.trim() || '发现更多职业机会',
+      description: '探索三生制药最新招聘动态',
+      background: fallbackBanners[index % fallbackBanners.length].background,
+    }))
+
+  return normalizedBanners.length ? normalizedBanners : fallbackBanners
+})
+
+const positionStore = usePositionStore()
+
 function openPage(pagePath: string) {
-  const url = `/${pagePath}`
-  if (TAB_PAGES.includes(pagePath)) {
-    uni.switchTab({ url })
+  const normalizedPath = pagePath.replace(/^\/+/, '')
+  const routePath = normalizedPath.split(/[?#]/)[0]
+  const url = `/${normalizedPath}`
+  if (TAB_PAGES.includes(routePath)) {
+    uni.switchTab({ url: `/${routePath}` })
     return
   }
   uni.navigateTo({ url })
+}
+
+function openBanner(banner: HomeBanner) {
+  const targetUrl = banner.targetUrl?.trim()
+  if (!targetUrl)
+    return
+
+  const miniappPath = targetUrl.replace(/^\/+/, '')
+  if (/^pages\//i.test(miniappPath)) {
+    openPage(miniappPath)
+    return
+  }
+
+  const trustedUrl = normalizeTrustedBannerUrl(targetUrl)
+  if (trustedUrl) {
+    uni.navigateTo({
+      url: `/pages/common/webview?url=${encodeURIComponent(trustedUrl)}`,
+    })
+    return
+  }
+
+  uni.showToast({
+    icon: 'none',
+    title: '仅支持三生制药官方活动链接',
+  })
+}
+
+function openEntry(entry: QuickEntry) {
+  if (entry.category) {
+    positionStore.setPendingCategory(entry.category)
+  }
+  openPage(entry.pagePath)
+}
+
+function showJobDetail(positionId: string) {
+  uni.navigateTo({
+    url: `/pages/position/detail?id=${encodeURIComponent(positionId)}`,
+  })
+}
+
+function getJobMeta(job: PositionListItem) {
+  const meta = [job.location, job.edu, job.experience, ...job.tags]
+    .filter((item): item is string => Boolean(item))
+  return meta.filter((item, index) => meta.indexOf(item) === index).slice(0, 3)
+}
+
+function isBannerImageVisible(banner: HomeBanner) {
+  return Boolean(banner.imageUrl && !bannerImageErrors[banner.id])
+}
+
+function handleBannerImageError(bannerId: string) {
+  bannerImageErrors[bannerId] = true
+}
+
+async function loadBanners() {
+  if (bannersLoading.value)
+    return
+  bannersLoading.value = true
+  bannersFailed.value = false
+  try {
+    const result = await getMiniappBanners()
+    remoteBanners.value = Array.isArray(result) ? result : []
+    bannerIndex.value = 0
+    Object.keys(bannerImageErrors).forEach(key => delete bannerImageErrors[key])
+  }
+  catch {
+    remoteBanners.value = []
+    bannersFailed.value = true
+  }
+  finally {
+    bannersLoading.value = false
+  }
+}
+
+async function loadHotPositions() {
+  if (hotPositionsLoading.value)
+    return
+  hotPositionsLoading.value = true
+  hotPositionsFailed.value = false
+  try {
+    const page = await getHotPositions({ pageNum: 1, pageSize: HOT_POSITION_LIMIT })
+    hotPositions.value = page.list.slice(0, HOT_POSITION_LIMIT)
+  }
+  catch {
+    hotPositions.value = []
+    hotPositionsFailed.value = true
+  }
+  finally {
+    hotPositionsLoading.value = false
+  }
 }
 
 function handleBannerChange(event: SwiperChangeEvent) {
@@ -104,16 +230,21 @@ function handleEntryPageChange(event: SwiperChangeEvent) {
   entryPageIndex.value = event.detail.current
 }
 
+onLoad(() => {
+  loadBanners()
+  loadHotPositions()
+})
+
 onPageScroll(({ scrollTop }) => {
   headerScrolled.value = scrollTop > 8
 })
 </script>
 
 <template>
-  <view class="app-tab-page font-['Noto_Sans_SC','Microsoft_YaHei',sans-serif]">
+  <view class="app-tab-page">
     <view class="relative overflow-hidden bg-home-hero">
       <AppPageHeader
-        title="三生制药招聘"
+        title="生生智家"
         transparent
         :scrolled="headerScrolled"
       />
@@ -125,40 +256,71 @@ onPageScroll(({ scrollTop }) => {
         </view>
 
         <view class="relative">
+          <view
+            v-if="bannersLoading"
+            class="h-296rpx center animate-pulse overflow-hidden rounded-36rpx bg-[#dfeaf8] text-app-muted shadow-[0_18rpx_40rpx_rgba(40,88,176,0.12)] motion-reduce:animate-none"
+          >
+            <view class="flex flex-col items-center">
+              <view class="i-carbon-image mb-2 text-2xl text-[#9db5d4] leading-none" />
+              <text class="text-xs">轮播内容加载中...</text>
+            </view>
+          </view>
+
           <swiper
+            v-else
             class="h-296rpx overflow-hidden rounded-36rpx shadow-[0_18rpx_40rpx_rgba(40,88,176,0.18)]"
-            circular
-            autoplay
+            :circular="banners.length > 1"
+            :autoplay="banners.length > 1"
             :interval="4200"
             :duration="420"
             @change="handleBannerChange"
           >
-            <swiper-item v-for="banner in banners" :key="banner.title">
+            <swiper-item v-for="banner in banners" :key="banner.id">
               <view
-                class="relative box-border h-full flex flex-col justify-center overflow-hidden rounded-36rpx px-5 pb-4 text-white"
+                class="relative box-border h-full flex flex-col justify-center overflow-hidden rounded-36rpx px-5 pb-4 text-white transition-opacity duration-200"
+                :class="banner.targetUrl ? 'cursor-pointer active:opacity-88' : ''"
                 :style="{ background: banner.background }"
+                :role="banner.targetUrl ? 'button' : undefined"
+                :aria-label="banner.hoverText || banner.title"
+                @tap="openBanner(banner)"
               >
-                <view class="pointer-events-none absolute h-260rpx w-260rpx rounded-full bg-white/14 -right-72rpx -top-96rpx" />
-                <view class="pointer-events-none absolute right-72rpx h-180rpx w-180rpx rounded-full bg-white/10 -bottom-88rpx" />
+                <image
+                  v-if="isBannerImageVisible(banner)"
+                  class="absolute inset-0 h-full w-full"
+                  :src="banner.imageUrl"
+                  mode="aspectFill"
+                  :alt="banner.hoverText || banner.title"
+                  @error="handleBannerImageError(banner.id)"
+                />
 
-                <view class="relative z-1 self-start rounded-full bg-white/22 px-2.5 py-1 text-3xs tracking-2rpx">
-                  {{ banner.tag }}
-                </view>
-                <text class="relative z-1 mt-3 text-xl font-800 leading-[1.32] tracking-2rpx">{{ banner.title }}</text>
-                <text class="relative z-1 mt-2 block text-xs text-white/86">{{ banner.description }}</text>
+                <template v-else>
+                  <view class="pointer-events-none absolute h-260rpx w-260rpx rounded-full bg-white/14 -right-72rpx -top-96rpx" />
+                  <view class="pointer-events-none absolute right-72rpx h-180rpx w-180rpx rounded-full bg-white/10 -bottom-88rpx" />
+                </template>
               </view>
             </swiper-item>
           </swiper>
 
-          <view class="pointer-events-none absolute inset-x-0 bottom-3 z-1 flex justify-center">
+          <view v-if="!bannersLoading" class="pointer-events-none absolute inset-x-0 bottom-3 z-2 flex justify-center">
             <view class="flex items-center gap-1.5 rounded-full bg-black/16 px-2 py-1">
               <view
                 v-for="(banner, index) in banners"
-                :key="banner.title"
+                :key="banner.id"
                 class="h-6rpx rounded-full transition-all duration-260"
                 :class="index === bannerIndex ? 'w-28rpx bg-white' : 'w-10rpx bg-white/48'"
               />
             </view>
+          </view>
+
+          <view
+            v-if="!bannersLoading && bannersFailed"
+            class="absolute right-3 top-3 z-3 min-h-64rpx flex cursor-pointer items-center rounded-full bg-black/42 px-3 text-2xs text-white backdrop-blur-6rpx active:opacity-75"
+            role="button"
+            aria-label="重新加载轮播图"
+            @tap.stop="loadBanners"
+          >
+            <view class="i-carbon-renew mr-1 text-sm leading-none" />
+            <text>重新加载</text>
           </view>
         </view>
       </view>
@@ -180,7 +342,7 @@ onPageScroll(({ scrollTop }) => {
 
           <view class="ml-3 min-w-0 flex flex-1 flex-col">
             <view class="flex items-center">
-              <text class="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-white font-700">麟才寻你 · AI 助手</text>
+              <text class="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-white font-700">生生智家 · AI 助手</text>
               <text class="ml-1.5 flex-none rounded-full bg-white/24 px-1.5 py-0.5 text-3xs text-white font-600">NEW</text>
             </view>
             <text class="mt-1.5 block text-2xs text-white/82">说出期望，AI 帮你匹配岗位并一键投递</text>
@@ -206,7 +368,7 @@ onPageScroll(({ scrollTop }) => {
                 :key="entry.title"
                 class="flex flex-col cursor-pointer items-center active:opacity-70"
                 role="button"
-                @tap="openPage(entry.pagePath)"
+                @tap="openEntry(entry)"
               >
                 <view
                   class="h-84rpx w-84rpx center rounded-26rpx"
@@ -220,7 +382,7 @@ onPageScroll(({ scrollTop }) => {
           </swiper-item>
         </swiper>
 
-        <view class="mt-1 flex items-center justify-center gap-1">
+        <view v-if="quickEntryPages.length > 1" class="mt-1 flex items-center justify-center gap-1">
           <view
             v-for="(entryPage, pageIndex) in quickEntryPages"
             :key="pageIndex"
@@ -246,29 +408,44 @@ onPageScroll(({ scrollTop }) => {
         </view>
       </view>
 
-      <view class="flex flex-col gap-2.5">
+      <view v-if="hotPositionsLoading" class="app-card py-8 text-center text-sm text-app-muted">
+        热门岗位加载中...
+      </view>
+      <view
+        v-else-if="hotPositionsFailed"
+        class="cursor-pointer app-card py-8 text-center active:opacity-74"
+        role="button"
+        @tap="loadHotPositions"
+      >
+        <text class="block text-sm text-app-ink-soft">热门岗位加载失败</text>
+        <text class="mt-1 block text-xs text-brand-blue">点击重新加载</text>
+      </view>
+      <view v-else-if="!hotPositions.length" class="app-card py-8 text-center text-sm text-app-muted">
+        暂无热门岗位
+      </view>
+      <view v-else class="flex flex-col gap-2.5">
         <view
-          v-for="(job, index) in popularJobs"
-          :key="job.title"
+          v-for="(job, index) in hotPositions"
+          :key="job.positionId"
           class="cursor-pointer app-card px-3.5 py-3.5 active:opacity-80"
           role="button"
-          @tap="openPage('pages/position/index')"
+          @tap="showJobDetail(job.positionId)"
         >
           <view class="flex items-center gap-2">
-            <text class="flex-none rounded-8rpx bg-[#fff1e6] px-1.5 py-0.5 text-3xs text-[#ff7311] font-700">
+            <text class="flex-none rounded-8rpx bg-[#fff1e6] px-1.5 py-0.5 text-3xs text-app-warning font-700">
               TOP{{ index + 1 }}
             </text>
             <text class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-app-ink font-700">
-              {{ job.title }}
+              {{ job.positionName }}
             </text>
-            <text class="flex-none text-sm text-[#ff7311] font-800">{{ job.salary }}</text>
+            <text class="flex-none text-sm text-brand-blue font-800">{{ formatPositionSalary(job) }}</text>
           </view>
 
-          <view class="mt-2.5 flex flex-wrap gap-1.5">
+          <view v-if="getJobMeta(job).length" class="mt-2.5 flex flex-wrap gap-1.5">
             <text
-              v-for="tag in job.tags"
+              v-for="tag in getJobMeta(job)"
               :key="tag"
-              class="rounded-10rpx bg-[#f1f5fb] px-2 py-1 text-2xs text-[#5b6b85]"
+              class="rounded-10rpx bg-[#f1f5fb] px-2 py-1 text-2xs text-app-ink-soft"
             >
               {{ tag }}
             </text>

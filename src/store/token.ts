@@ -30,11 +30,28 @@ const tokenInfoState = isDoubleTokenMode
       expiresIn: 0,
     }
 
+function normalizeAccessToken(value: unknown) {
+  return typeof value === 'string' ? value.replace(/^Bearer\s+/i, '').trim() : ''
+}
+
+function readAccessToken(value: IAuthLoginRes) {
+  if (isSingleTokenRes(value))
+    return normalizeAccessToken(value.token)
+  if (isDoubleTokenRes(value))
+    return normalizeAccessToken(value.accessToken)
+  return ''
+}
+
 export const useTokenStore = defineStore(
   'token',
   () => {
     // 定义用户信息
     const tokenInfo = ref<IAuthLoginRes>({ ...tokenInfoState })
+
+    // 登录尝试标识仅约束当前运行中的异步任务，不参与持久化。
+    let loginAttemptSequence = 0
+    let activeLoginAttemptId = 0
+    let tokenOwnerAttemptId: number | null = null
 
     // 添加一个时间戳 ref 作为响应式依赖
     const nowTime = ref(Date.now())
@@ -49,30 +66,65 @@ export const useTokenStore = defineStore(
       return useTokenStore()
     }
 
-    // 设置用户信息
-    const setTokenInfo = (val: IAuthLoginRes) => {
-      updateNowTime()
-      tokenInfo.value = val
+    function beginLoginAttempt() {
+      const attemptId = ++loginAttemptSequence
+      activeLoginAttemptId = attemptId
 
-      // 计算并存储过期时间
-      const now = Date.now()
-      if (isSingleTokenRes(val)) {
-        uni.setStorageSync(AUTH_TOKEN_STORAGE_KEY, val.token)
-        // 单token模式
-        if (typeof val.expiresIn === 'number' && val.expiresIn > 0) {
-          uni.setStorageSync('accessTokenExpireTime', now + val.expiresIn * 1000)
-        }
-        else {
-          uni.removeStorageSync('accessTokenExpireTime')
-        }
+      // 新尝试开始时只移除尚未完成资料提交的临时登录，不影响已完成的会话。
+      if (tokenOwnerAttemptId !== null) {
+        tokenOwnerAttemptId = null
+        resetLoginState()
       }
-      else if (isDoubleTokenRes(val)) {
-        uni.setStorageSync(AUTH_TOKEN_STORAGE_KEY, val.accessToken)
-        // 双token模式
-        const accessExpireTime = now + val.accessExpiresIn * 1000
-        const refreshExpireTime = now + val.refreshExpiresIn * 1000
-        uni.setStorageSync('accessTokenExpireTime', accessExpireTime)
-        uni.setStorageSync('refreshTokenExpireTime', refreshExpireTime)
+      return attemptId
+    }
+
+    function cancelLoginAttempt(attemptId: number) {
+      if (activeLoginAttemptId !== attemptId)
+        return false
+
+      activeLoginAttemptId = ++loginAttemptSequence
+      if (tokenOwnerAttemptId === attemptId) {
+        tokenOwnerAttemptId = null
+        resetLoginState()
+      }
+      return true
+    }
+
+    // 设置用户信息。先完整持久化，再发布响应式状态，避免写入失败时出现新旧账号混合态。
+    const setTokenInfo = (val: IAuthLoginRes, ownerAttemptId?: number) => {
+      if (ownerAttemptId !== undefined && ownerAttemptId !== activeLoginAttemptId)
+        return false
+
+      const now = Date.now()
+      try {
+        if (isSingleTokenRes(val)) {
+          uni.setStorageSync(AUTH_TOKEN_STORAGE_KEY, val.token)
+          // 单token模式
+          if (typeof val.expiresIn === 'number' && val.expiresIn > 0) {
+            uni.setStorageSync('accessTokenExpireTime', now + val.expiresIn * 1000)
+          }
+          else {
+            uni.removeStorageSync('accessTokenExpireTime')
+          }
+        }
+        else if (isDoubleTokenRes(val)) {
+          uni.setStorageSync(AUTH_TOKEN_STORAGE_KEY, val.accessToken)
+          // 双token模式
+          const accessExpireTime = now + val.accessExpiresIn * 1000
+          const refreshExpireTime = now + val.refreshExpiresIn * 1000
+          uni.setStorageSync('accessTokenExpireTime', accessExpireTime)
+          uni.setStorageSync('refreshTokenExpireTime', refreshExpireTime)
+        }
+
+        tokenInfo.value = val
+        tokenOwnerAttemptId = ownerAttemptId ?? null
+        updateNowTime()
+        return true
+      }
+      catch (error) {
+        tokenOwnerAttemptId = null
+        resetLoginState()
+        throw error
       }
     }
 
@@ -120,12 +172,38 @@ export const useTokenStore = defineStore(
 
     /**
      * 登录成功后处理逻辑
-     * @param tokenInfo 登录返回的token信息
+     * @param nextTokenInfo 登录返回的token信息
+     * @param attemptId 发起登录网络请求前创建的尝试标识
      */
-    async function _postLogin(tokenInfo: IAuthLoginRes) {
-      setTokenInfo(tokenInfo)
+    async function _postLogin(nextTokenInfo: IAuthLoginRes, attemptId: number) {
+      if (attemptId !== activeLoginAttemptId)
+        return false
+
+      const expectedAccessToken = readAccessToken(nextTokenInfo)
       const userStore = useUserStore()
-      await userStore.fetchUserInfo()
+      try {
+        if (!setTokenInfo(nextTokenInfo, attemptId))
+          return false
+
+        // 新 token 生效后先移除旧账号资料；待资料请求成功且所有权仍有效时再一次性提交。
+        userStore.clearUserInfo()
+        const userInfo = await userStore.fetchUserInfo({ commit: false })
+        if (
+          attemptId !== activeLoginAttemptId
+          || tokenOwnerAttemptId !== attemptId
+          || readAccessToken(tokenInfo.value) !== expectedAccessToken
+        ) {
+          return false
+        }
+
+        userStore.setUserInfo(userInfo)
+        tokenOwnerAttemptId = null
+        return true
+      }
+      catch (error) {
+        clearLoginStateForAttempt(attemptId, expectedAccessToken)
+        throw error
+      }
     }
 
     /**
@@ -136,14 +214,17 @@ export const useTokenStore = defineStore(
      * @returns 登录结果
      */
     const login = async (loginForm: ILoginForm) => {
+      const attemptId = beginLoginAttempt()
       try {
         const res = await _login(loginForm)
         console.log('普通登录-res: ', res)
-        await _postLogin(res)
-        uni.showToast({
-          title: '登录成功',
-          icon: 'success',
-        })
+        const committed = await _postLogin(res, attemptId)
+        if (committed) {
+          uni.showToast({
+            title: '登录成功',
+            icon: 'success',
+          })
+        }
         return res
       }
       catch (error) {
@@ -155,6 +236,7 @@ export const useTokenStore = defineStore(
         throw error
       }
       finally {
+        cancelLoginAttempt(attemptId)
         updateNowTime()
       }
     }
@@ -163,59 +245,93 @@ export const useTokenStore = defineStore(
      * Completes a successful external provider login after that provider has
      * returned a verified token response. Mock provider results never call this.
      */
-    const completeExternalLogin = async (tokenInfo: IAuthLoginRes) => {
+    const completeExternalLogin = async (nextTokenInfo: IAuthLoginRes, attemptId = beginLoginAttempt()) => {
       try {
-        await _postLogin(tokenInfo)
-        uni.showToast({
-          title: '登录成功',
-          icon: 'success',
-        })
+        const committed = await _postLogin(nextTokenInfo, attemptId)
+        if (committed) {
+          uni.showToast({
+            title: '登录成功',
+            icon: 'success',
+          })
+        }
+        return committed
       }
       finally {
+        cancelLoginAttempt(attemptId)
         updateNowTime()
       }
     }
 
-    /**
-     * 微信登录
-     * 有的时候后端会用一个接口返回token和用户信息，有的时候会分开2个接口，一个获取token，一个获取用户信息
-     * （各有利弊，看业务场景和系统复杂度），这里使用2个接口返回的来模拟
-     * @returns 登录结果
-     */
-    /**
-     * 退出登录 并 删除用户信息
-     */
-    const clearLoginState = () => {
-      updateNowTime()
-      uni.removeStorageSync('accessTokenExpireTime')
-      uni.removeStorageSync('refreshTokenExpireTime')
+    function resetLoginState() {
       tokenInfo.value = { ...tokenInfoState }
-      uni.removeStorageSync('token')
-      uni.removeStorageSync(AUTH_TOKEN_STORAGE_KEY)
-      useUserStore().clearUserInfo()
+      updateNowTime()
+
+      for (const storageKey of [
+        'accessTokenExpireTime',
+        'refreshTokenExpireTime',
+        'token',
+        AUTH_TOKEN_STORAGE_KEY,
+      ]) {
+        try {
+          uni.removeStorageSync(storageKey)
+        }
+        catch (error) {
+          console.error(`清理认证缓存失败: ${storageKey}`, error)
+        }
+      }
+
+      try {
+        useUserStore().clearUserInfo()
+      }
+      catch (error) {
+        console.error('清理用户信息失败:', error)
+      }
+    }
+
+    function clearLoginStateForAttempt(attemptId: number, expectedAccessToken: string) {
+      if (
+        tokenOwnerAttemptId !== attemptId
+        || readAccessToken(tokenInfo.value) !== expectedAccessToken
+      ) {
+        return false
+      }
+
+      tokenOwnerAttemptId = null
+      if (activeLoginAttemptId === attemptId)
+        activeLoginAttemptId = ++loginAttemptSequence
+      resetLoginState()
+      return true
+    }
+
+    /**
+     * 退出登录并删除用户信息。
+     * 指定 expectedAccessToken 时，仅允许使用该 token 的请求清理自身。
+     */
+    function clearLoginState(expectedAccessToken?: string) {
+      if (
+        expectedAccessToken !== undefined
+        && readAccessToken(tokenInfo.value) !== normalizeAccessToken(expectedAccessToken)
+      ) {
+        return false
+      }
+
+      if (expectedAccessToken === undefined)
+        activeLoginAttemptId = ++loginAttemptSequence
+      tokenOwnerAttemptId = null
+      resetLoginState()
+      return true
     }
 
     const logout = async () => {
+      // 先发起带当前 token 的服务端退出请求，再立即清理本地登录态。
+      const logoutRequest = _logout()
+      clearLoginState()
       try {
-        // TODO 实现自己的退出登录逻辑
-        await _logout()
+        await logoutRequest
       }
       catch (error) {
-        console.error('退出登录失败:', error)
-      }
-      finally {
-        clearLoginState()
-        updateNowTime()
-
-        // 无论成功失败，都需要清除本地token信息
-        // 清除存储的过期时间
-        uni.removeStorageSync('accessTokenExpireTime')
-        uni.removeStorageSync('refreshTokenExpireTime')
-        console.log('退出登录-清除用户信息')
-        tokenInfo.value = { ...tokenInfoState }
-        uni.removeStorageSync('token')
-        const userStore = useUserStore()
-        userStore.clearUserInfo()
+        // 服务端退出失败不应阻止用户在当前设备退出。
+        console.error('服务端退出登录失败，本地登录态已清理:', error)
       }
     }
 
@@ -235,10 +351,21 @@ export const useTokenStore = defineStore(
           throw new Error('无效的refreshToken')
         }
 
+        const expectedAccessToken = readAccessToken(tokenInfo.value)
+        const expectedOwnerAttemptId = tokenOwnerAttemptId
         const refreshToken = tokenInfo.value.refreshToken
         const res = await _refreshToken(refreshToken)
+        if (
+          readAccessToken(tokenInfo.value) !== expectedAccessToken
+          || tokenOwnerAttemptId !== expectedOwnerAttemptId
+        ) {
+          throw new Error('登录状态已更新，忽略过期的刷新结果')
+        }
+
         console.log('刷新token-res: ', res)
-        setTokenInfo(res)
+        const installed = setTokenInfo(res, expectedOwnerAttemptId ?? undefined)
+        if (!installed)
+          throw new Error('登录状态已更新，忽略过期的刷新结果')
         return res
       }
       catch (error) {
@@ -316,6 +443,8 @@ export const useTokenStore = defineStore(
     return {
       // 核心API方法
       login,
+      beginLoginAttempt,
+      cancelLoginAttempt,
       completeExternalLogin,
       logout,
       clearLoginState,

@@ -110,6 +110,7 @@ export default defineConfig({
     'i-carbon-template',
     'i-carbon-ibm-watson-language-translator',
     'i-carbon-menu',
+    'i-carbon-checkmark',
   ],
   rules: [
     ['bg-brand-hero', { background: 'var(--app-brand-hero)' }],
@@ -141,6 +142,12 @@ export default defineConfig({
       'brand-blue': 'var(--app-brand-blue)',
       'brand-violet': 'var(--app-brand-violet)',
       'brand-mint': 'var(--app-brand-mint)',
+      'app-success': 'var(--app-success)',
+      'app-warning': 'var(--app-warning)',
+      'app-danger': 'var(--app-danger)',
+      'app-info': 'var(--app-info)',
+      'app-placeholder': 'var(--app-placeholder)',
+      'app-border': 'var(--app-border)',
     },
     fontSize: {
       /** 提供更小号的字体，用法如：text-2xs */

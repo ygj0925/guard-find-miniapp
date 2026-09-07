@@ -41,9 +41,10 @@ export const useUserStore = defineStore(
     /**
      * 获取用户信息
      */
-    const fetchUserInfo = async () => {
+    const fetchUserInfo = async (options: { commit?: boolean } = {}) => {
       const res = await getUserInfo()
-      setUserInfo(res)
+      if (options.commit !== false)
+        setUserInfo(res)
       return res
     }
 

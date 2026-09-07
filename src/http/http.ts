@@ -1,7 +1,7 @@
 import type { IDoubleTokenRes } from '@/api/types/login'
 import type { CustomRequestOptions, HttpError, IResponse } from '@/http/types'
 import { nextTick } from 'vue'
-import { useTokenStore } from '@/store/token'
+import { AUTH_TOKEN_STORAGE_KEY, useTokenStore } from '@/store/token'
 import { isDoubleTokenMode } from '@/utils'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { createHttpError, getResponseMessage, HttpErrorType, isSuccessResultCode, ResultEnum, ShowMessage } from './tools/enum'
@@ -10,7 +10,27 @@ import { createHttpError, getResponseMessage, HttpErrorType, isSuccessResultCode
 let refreshing = false // 防止重复刷新 token 标识
 let taskQueue: (() => void)[] = [] // 刷新 token 请求队列
 
+function normalizeAccessToken(value: unknown) {
+  return typeof value === 'string' ? value.replace(/^Bearer\s+/i, '').trim() : ''
+}
+
+function readRequestAccessToken(options: CustomRequestOptions) {
+  const authorization = options.header?.Authorization || options.header?.authorization
+  const headerToken = normalizeAccessToken(authorization)
+  if (headerToken)
+    return headerToken
+
+  try {
+    const persistedToken = normalizeAccessToken(uni.getStorageSync<string>(AUTH_TOKEN_STORAGE_KEY))
+    return persistedToken || normalizeAccessToken(useTokenStore().updateNowTime().validToken)
+  }
+  catch {
+    return normalizeAccessToken(useTokenStore().updateNowTime().validToken)
+  }
+}
+
 export function http<T>(options: CustomRequestOptions) {
+  const requestAccessToken = readRequestAccessToken(options)
   // 1. 返回 Promise 对象
   return new Promise<T>((resolve, reject) => {
     uni.request({
@@ -43,9 +63,9 @@ export function http<T>(options: CustomRequestOptions) {
         if (isTokenExpired) {
           const tokenStore = useTokenStore()
           if (!isDoubleTokenMode) {
-            // 未启用双token策略，清理用户信息，跳转到登录页
-            tokenStore.clearLoginState()
-            toLoginPage()
+            // 迟到的旧请求只能清理它实际携带的 token，不能撤销更新后的登录态。
+            if (tokenStore.clearLoginState(requestAccessToken))
+              toLoginPage()
             return reject(createHttpError({
               type: HttpErrorType.Auth,
               code,
@@ -87,21 +107,19 @@ export function http<T>(options: CustomRequestOptions) {
             catch (refreshErr) {
               console.error('刷新 token 失败:', refreshErr)
               refreshing = false
-              // 刷新 token 失败，跳转到登录页
-              nextTick(() => {
-                // 关闭其他弹窗
-                uni.hideToast()
-                uni.showToast({
-                  title: '登录已过期，请重新登录',
-                  icon: 'none',
+              // 仅当失败请求的 token 仍属于当前会话时才清理，避免迟到失败退出新账号。
+              if (tokenStore.clearLoginState(requestAccessToken)) {
+                nextTick(() => {
+                  uni.hideToast()
+                  uni.showToast({
+                    title: '登录已过期，请重新登录',
+                    icon: 'none',
+                  })
                 })
-              })
-              // 清除用户信息
-              await tokenStore.logout()
-              // 跳转到登录页
-              setTimeout(() => {
-                toLoginPage()
-              }, 2000)
+                setTimeout(() => {
+                  toLoginPage()
+                }, 2000)
+              }
             }
             finally {
               // 不管刷新 token 成功与否，都清空任务队列

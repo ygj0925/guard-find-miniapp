@@ -65,10 +65,11 @@ export const navigateToInterceptor = {
     }
 
     const tokenStore = useTokenStore()
-    FG_LOG_ENABLE && console.log('tokenStore.hasLogin:', tokenStore.hasLogin)
+    const hasLogin = tokenStore.updateNowTime().hasLogin
+    FG_LOG_ENABLE && console.log('tokenStore.hasLogin:', hasLogin)
 
     // 不管黑白名单，登录了就直接去吧（但是当前不能是登录页）
-    if (tokenStore.hasLogin) {
+    if (hasLogin) {
       if (path !== LOGIN_PAGE) {
         return true // 明确表示允许路由继续执行
       }
