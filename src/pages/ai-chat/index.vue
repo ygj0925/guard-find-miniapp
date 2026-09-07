@@ -1100,6 +1100,13 @@ function handleRecordCancel() {
 watch(
   () => tokenStore.tokenInfo,
   () => {
+    const pages = getCurrentPages()
+    const currentPage = pages[pages.length - 1]
+    const currentPath = currentPage?.route ? `/${currentPage.route}` : ''
+    // tab 页会被缓存；隐藏的 AI 页面不得覆盖其他页面发起的登录回跳意图。
+    if (currentPath !== AI_PAGE_PATH)
+      return
+
     const currentTokenStore = tokenStore.updateNowTime()
     if (!currentTokenStore.hasLogin || !currentTokenStore.validToken)
       leaveAuthenticatedAiSession()
