@@ -450,12 +450,14 @@ function skipLogin() {
       <!-- #ifdef MP-WEIXIN -->
       <view
         v-if="mode === 'phone'"
-        class="tap-target h-72rpx flex items-center justify-center text-29rpx text-[#777]"
+        class="tap-target box-border h-88rpx flex items-center justify-center border-2rpx border-[#07a84f] rounded-44rpx border-solid bg-[#effcf4] px-28rpx text-30rpx text-[#078f45] font-700 shadow-[0_8rpx_24rpx_rgba(7,168,79,0.16)]"
         role="button"
-        aria-label="切换为微信一键登录"
+        aria-label="切换至微信一键登录"
         @tap="mode = 'wechat'"
       >
-        <text>切换为一键登录</text>
+        <view class="i-carbon-logo-wechat mr-12rpx text-38rpx leading-none" aria-hidden="true" />
+        <text>微信一键登录</text>
+        <view class="i-carbon-chevron-right ml-10rpx text-28rpx leading-none" aria-hidden="true" />
       </view>
       <!-- #endif -->
       <view

@@ -92,3 +92,32 @@ border-t-1
 //   border-style: solid; /* 2 */
 //   border-color: var(--un-default-border-color, #e5e7eb); /* 3 */
 // }
+
+/* AI 对话与历史列表保留滚动能力，仅隐藏各浏览器的滚动条外观。 */
+.page-scroll,
+.history-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.page-scroll::-webkit-scrollbar,
+.history-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* #ifdef H5 */
+.page-scroll .uni-scroll-view,
+.history-scroll .uni-scroll-view {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.page-scroll .uni-scroll-view::-webkit-scrollbar,
+.history-scroll .uni-scroll-view::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+/* #endif */

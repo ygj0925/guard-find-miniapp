@@ -33,16 +33,8 @@ interface PositionDetailView {
   id: string
   jobId: string | number
   title: string
-  company: string
-  companyLogo?: string
-  companyIndustry?: string
-  companyStage?: string
-  companySize?: string
   salary: string
   location: string
-  address?: string
-  latitude?: number
-  longitude?: number
   education: string
   experience: string
   tags: string[]
@@ -56,7 +48,6 @@ const EMPTY_POSITION: PositionDetailView = {
   id: '',
   jobId: '',
   title: '',
-  company: '',
   salary: '',
   location: '',
   education: '',
@@ -99,16 +90,8 @@ function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
     id: source.positionId,
     jobId: source.jobId,
     title: source.positionName,
-    company: source.company || '招聘企业',
-    companyLogo: source.companyLogo,
-    companyIndustry: source.companyIndustry,
-    companyStage: source.companyStage,
-    companySize: source.companySize,
     salary: formatPositionSalary(source),
     location: source.location,
-    address: source.address,
-    latitude: source.latitude,
-    longitude: source.longitude,
     education: source.edu,
     experience: source.experience,
     tags: source.tags || [],
