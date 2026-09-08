@@ -5,6 +5,7 @@ import type {
   AgentChatStreamEvent,
   AgentToolAskAction,
 } from '@/api/agent'
+import type { MiniappRecommendMessage } from '@/api/recommend-message'
 import type {
   AiChatConversation,
   AiChatMessage,
@@ -23,6 +24,7 @@ import {
   resolveAgentToolAsk,
   streamAgentChat,
 } from '@/api/agent'
+import { getMiniappRecommendMessages } from '@/api/recommend-message'
 import { useTokenStore } from '@/store/token'
 import { useUserStore } from '@/store/user'
 import { toLoginPage } from '@/utils/toLoginPage'
@@ -54,13 +56,6 @@ definePage({
   },
 })
 
-interface QuickQuestion {
-  id: number
-  tag: string
-  displayQuestion: string
-  sendContent: string
-}
-
 interface ScrollEvent {
   detail: {
     scrollHeight: number
@@ -80,11 +75,9 @@ const AI_PAGE_PATH = '/pages/ai-chat/index'
 const PROCESSING_STATUS_TEXT = '正在处理你的问题…'
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
-const quickQuestions = ref<QuickQuestion[]>([
-  { id: 1, tag: '岗位推荐', displayQuestion: '帮我找上海的研发岗位', sendContent: '帮我推荐上海的生物药研发岗位' },
-  { id: 2, tag: '简历优化', displayQuestion: '怎样突出我的项目经历？', sendContent: '怎样在简历中突出我的项目经历？' },
-  { id: 3, tag: '面试准备', displayQuestion: '医学岗位面试会问什么？', sendContent: '医学相关岗位面试通常会问什么？' },
-])
+const recommendMessages = ref<MiniappRecommendMessage[]>([])
+const recommendMessagesLoading = ref(false)
+const recommendMessagesFailed = ref(false)
 
 const hasStarted = ref(false)
 const inputValue = ref('')
@@ -320,6 +313,50 @@ function ensureAuthenticatedAiSession() {
   }
   conversationOwnerId = authenticatedUserId
   return true
+}
+
+function normalizeRecommendMessages(messages: MiniappRecommendMessage[]) {
+  const normalized: MiniappRecommendMessage[] = []
+  if (!Array.isArray(messages))
+    return normalized
+
+  for (const item of messages) {
+    if (!item || (typeof item.id !== 'string' && typeof item.id !== 'number'))
+      continue
+
+    const topic = typeof item.topic === 'string' ? item.topic.trim() : ''
+    const displayMessage = typeof item.displayMessage === 'string' ? item.displayMessage.trim() : ''
+    const actualMessage = typeof item.actualMessage === 'string' ? item.actualMessage.trim() : ''
+    if (!displayMessage || !actualMessage)
+      continue
+
+    normalized.push({
+      id: item.id,
+      topic,
+      displayMessage,
+      actualMessage,
+    })
+  }
+  return normalized
+}
+
+async function loadRecommendMessages() {
+  if (recommendMessagesLoading.value)
+    return
+
+  recommendMessagesLoading.value = true
+  recommendMessagesFailed.value = false
+  try {
+    recommendMessages.value = normalizeRecommendMessages(await getMiniappRecommendMessages())
+  }
+  catch (error) {
+    recommendMessages.value = []
+    if (!handleAsyncAuthLoss(error))
+      recommendMessagesFailed.value = true
+  }
+  finally {
+    recommendMessagesLoading.value = false
+  }
 }
 
 function startNewConversation() {
@@ -1138,6 +1175,7 @@ watch(
 onShow(() => {
   if (!ensureAuthenticatedAiSession())
     return
+  void loadRecommendMessages()
   void restoreHistorySelection()
   if (hasStarted.value)
     void measureContentViewport()
@@ -1241,22 +1279,43 @@ onUnmounted(() => {
             <image class="welcome-character" src="https://static1.3sbio.com/assets/lingcai/%E7%94%9F%E7%94%9F%E7%99%BD%E5%A4%A7%E8%A4%82-%E5%8D%8A%E8%BA%AB.gif" mode="aspectFit" />
           </view>
 
-          <view class="quick-list">
-            <view
-              v-for="item in quickQuestions"
-              :key="item.id"
-              class="quick-item"
-              :class="{ 'without-tag': !item.tag }"
-              @tap="sendMessage(item.sendContent)"
-            >
-              <view v-if="item.tag" class="quick-tag">
-                <text>{{ item.tag }}</text>
-              </view>
-              <view class="quick-question">
-                <text>{{ item.displayQuestion }}</text>
-              </view>
-              <view class="quick-arrow" />
+          <view class="quick-list" aria-live="polite">
+            <view v-if="recommendMessagesLoading && recommendMessages.length === 0" class="quick-status">
+              <view class="quick-status-spinner" />
+              <text>快捷问题加载中…</text>
             </view>
+
+            <button
+              v-else-if="recommendMessagesFailed"
+              class="quick-status quick-status-action"
+              hover-class="quick-status-action-active"
+              aria-label="重新加载快捷问题"
+              @tap="loadRecommendMessages"
+            >
+              <text>快捷问题加载失败，点击重试</text>
+            </button>
+
+            <view v-else-if="recommendMessages.length === 0" class="quick-status">
+              <text>暂无快捷问题，可以直接输入你的需求</text>
+            </view>
+
+            <template v-else>
+              <view
+                v-for="item in recommendMessages"
+                :key="String(item.id)"
+                class="quick-item"
+                :class="{ 'without-tag': !item.topic }"
+                @tap="sendMessage(item.actualMessage)"
+              >
+                <view v-if="item.topic" class="quick-tag">
+                  <text>{{ item.topic }}</text>
+                </view>
+                <view class="quick-question">
+                  <text>{{ item.displayMessage }}</text>
+                </view>
+                <view class="quick-arrow" />
+              </view>
+            </template>
           </view>
         </template>
 
@@ -1562,6 +1621,48 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 46rpx;
   margin-top: 42rpx;
+}
+
+.quick-status {
+  box-sizing: border-box;
+  min-height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 18rpx 30rpx;
+  border: 2rpx solid rgba(151, 170, 255, 0.62);
+  border-radius: 44rpx;
+  background: rgba(255, 255, 255, 0.94);
+  color: #74839d;
+  font-size: 25rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.quick-status-spinner {
+  box-sizing: border-box;
+  width: 32rpx;
+  height: 32rpx;
+  flex: 0 0 32rpx;
+  border: 4rpx solid rgba(82, 126, 219, 0.18);
+  border-top-color: #527edb;
+  border-radius: 50%;
+  animation: conversation-loading 0.8s linear infinite;
+}
+
+.quick-status-action {
+  width: 100%;
+  margin: 0;
+  color: #527edb;
+}
+
+.quick-status-action::after {
+  border: 0;
+}
+
+.quick-status-action-active {
+  background: rgba(231, 239, 255, 0.96);
 }
 
 .quick-item {
