@@ -45,17 +45,25 @@ const httpInterceptor = {
     }
     // 1. 请求超时（调用方可为 SSE 等长连接显式覆盖）
     options.timeout ??= 60000 // 60s
-    // 2. （可选）添加小程序端请求头标识
+    // 2. 复制请求头，并在进入原生请求前消费自定义认证选项
+    const skipAuth = options.skipAuth
+    delete options.skipAuth
     options.header = {
       ...options.header,
     }
-    // 3. 添加 token 请求头标识
-    const tokenStore = useTokenStore()
-    const persistedToken = uni.getStorageSync<string>(AUTH_TOKEN_STORAGE_KEY)
-    const token = persistedToken || tokenStore.updateNowTime().validToken
+    // 3. 匿名请求不允许携带调用方提供或自动注入的认证头
+    if (skipAuth) {
+      delete options.header.Authorization
+      delete options.header.authorization
+    }
+    else {
+      const tokenStore = useTokenStore()
+      const persistedToken = uni.getStorageSync<string>(AUTH_TOKEN_STORAGE_KEY)
+      const token = persistedToken || tokenStore.updateNowTime().validToken
 
-    if (token) {
-      options.header.Authorization = `Bearer ${token}`
+      if (token) {
+        options.header.Authorization = `Bearer ${token}`
+      }
     }
     return options
   },

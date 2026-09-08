@@ -1,7 +1,7 @@
 import type { IDoubleTokenRes } from '@/api/types/login'
 import type { CustomRequestOptions, HttpError, IResponse } from '@/http/types'
 import { nextTick } from 'vue'
-import { AUTH_TOKEN_STORAGE_KEY, useTokenStore } from '@/store/token'
+import { AUTH_TOKEN_STORAGE_KEY, isAuthSessionOperationActive, useTokenStore } from '@/store/token'
 import { isDoubleTokenMode } from '@/utils'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { createHttpError, getResponseMessage, HttpErrorType, isSuccessResultCode, ResultEnum, ShowMessage } from './tools/enum'
@@ -15,6 +15,9 @@ function normalizeAccessToken(value: unknown) {
 }
 
 function readRequestAccessToken(options: CustomRequestOptions) {
+  if (options.skipAuth)
+    return ''
+
   const authorization = options.header?.Authorization || options.header?.authorization
   const headerToken = normalizeAccessToken(authorization)
   if (headerToken)
@@ -49,6 +52,17 @@ export function http<T>(options: CustomRequestOptions) {
         // 检查是否是401错误（包括HTTP状态码401或业务码401）
         const isTokenExpired = res.statusCode === 401 || normalizedCode === ResultEnum.Unauthorized
 
+        if (isTokenExpired && options.skipAuth) {
+          return reject(createHttpError({
+            type: HttpErrorType.Auth,
+            code,
+            statusCode: res.statusCode,
+            message: getResponseMessage(responseData, '请求未授权'),
+            data: responseData?.data,
+            raw: res,
+          }))
+        }
+
         if (isTokenExpired && options.url.includes('/auth/logout')) {
           return reject(createHttpError({
             type: HttpErrorType.Auth,
@@ -62,11 +76,9 @@ export function http<T>(options: CustomRequestOptions) {
 
         if (isTokenExpired) {
           const tokenStore = useTokenStore()
-          if (!isDoubleTokenMode) {
-            // 迟到的旧请求只能清理它实际携带的 token，不能撤销更新后的登录态。
-            if (tokenStore.clearLoginState(requestAccessToken))
-              toLoginPage()
-            return reject(createHttpError({
+          if (!isDoubleTokenMode || isAuthSessionOperationActive()) {
+            // 会话提交锁内不得递归刷新；先结束请求，让外层提交安全回滚后再条件清理。
+            reject(createHttpError({
               type: HttpErrorType.Auth,
               code,
               statusCode: res.statusCode,
@@ -74,6 +86,9 @@ export function http<T>(options: CustomRequestOptions) {
               data: responseData?.data,
               raw: res,
             }))
+            if (await tokenStore.clearLoginState(requestAccessToken))
+              toLoginPage()
+            return
           }
 
           /* -------- 无感刷新 token ----------- */
@@ -107,8 +122,17 @@ export function http<T>(options: CustomRequestOptions) {
             catch (refreshErr) {
               console.error('刷新 token 失败:', refreshErr)
               refreshing = false
-              // 仅当失败请求的 token 仍属于当前会话时才清理，避免迟到失败退出新账号。
-              if (tokenStore.clearLoginState(requestAccessToken)) {
+              // 先结束请求，避免锁内登录资料请求等待公开清理再次获取同一把锁。
+              reject(createHttpError({
+                type: HttpErrorType.Auth,
+                code,
+                statusCode: res.statusCode,
+                message: getResponseMessage(responseData, '登录已过期，请重新登录'),
+                data: responseData?.data,
+                raw: res,
+              }))
+              // 仅当失败请求的 token 仍属于当前会话时才跳转，避免迟到失败退出新账号。
+              if (await tokenStore.clearLoginState(requestAccessToken)) {
                 nextTick(() => {
                   uni.hideToast()
                   uni.showToast({
@@ -120,6 +144,7 @@ export function http<T>(options: CustomRequestOptions) {
                   toLoginPage()
                 }, 2000)
               }
+              return
             }
             finally {
               // 不管刷新 token 成功与否，都清空任务队列

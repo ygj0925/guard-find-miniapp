@@ -35,6 +35,8 @@ interface ImportMetaEnv {
   readonly VITE_WECHAT_AUTH_MODE?: 'mock' | 'api'
   /** 登录接口使用的后端客户端 ID。 */
   readonly VITE_AUTH_CLIENT_ID?: string
+  /** 是否展示并启用 H5 微信开放平台登录。 */
+  readonly VITE_WECHAT_H5_LOGIN_ENABLE?: 'true' | 'false'
   // 更多环境变量...
 }
 

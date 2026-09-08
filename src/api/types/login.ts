@@ -11,6 +11,21 @@ export interface PhoneLoginForm {
   wxLoginCode?: string
 }
 
+export type SocialLoginSource = 'WECHAT_OPEN'
+
+export interface SocialAuthorizeResult {
+  authorizeUrl: string
+}
+
+export interface SocialLoginForm {
+  /** 后端 sys_client.client_id，不是微信 AppID。 */
+  clientId: string
+  authType: 'SOCIAL'
+  source: SocialLoginSource
+  code: string
+  state: string
+}
+
 export interface BehaviorCaptcha {
   originalImageBase64: string
   jigsawImageBase64: string

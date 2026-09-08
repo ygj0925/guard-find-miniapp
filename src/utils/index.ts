@@ -168,6 +168,26 @@ export function getEnvBaseUrl() {
 }
 
 /**
+ * 将业务接口路径解析为当前平台可访问的请求地址。
+ * H5 开发环境启用代理时保留同源前缀，其他场景使用配置的服务端地址。
+ */
+export function getApiUrl(path: string) {
+  if (/^https?:\/\//i.test(path))
+    return path
+
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  // #ifdef H5
+  if (import.meta.env.VITE_APP_PROXY_ENABLE === 'true') {
+    const proxyPrefix = String(import.meta.env.VITE_APP_PROXY_PREFIX || '').replace(/\/$/, '')
+    return `${proxyPrefix}${normalizedPath}`
+  }
+  // #endif
+
+  const baseUrl = String(getEnvBaseUrl() || '').replace(/\/$/, '')
+  return `${baseUrl}${normalizedPath}`
+}
+
+/**
  * 是否是双token模式
  */
 export const isDoubleTokenMode = import.meta.env.VITE_AUTH_MODE === 'double'

@@ -103,10 +103,18 @@ function handleLogout() {
   uni.showModal({
     title: '提示',
     content: '确定要退出登录吗？',
-    success: (res) => {
-      if (res.confirm) {
-        void tokenStore.logout()
+    success: async (res) => {
+      if (!res.confirm)
+        return
+
+      try {
+        const loggedOut = await tokenStore.logout()
+        if (!loggedOut)
+          throw new Error('退出登录未完成')
         uni.showToast({ title: '退出登录成功', icon: 'success' })
+      }
+      catch {
+        uni.showToast({ title: '退出登录失败，请重试', icon: 'none' })
       }
     },
   })

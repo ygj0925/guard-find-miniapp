@@ -1,4 +1,4 @@
-import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm } from './types/login'
+import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm, SocialAuthorizeResult, SocialLoginForm, SocialLoginSource } from './types/login'
 import { http } from '@/http/http'
 
 /**
@@ -42,6 +42,25 @@ export function login(loginForm: ILoginForm) {
  */
 export function phoneLogin(loginForm: PhoneLoginForm) {
   return http.post<IAuthLoginRes>('/auth/login', loginForm)
+}
+
+export function getSocialAuthorizeUrl(source: SocialLoginSource) {
+  return http.get<SocialAuthorizeResult>(
+    `/auth/${encodeURIComponent(source)}`,
+    undefined,
+    undefined,
+    { skipAuth: true },
+  )
+}
+
+export function socialLogin(loginForm: SocialLoginForm) {
+  return http.post<IAuthLoginRes>(
+    '/auth/login',
+    loginForm,
+    undefined,
+    undefined,
+    { skipAuth: true },
+  )
 }
 
 export function getBehaviorCaptcha() {

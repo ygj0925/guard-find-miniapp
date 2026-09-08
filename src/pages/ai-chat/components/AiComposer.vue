@@ -148,6 +148,7 @@ function showVoiceTip() {
       'recognizing': speechState === 'recognizing',
     }"
   >
+    <!-- #ifdef MP-WEIXIN -->
     <view
       class="icon-button voice-button"
       :class="{ active: voiceMode }"
@@ -158,6 +159,7 @@ function showVoiceTip() {
         :class="voiceMode ? 'i-carbon-keyboard' : 'i-carbon-microphone'"
       />
     </view>
+    <!-- #endif -->
 
     <view class="input-area">
       <view
