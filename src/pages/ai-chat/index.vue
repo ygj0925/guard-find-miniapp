@@ -806,6 +806,7 @@ async function restoreConversation(sessionId: string) {
   hasStarted.value = true
   isRestoringHistory.value = true
   isFollowingLatest.value = true
+  expandedReasoningIds.value = []
   currentConversation.value = null
   try {
     const askHistoryPromise = listAgentChatAsks(sessionId, { limit: 30 })
@@ -1341,6 +1342,21 @@ onUnmounted(() => {
                 @resolve="handleAskResolution(message, $event.extension, $event.action)"
               />
 
+              <view v-if="message.role === 'assistant' && message.reasoningContent" class="reasoning-section">
+                <button class="reasoning-toggle" @tap="toggleReasoning(message.id)">
+                  <view class="i-carbon-idea" />
+                  <text>{{ expandedReasoningIds.includes(message.id) ? '收起思考过程' : '查看思考过程' }}</text>
+                  <view class="i-carbon-chevron-down reasoning-arrow" :class="{ expanded: expandedReasoningIds.includes(message.id) }" />
+                </button>
+                <view v-if="expandedReasoningIds.includes(message.id)" class="reasoning-panel">
+                  <AiRichText
+                    :content="message.reasoningContent"
+                    :streaming="message.status === 'streaming'"
+                    @rendered="handleRichTextRendered"
+                  />
+                </view>
+              </view>
+
               <text v-if="message.role === 'user' && message.content" class="user-message-content">{{ message.content }}</text>
               <AiRichText
                 v-else-if="message.role === 'assistant' && message.content"
@@ -1360,21 +1376,6 @@ onUnmounted(() => {
                   <view class="typing-dot" />
                 </view>
                 <text class="typing-label">{{ streamStatusText || '正在思考…' }}</text>
-              </view>
-
-              <view v-if="message.role === 'assistant' && message.reasoningContent" class="reasoning-section">
-                <button class="reasoning-toggle" @tap="toggleReasoning(message.id)">
-                  <view class="i-carbon-idea" />
-                  <text>{{ expandedReasoningIds.includes(message.id) ? '收起思考过程' : '查看思考过程' }}</text>
-                  <view class="i-carbon-chevron-down reasoning-arrow" :class="{ expanded: expandedReasoningIds.includes(message.id) }" />
-                </button>
-                <view v-if="expandedReasoningIds.includes(message.id)" class="reasoning-panel">
-                  <AiRichText
-                    :content="message.reasoningContent"
-                    :streaming="message.status === 'streaming'"
-                    @rendered="handleRichTextRendered"
-                  />
-                </view>
               </view>
 
               <text v-if="message.status === 'stopped'" class="message-state">回复已停止</text>
@@ -1912,9 +1913,9 @@ onUnmounted(() => {
 }
 
 .reasoning-section {
-  margin-top: 16rpx;
-  padding-top: 14rpx;
-  border-top: 1rpx solid #e8edf5;
+  margin-bottom: 16rpx;
+  padding-bottom: 14rpx;
+  border-bottom: 1rpx solid #e8edf5;
 }
 
 .reasoning-toggle {
