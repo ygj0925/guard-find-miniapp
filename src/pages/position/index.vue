@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
 import { getPositionFilterOptions, getPositions } from '@/api/position'
-import type { PositionFilterOption, PositionFilterOptions, PositionListItem } from '@/api/position'
+import type { PositionFilterOption, PositionFilterOptions, PositionListItem, PositionLocationOption } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { tabbarStore } from '@/tabbar/store'
@@ -40,6 +40,12 @@ interface FilterSection {
   options: PositionFilterOption[]
 }
 
+interface FilterSelectionState {
+  educationInfos: string[]
+  workExperiences: string[]
+  locIds: string[]
+}
+
 const headerScrolled = ref(false)
 const currentScrollTop = ref(0)
 const searchMorphProgress = ref(0)
@@ -48,8 +54,10 @@ const appliedKeyword = ref('')
 const activeKinds = ref<string[]>([])
 const kindScrollLeft = ref(0)
 const filterOptions = ref<PositionFilterOptions>({ kinds: [], educationInfos: [], workExperiences: [], locations: [] })
-const selectedFilters = reactive({ educationInfos: [] as string[], workExperiences: [] as string[], locIds: [] as string[] })
-const appliedFilters = reactive({ educationInfos: [] as string[], workExperiences: [] as string[], locIds: [] as string[] })
+const filterOptionsLoading = ref(false)
+const filterOptionsFailed = ref(false)
+const selectedFilters = reactive<FilterSelectionState>({ educationInfos: [], workExperiences: [], locIds: [] })
+const appliedFilters = reactive<FilterSelectionState>({ educationInfos: [], workExperiences: [], locIds: [] })
 const jobs = ref<PositionListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -62,11 +70,44 @@ const filterSections = computed<FilterSection[]>(() => [
   { key: 'educationInfos', label: '学历要求', options: filterOptions.value.educationInfos },
   { key: 'workExperiences', label: '工作经验', options: filterOptions.value.workExperiences },
 ])
-const selectedFilterCount = computed(() => (
-  appliedFilters.educationInfos.length
-  + appliedFilters.workExperiences.length
-  + appliedFilters.locIds.length
-))
+
+function countFilterSelections(filters: FilterSelectionState) {
+  return filters.educationInfos.length
+    + filters.workExperiences.length
+    + (filters.locIds.length > 0 ? 1 : 0)
+}
+
+function appendLocationLabels(options: PositionLocationOption[], labels: Map<string, string>) {
+  options.forEach((option) => {
+    if (option.value)
+      labels.set(option.value, option.label)
+    if (option.children?.length)
+      appendLocationLabels(option.children, labels)
+  })
+}
+
+function resolveOptionLabels(options: PositionFilterOption[], values: string[]) {
+  return values.map(value => options.find(option => option.value === value)?.label || value)
+}
+
+const locationLabelByValue = computed(() => {
+  const labels = new Map<string, string>()
+  appendLocationLabels(filterOptions.value.locations, labels)
+  return labels
+})
+const selectedFilterCount = computed(() => countFilterSelections(appliedFilters))
+const draftFilterCount = computed(() => countFilterSelections(selectedFilters))
+const hasLocationOptions = computed(() => filterOptions.value.locations.length > 0)
+const appliedFilterLabels = computed(() => {
+  const labels: string[] = []
+  if (appliedFilters.locIds.length) {
+    const locationLabels = appliedFilters.locIds.map(value => locationLabelByValue.value.get(value) || value)
+    labels.push(locationLabels.length === 1 ? locationLabels[0] : `${locationLabels[0]}等${locationLabels.length}个地点`)
+  }
+  labels.push(...resolveOptionLabels(filterOptions.value.educationInfos, appliedFilters.educationInfos))
+  labels.push(...resolveOptionLabels(filterOptions.value.workExperiences, appliedFilters.workExperiences))
+  return labels
+})
 const hasMore = computed(() => jobs.value.length < total.value)
 const positionStore = usePositionStore()
 const activeCategories = ref<string[]>([])
@@ -224,7 +265,17 @@ async function loadPositions(reset = false) {
 }
 
 async function loadFilterOptions() {
-  filterOptions.value = await getPositionFilterOptions()
+  filterOptionsLoading.value = true
+  filterOptionsFailed.value = false
+  try {
+    filterOptions.value = await getPositionFilterOptions()
+  }
+  catch {
+    filterOptionsFailed.value = true
+  }
+  finally {
+    filterOptionsLoading.value = false
+  }
 }
 
 function handleKeywordSearch(value: string) {
@@ -305,15 +356,68 @@ function applyPendingCategory() {
   return false
 }
 
+function focusFilterElement(id: string) {
+  // #ifdef H5
+  void nextTick(() => document.getElementById(id)?.focus())
+  // #endif
+}
+
+function activateButtonWithKeyboard(event: KeyboardEvent) {
+  // #ifdef H5
+  if (event.key !== 'Enter' && event.key !== ' ')
+    return
+  event.preventDefault()
+  const element = event.currentTarget as HTMLElement | null
+  element?.click()
+  // #endif
+}
+
+function handleFilterDialogKeydown(event: KeyboardEvent) {
+  // #ifdef H5
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    closeFilter()
+    return
+  }
+  if (event.key !== 'Tab')
+    return
+
+  const dialog = event.currentTarget as HTMLElement
+  const focusableElements = Array.from(
+    dialog.querySelectorAll<HTMLElement>('[tabindex="0"]:not([disabled])'),
+  )
+  if (!focusableElements.length) {
+    event.preventDefault()
+    dialog.focus()
+    return
+  }
+
+  const firstElement = focusableElements[0]
+  const lastElement = focusableElements[focusableElements.length - 1]
+  const activeElement = document.activeElement
+  if (event.shiftKey && (activeElement === firstElement || activeElement === dialog)) {
+    event.preventDefault()
+    lastElement.focus()
+  }
+  else if (!event.shiftKey && activeElement === lastElement) {
+    event.preventDefault()
+    firstElement.focus()
+  }
+  // #endif
+}
+
 function openFilter() {
   selectedFilters.educationInfos = [...appliedFilters.educationInfos]
   selectedFilters.workExperiences = [...appliedFilters.workExperiences]
   selectedFilters.locIds = [...appliedFilters.locIds]
   showFilter.value = true
+  focusFilterElement('position-filter-dialog')
 }
 
 function closeFilter() {
   showFilter.value = false
+  focusFilterElement('position-filter-trigger')
 }
 
 function toggleFilter(type: ChipFilterKey, value: string) {
@@ -335,9 +439,16 @@ function applyFilters() {
   appliedFilters.educationInfos = [...selectedFilters.educationInfos]
   appliedFilters.workExperiences = [...selectedFilters.workExperiences]
   appliedFilters.locIds = [...selectedFilters.locIds]
-  showFilter.value = false
+  closeFilter()
   loadPositions(true)
 }
+
+onBackPress(() => {
+  if (!showFilter.value)
+    return false
+  closeFilter()
+  return true
+})
 
 onPageScroll(({ scrollTop }) => {
   syncScrollState(scrollTop)
@@ -350,16 +461,10 @@ onShow(() => {
     loadPositions(true)
 })
 
-onLoad(async () => {
+onLoad(() => {
   applyPendingCategory()
-  try {
-    await loadFilterOptions()
-    await loadPositions(true)
-  }
-  catch {
-    // 请求层会在 401 时跳转登录页；其他错误保留页面内重试入口。
-    positionsFailed.value = true
-  }
+  void loadFilterOptions()
+  void loadPositions(true)
 })
 
 onReachBottom(() => {
@@ -457,29 +562,52 @@ onUnload(() => {
           </view>
         </view>
 
-        <view class="mt-5 flex items-center justify-between gap-3">
-          <view class="min-w-0 flex flex-1 items-center">
-            <text class="overflow-hidden text-ellipsis whitespace-nowrap text-xl text-app-ink font-700 leading-none">{{ total }} 个职位</text>
-            <view class="i-carbon-chevron-right ml-1.5 flex-none text-base text-app-ink-soft leading-none" />
-          </view>
-          <view
-            class="min-h-88rpx flex flex-none cursor-pointer items-center border-1rpx border-[#cfe2ff] rounded-full border-solid bg-[linear-gradient(135deg,rgba(255,255,255,0.96)_0%,rgba(231,242,255,0.96)_100%)] px-3.5 text-xs text-brand-blue shadow-[0_10rpx_28rpx_rgba(47,111,232,0.14)] transition-transform duration-180 active:scale-98 active:opacity-78 motion-reduce:transition-none"
-            role="button"
-            :aria-label="`打开其他职位筛选，已选择 ${selectedFilterCount} 项`"
-            @tap="openFilter"
-          >
-            <view class="mr-2 h-48rpx w-48rpx flex items-center justify-center rounded-full bg-white shadow-[0_4rpx_12rpx_rgba(47,111,232,0.12)]">
-              <view class="i-carbon-settings-adjust text-base leading-none" />
+        <view class="mt-5">
+          <view class="flex items-center justify-between gap-3">
+            <view class="min-w-0 flex flex-1 items-center">
+              <text class="overflow-hidden text-ellipsis whitespace-nowrap text-xl text-app-ink font-700 leading-none">{{ total }} 个职位</text>
+              <view class="i-carbon-chevron-right ml-1.5 flex-none text-base text-app-ink-soft leading-none" />
             </view>
-            <text class="font-700">其他筛选</text>
-            <text
-              v-if="selectedFilterCount"
-              class="ml-1.5 min-w-36rpx rounded-full bg-brand-blue px-1.5 py-0.5 text-center text-3xs text-white font-700"
+            <button
+              id="position-filter-trigger"
+              tabindex="0"
+              class="m-0 h-72rpx flex flex-none cursor-pointer items-center rounded-xl bg-white/92 px-3.5 py-0 text-sm text-app-ink font-650 leading-none shadow-[0_8rpx_24rpx_rgba(47,111,232,0.1)] transition-[transform,background-color] duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-98 after:border-0 active:bg-[#edf5ff] motion-reduce:transition-none"
+              :aria-label="`打开职位筛选，已选择 ${selectedFilterCount} 项`"
+              @keydown="activateButtonWithKeyboard"
+              @tap="openFilter"
             >
-              {{ selectedFilterCount }}
-            </text>
-            <view class="i-carbon-chevron-right ml-1 text-xs leading-none" />
+              <view class="i-carbon-filter mr-1.5 text-sm text-brand-blue leading-none" aria-hidden="true" />
+              <text>筛选</text>
+              <text
+                v-if="selectedFilterCount"
+                class="ml-1.5 min-w-32rpx rounded-full bg-brand-blue px-1.5 py-0.5 text-center text-3xs text-white font-700"
+              >
+                {{ selectedFilterCount }}
+              </text>
+              <view class="i-carbon-chevron-down ml-1 text-xs text-app-muted leading-none" aria-hidden="true" />
+            </button>
           </view>
+
+          <scroll-view
+            v-if="appliedFilterLabels.length"
+            class="mt-3 w-full whitespace-nowrap"
+            scroll-x
+            :show-scrollbar="false"
+          >
+            <view class="inline-flex items-center gap-2 pr-4">
+              <button
+                v-for="(label, index) in appliedFilterLabels"
+                :key="`${label}-${index}`"
+                tabindex="0"
+                class="m-0 h-60rpx inline-flex cursor-pointer items-center rounded-lg bg-white/78 px-3 py-0 text-2xs text-brand-blue font-600 leading-none shadow-[inset_0_0_0_1rpx_rgba(118,166,226,0.2)] after:border-0 active:opacity-72"
+                :aria-label="`${label}，点击调整筛选`"
+                @keydown="activateButtonWithKeyboard"
+                @tap="openFilter"
+              >
+                {{ label }}
+              </button>
+            </view>
+          </scroll-view>
         </view>
       </view>
     </view>
@@ -570,94 +698,145 @@ onUnload(() => {
       </view>
     </view>
 
-    <view v-if="showFilter" class="fixed inset-0 z-[1100] flex items-end bg-black/50" @tap="closeFilter">
-      <view
-        class="box-border h-[86vh] max-h-[calc(100vh-24rpx)] max-w-full w-full flex flex-col overflow-hidden rounded-t-[40rpx] bg-[#f5f8fd] shadow-[0_-20rpx_60rpx_rgba(18,43,82,0.22)]"
-        role="dialog"
-        aria-label="职位筛选"
-        @tap.stop
-      >
-        <view class="box-border max-w-full w-full flex-none border-b-1rpx border-b-[#e8eef6] border-b-solid bg-white px-4 pb-3 pt-3">
-          <view class="mx-auto mb-3 h-8rpx w-72rpx rounded-full bg-[#d8e1ee]" aria-hidden="true" />
-          <view class="flex items-center justify-between gap-3">
-            <view class="min-w-0 flex-1">
-              <text class="block text-lg text-app-ink font-700">其他筛选</text>
-              <text class="mt-1 block text-xs text-app-muted">选择更符合期望的职位条件</text>
-            </view>
-            <view
-              class="h-88rpx w-88rpx flex flex-none cursor-pointer items-center justify-center rounded-full bg-[#f3f6fa] text-app-ink-soft transition-colors duration-180 active:bg-[#e8edf4] motion-reduce:transition-none"
-              role="button"
-              aria-label="关闭筛选面板"
-              @tap="closeFilter"
-            >
-              <view class="i-carbon-close text-lg leading-none" aria-hidden="true" />
-            </view>
-          </view>
-        </view>
+    <!-- #ifdef MP-WEIXIN -->
+    <page-container
+      :show="showFilter"
+      :duration="0"
+      :overlay="false"
+      @beforeleave="closeFilter"
+    />
+    <!-- #endif -->
 
-        <scroll-view class="box-border max-w-full min-h-0 min-w-0 w-full flex-1 overflow-hidden px-4" scroll-y :show-scrollbar="false">
-          <view class="box-border max-w-full min-w-0 w-full pb-4 pt-3">
+    <view
+      v-if="showFilter"
+      id="position-filter-dialog"
+      class="fixed inset-0 z-[1100] flex flex-col overflow-hidden bg-[#f4f8fd]"
+      role="dialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="position-filter-title"
+      @keydown="handleFilterDialogKeydown"
+    >
+      <view class="flex-none bg-white/96 shadow-[0_8rpx_24rpx_rgba(39,74,125,0.07)]" :style="{ paddingTop: `${statusBarHeight}px` }">
+        <view class="grid grid-cols-[88rpx_1fr_88rpx] h-96rpx items-center px-2">
+          <button
+            tabindex="0"
+            class="m-0 h-80rpx w-80rpx flex cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-app-ink leading-none transition-colors duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] after:border-0 active:bg-[#edf3fa] motion-reduce:transition-none"
+            aria-label="关闭筛选面板"
+            @keydown="activateButtonWithKeyboard"
+            @tap="closeFilter"
+          >
+            <view class="i-carbon-close text-xl leading-none" aria-hidden="true" />
+          </button>
+          <text id="position-filter-title" class="text-center text-lg text-app-ink font-700 tracking-1rpx">筛选职位</text>
+          <text v-if="draftFilterCount" class="text-center text-xs text-brand-blue font-650">{{ draftFilterCount }} 项</text>
+          <view v-else />
+        </view>
+      </view>
+
+      <view class="mx-4 mt-3 flex flex-none items-center rounded-2xl bg-[#e7f3ff] px-3.5 py-3 text-brand-blue shadow-[inset_0_1rpx_0_rgba(255,255,255,0.7)]">
+        <view class="mr-3 h-56rpx w-56rpx flex flex-none items-center justify-center rounded-xl bg-white/82">
+          <view class="i-carbon-location-filled text-base leading-none" aria-hidden="true" />
+        </view>
+        <view class="min-w-0 flex flex-1 flex-col">
+          <text class="text-sm font-700">优先选择工作地点</text>
+          <text class="mt-0.5 text-2xs text-[#5f7fa6]">支持多选，可展开地区查看下级地点</text>
+        </view>
+      </view>
+
+      <scroll-view class="box-border min-h-0 w-full flex-1" scroll-y :show-scrollbar="false">
+        <view class="px-4 pb-8 pt-5">
+          <view class="mb-8">
+            <view class="mb-3 flex items-end justify-between gap-3">
+              <view class="min-w-0 flex-1">
+                <text class="block text-base text-app-ink font-700">工作地点</text>
+                <text class="mt-1 block text-2xs text-app-muted">不选择具体地点即为全国</text>
+              </view>
+              <text v-if="selectedFilters.locIds.length" class="flex-none text-2xs text-brand-blue font-650">已选 {{ selectedFilters.locIds.length }} 个</text>
+            </view>
+
+            <view v-if="filterOptionsLoading" class="flex flex-col gap-2" aria-label="工作地点加载中">
+              <view v-for="index in 3" :key="index" class="h-92rpx animate-pulse rounded-2xl bg-[#e7edf5] motion-reduce:animate-none" />
+            </view>
+            <button
+              v-else-if="filterOptionsFailed"
+              tabindex="0"
+              class="m-0 min-h-176rpx w-full flex flex-col cursor-pointer items-center justify-center rounded-2xl bg-white px-4 py-0 text-center leading-none shadow-[0_8rpx_26rpx_rgba(39,74,125,0.06)] after:border-0 active:opacity-72"
+              aria-label="重新加载工作地点"
+              @keydown="activateButtonWithKeyboard"
+              @tap="loadFilterOptions"
+            >
+              <text class="text-sm text-app-ink-soft">工作地点加载失败</text>
+              <text class="mt-1.5 text-xs text-brand-blue font-650">点击重新加载</text>
+            </button>
+            <view v-else-if="!hasLocationOptions" class="min-h-176rpx flex items-center justify-center rounded-2xl bg-white px-4 text-sm text-app-muted">
+              暂无可选工作地点
+            </view>
+            <PositionLocationFilter
+              v-else
+              :options="filterOptions.locations"
+              :model-value="selectedFilters.locIds"
+              @update:model-value="updateSelectedLocations"
+            />
+          </view>
+
+          <view>
+            <view class="mb-4">
+              <text class="block text-base text-app-ink font-700">更多条件</text>
+              <text class="mt-1 block text-2xs text-app-muted">可继续选择学历与工作经验</text>
+            </view>
+
             <view
               v-for="section in filterSections"
               :key="section.key"
-              class="mb-3 box-border max-w-full min-w-0 w-full overflow-hidden border-1rpx border-[#e6edf6] rounded-3xl border-solid bg-white p-4"
+              class="mb-7"
             >
-              <view class="mb-3 min-w-0 flex items-center">
-                <text class="min-w-0 text-sm text-app-ink font-700">{{ section.label }}</text>
-              </view>
-              <view class="box-border max-w-full min-w-0 w-full flex flex-wrap gap-2 overflow-hidden">
-                <view
+              <text class="mb-3 block text-sm text-app-ink font-650">{{ section.label }}</text>
+              <view v-if="section.options.length" class="grid grid-cols-3 gap-2">
+                <button
                   v-for="option in section.options"
                   :key="option.value"
-                  class="box-border max-w-full min-h-88rpx min-w-0 flex cursor-pointer items-center overflow-hidden border-1rpx rounded-xl border-solid px-3 py-2 text-xs transition-colors duration-180 active:opacity-72 motion-reduce:transition-none"
+                  tabindex="0"
+                  class="m-0 box-border min-h-84rpx min-w-0 flex cursor-pointer items-center justify-center rounded-xl px-2 py-2 text-center text-xs leading-none transition-[transform,background-color,color] duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-98 after:border-0 motion-reduce:transition-none"
                   :class="selectedFilters[section.key].includes(option.value)
-                    ? 'border-[#6aa9f8] bg-[#e8f3ff] text-brand-blue'
-                    : 'border-[#e1e8f1] bg-[#f7f9fc] text-app-ink-soft'"
+                    ? 'bg-[#e5f1ff] text-brand-blue font-650 shadow-[inset_0_0_0_2rpx_rgba(47,111,232,0.42)]'
+                    : 'bg-white text-app-ink-soft shadow-[0_6rpx_20rpx_rgba(39,74,125,0.055)]'"
                   role="checkbox"
                   :aria-checked="selectedFilters[section.key].includes(option.value)"
                   :aria-label="option.label"
+                  @keydown="activateButtonWithKeyboard"
                   @tap="toggleFilter(section.key, option.value)"
                 >
-                  <text class="max-w-full min-w-0 break-words">{{ option.label }}</text>
-                </view>
+                  <text class="max-w-full break-words leading-snug">{{ option.label }}</text>
+                </button>
               </view>
-            </view>
-
-            <view class="box-border max-w-full min-w-0 w-full overflow-hidden border-1rpx border-[#e6edf6] rounded-3xl border-solid bg-white p-4">
-              <view class="mb-3 min-w-0 flex items-center">
-                <view class="min-w-0 flex items-center">
-                  <view class="mr-2 h-48rpx w-48rpx flex flex-none items-center justify-center rounded-xl bg-[#e8f3ff] text-brand-blue">
-                    <view class="i-carbon-location text-sm leading-none" aria-hidden="true" />
-                  </view>
-                  <text class="min-w-0 text-sm text-app-ink font-700">工作地点</text>
-                </view>
-              </view>
-              <PositionLocationFilter
-                :options="filterOptions.locations"
-                :model-value="selectedFilters.locIds"
-                @update:model-value="updateSelectedLocations"
-              />
+              <text v-else class="block rounded-xl bg-white px-3 py-4 text-xs text-app-muted">暂无可选条件</text>
             </view>
           </view>
-        </scroll-view>
+        </view>
+      </scroll-view>
 
-        <view class="box-border max-w-full w-full flex-none border-t-1rpx border-t-[#e0e8f2] border-t-solid bg-white px-4 pt-3 pb-safe">
-          <view class="box-border max-w-full min-w-0 w-full flex gap-3 pb-3">
-            <button
-              class="m-0 h-96rpx min-w-0 flex flex-1 items-center justify-center border-1rpx border-[#d5e0ed] rounded-full border-solid bg-[#f5f8fc] p-0 text-sm text-app-ink-soft font-700 leading-none after:border-0 active:opacity-72"
-              aria-label="重置其他筛选"
-              @tap="resetFilters"
-            >
-              重置
-            </button>
-            <button
-              class="m-0 h-96rpx min-w-0 flex flex-[1.35] items-center justify-center border-0 rounded-full bg-[linear-gradient(135deg,#2f6fe8_0%,#4d9bf6_100%)] p-0 text-sm text-white font-700 leading-none shadow-[0_10rpx_24rpx_rgba(47,111,232,0.24)] after:border-0 active:opacity-78"
-              aria-label="筛选职位"
-              @tap="applyFilters"
-            >
-              筛选
-            </button>
-          </view>
+      <view class="flex-none bg-white px-4 pt-3 shadow-[0_-10rpx_30rpx_rgba(31,63,108,0.08)] pb-safe">
+        <view class="flex gap-3 pb-3">
+          <button
+            tabindex="0"
+            class="m-0 h-96rpx min-w-0 flex flex-[0.72] items-center justify-center rounded-2xl bg-white p-0 text-sm text-app-ink-soft font-700 leading-none shadow-[inset_0_0_0_1rpx_#d9e3ef] active:scale-98 after:border-0 active:bg-[#f3f6fa]"
+            aria-label="重置筛选条件"
+            @keydown="activateButtonWithKeyboard"
+            @tap="resetFilters"
+          >
+            重置
+          </button>
+          <button
+            tabindex="0"
+            class="m-0 h-96rpx min-w-0 flex flex-[1.45] items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2f6fe8_0%,#438fea_100%)] p-0 text-sm text-white font-700 leading-none shadow-[0_12rpx_28rpx_rgba(47,111,232,0.24)] transition-transform duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-98 after:border-0 motion-reduce:transition-none"
+            :aria-label="`确定筛选，已选择 ${draftFilterCount} 项`"
+            @keydown="activateButtonWithKeyboard"
+            @tap="applyFilters"
+          >
+            <text>确定</text>
+            <text v-if="draftFilterCount" class="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-3xs">{{ draftFilterCount }}</text>
+          </button>
         </view>
       </view>
     </view>
