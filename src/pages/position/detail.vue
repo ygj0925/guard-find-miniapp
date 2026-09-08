@@ -75,7 +75,6 @@ const isResumesLoading = ref(false)
 const resumes = ref<ResumeItem[]>([])
 const selectedResumeId = ref<string>()
 const screenshotPath = ref('')
-const isMapRevealed = ref(false)
 const sharePositionId = ref('')
 const isShareLoading = ref(false)
 
@@ -87,7 +86,6 @@ const sharePath = computed(() => {
   return sharePositionId.value ? `${base}&shareId=${encodeURIComponent(sharePositionId.value)}` : base
 })
 const shareTitle = computed(() => position.value.title)
-const hasLocation = computed(() => position.value.latitude != null && position.value.longitude != null)
 
 function normalizeTextList(value?: string[] | string) {
   const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\\r?\\n|\r?\n/) : []
@@ -267,21 +265,6 @@ onShareTimeline(() => ({
     : `id=${encodeURIComponent(position.value.id)}`,
 }))
 
-function openCompanyLocation() {
-  if (!hasLocation.value)
-    return
-  if (!isMapRevealed.value) {
-    isMapRevealed.value = true
-    return
-  }
-  uni.openLocation({
-    latitude: position.value.latitude!,
-    longitude: position.value.longitude!,
-    name: position.value.company,
-    address: position.value.address || position.value.location,
-  })
-}
-
 function handleBack() {
   if (getCurrentPages().length > 1) {
     uni.navigateBack()
@@ -455,7 +438,6 @@ function openApplyProgress() {
       <view class="bg-white px-4 pb-5 pt-4">
         <view class="skeleton-block h-10 w-3/5 rounded-xl" />
         <view class="mt-3 flex gap-2">
-          <view class="skeleton-block h-6 w-24 rounded-lg" />
           <view class="skeleton-block h-6 w-20 rounded-lg" />
           <view class="skeleton-block h-6 w-20 rounded-lg" />
         </view>
@@ -474,11 +456,7 @@ function openApplyProgress() {
           <text class="min-w-0 flex-1 text-2xl text-app-ink font-700 leading-[1.3]">{{ position.title }}</text>
           <text class="flex-none pt-1 text-xl text-brand-blue font-700 leading-none">{{ position.salary }}</text>
         </view>
-        <view v-if="position.location || position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-app-ink-soft">
-          <view v-if="position.location" class="flex items-center gap-1.5">
-            <view class="i-carbon-location text-base text-app-muted leading-none" />
-            <text>{{ position.location }}</text>
-          </view>
+        <view v-if="position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-app-ink-soft">
           <view v-if="position.experience" class="flex items-center gap-1.5">
             <view class="i-carbon-portfolio text-base text-app-muted leading-none" />
             <text>{{ position.experience }}</text>
@@ -507,39 +485,6 @@ function openApplyProgress() {
           <text v-for="(item, index) in position.requirements" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
-        </view>
-      </view>
-
-      <view class="mt-2 bg-white px-4 py-5">
-        <view class="flex cursor-pointer items-center active:opacity-75" role="button" aria-label="查看公司地址" @tap="openCompanyLocation">
-          <view class="h-16 w-16 flex flex-none items-center justify-center overflow-hidden rounded-2xl bg-[#edf5ff]">
-            <image class="h-12 w-12" :src="position.companyLogo" mode="aspectFit" />
-          </view>
-          <view class="ml-3 min-w-0 flex-1">
-            <text class="block overflow-hidden text-ellipsis whitespace-nowrap text-lg text-[#202938] font-700">{{ position.company }}</text>
-            <text class="mt-1 block text-sm text-[#667085]">{{ position.companyIndustry }} · {{ position.companyStage }} · {{ position.companySize }}</text>
-          </view>
-          <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
-        </view>
-
-        <view v-if="hasLocation && isMapRevealed" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
-          <map class="h-full w-full" :latitude="position.latitude" :longitude="position.longitude" :scale="15" :enable-scroll="false" :enable-zoom="false" />
-          <view class="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
-            <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-[#263249] shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
-              <view class="i-carbon-location-filled mr-1.5 flex-none text-base text-brand-blue leading-none" />
-              <text class="overflow-hidden text-ellipsis whitespace-nowrap">{{ position.address }}</text>
-            </view>
-          </view>
-          <view class="pointer-events-none absolute left-1/2 top-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-brand-blue text-xl text-white shadow-[0_8rpx_20rpx_rgba(45,111,230,0.28)] -translate-x-1/2 -translate-y-full">
-            <view class="i-carbon-location-filled" />
-          </view>
-        </view>
-        <view v-else-if="hasLocation" class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#edf4ff] px-4 py-5 text-sm text-brand-blue active:opacity-75" role="button" aria-label="点击显示地图" @tap="openCompanyLocation">
-          <view class="i-carbon-map text-base leading-none" />
-          <text>点击查看地图</text>
-        </view>
-        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">
-          暂未提供工作地点坐标
         </view>
       </view>
 
