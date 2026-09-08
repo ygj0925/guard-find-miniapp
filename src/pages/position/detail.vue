@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { applyPosition, getPositionDetail } from '@/api/position'
+import { computed, nextTick, ref } from 'vue'
+import { applyPosition, createPositionShares, getPositionDetail } from '@/api/position'
 import type { PositionDetail as PositionDetailResponse } from '@/api/position'
 import { getResumes } from '@/api/resume'
 import type { ResumeItem } from '@/api/resume'
@@ -27,6 +27,7 @@ definePage({
 
 const POSITION_LIST_PATH = '/pages/position/index'
 const DETAIL_PATH = '/pages/position/detail'
+const SHARE_LIST_PATH = '/pages/position/sharelist'
 const POSITION_PROGRESS_PATH = '/pages/position/progress'
 interface PositionDetailView {
   id: string
@@ -74,12 +75,17 @@ const isResumesLoading = ref(false)
 const resumes = ref<ResumeItem[]>([])
 const selectedResumeId = ref<string>()
 const screenshotPath = ref('')
-const isMapRevealed = ref(false)
+const sharePositionId = ref('')
+const isShareLoading = ref(false)
 
 const isApplied = computed(() => position.value.applied)
-const hasLocation = computed(() => typeof position.value.latitude === 'number' && typeof position.value.longitude === 'number')
-const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
-const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
+const isLoggedIn = computed(() => tokenStore.hasLogin)
+const detailPath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
+const sharePath = computed(() => {
+  const base = `${SHARE_LIST_PATH}?id=${encodeURIComponent(position.value.id)}`
+  return sharePositionId.value ? `${base}&shareId=${encodeURIComponent(sharePositionId.value)}` : base
+})
+const shareTitle = computed(() => position.value.title)
 
 function normalizeTextList(value?: string[] | string) {
   const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\\r?\\n|\r?\n/) : []
@@ -120,6 +126,9 @@ onLoad(async (options) => {
   }
   try {
     position.value = toPositionDetail(await getPositionDetail(options.id))
+    // #ifdef MP-WEIXIN
+    nextTick(() => drawSharePoster())
+    // #endif
   }
   catch {
     uni.showToast({ title: '职位加载失败，请稍后重试', icon: 'none' })
@@ -129,45 +138,132 @@ onLoad(async (options) => {
   }
 })
 
-onReady(() => {
-  // #ifdef MP-WEIXIN
-  // 延迟截图避免与 map 原生组件初始化竞争，防止模拟器卡顿
-  setTimeout(() => {
-    if (typeof wx.takeScreenshot === 'function') {
-      wx.takeScreenshot({
-        success: (res: { tempImagePath: string }) => {
-          screenshotPath.value = res.tempImagePath
+// #ifdef MP-WEIXIN
+function drawSharePoster() {
+  uni.downloadFile({
+    url: 'https://static1.3sbio.com/logo/2.png',
+    success: ({ statusCode, tempFilePath }: { statusCode: number, tempFilePath: string }) => {
+      renderCanvas(statusCode === 200 ? tempFilePath : '')
+    },
+    fail: () => renderCanvas(''),
+  })
+
+  function renderCanvas(logoPath: string) {
+    const ctx = uni.createCanvasContext('share-poster')
+    const W = 375
+    const H = 320
+    const PAD = 16
+    const MAX_CHARS = 22
+    const LOGO_SIZE = 21
+    const TITLE_X = logoPath ? PAD + LOGO_SIZE + 8 : PAD
+
+    ctx.setFillStyle('#ffffff')
+    ctx.fillRect(0, 0, W, H)
+
+    // Logo（与标题行垂直居中）
+    if (logoPath) {
+      ctx.drawImage(logoPath, PAD, 16, LOGO_SIZE, LOGO_SIZE)
+    }
+
+    // 职位名 + 薪资
+    const title = position.value.title || ''
+    const titleShort = title.length > 14 ? `${title.slice(0, 14)}…` : title
+    ctx.font = 'bold 17px sans-serif'
+    ctx.setFillStyle('#1a2640')
+    ctx.setTextAlign('left')
+    ctx.fillText(titleShort, TITLE_X, 36)
+    ctx.font = '600 14px sans-serif'
+    ctx.setFillStyle('#2d6fe6')
+    ctx.setTextAlign('right')
+    ctx.fillText(position.value.salary || '', W - PAD, 36)
+
+    // 工作信息行
+    const metas = [
+      position.value.location,
+      position.value.experience,
+      position.value.education,
+    ].filter(Boolean).join('   ·   ')
+    ctx.font = '12px sans-serif'
+    ctx.setFillStyle('#6b7a8d')
+    ctx.setTextAlign('left')
+    ctx.fillText(metas, PAD, 58)
+
+    // 分隔线
+    ctx.setStrokeStyle('#edf0f5')
+    ctx.setLineWidth(1)
+    ctx.beginPath()
+    ctx.moveTo(PAD, 70)
+    ctx.lineTo(W - PAD, 70)
+    ctx.stroke()
+
+    // 职位详情
+    ctx.font = 'bold 14px sans-serif'
+    ctx.setFillStyle('#1a2640')
+    ctx.fillText('职位详情', PAD, 90)
+
+    const resps = position.value.responsibilities.slice(0, 4)
+    resps.forEach((text, i) => {
+      const truncated = text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS)}…` : text
+      ctx.font = '13px sans-serif'
+      ctx.setFillStyle('#4b5565')
+      ctx.fillText(`${i + 1}. ${truncated}`, PAD, 112 + i * 22)
+    })
+
+    // 分隔线
+    ctx.setStrokeStyle('#edf0f5')
+    ctx.beginPath()
+    ctx.moveTo(PAD, 192)
+    ctx.lineTo(W - PAD, 192)
+    ctx.stroke()
+
+    // 任职要求
+    ctx.font = 'bold 14px sans-serif'
+    ctx.setFillStyle('#1a2640')
+    ctx.fillText('任职要求', PAD, 212)
+
+    const reqs = position.value.requirements.slice(0, 3)
+    reqs.forEach((text, i) => {
+      const truncated = text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS)}…` : text
+      ctx.font = '13px sans-serif'
+      ctx.setFillStyle('#4b5565')
+      ctx.fillText(`${i + 1}. ${truncated}`, PAD, 234 + i * 22)
+    })
+
+    // 灰色底部
+    ctx.setFillStyle('#f5f7fa')
+    ctx.fillRect(0, 292, W, H - 292)
+    ctx.font = '11px sans-serif'
+    ctx.setFillStyle('#9aa5b5')
+    ctx.setTextAlign('center')
+    ctx.fillText('三生制药 · 期待您的加入', W / 2, 308)
+
+    ctx.draw(false, () => {
+      uni.canvasToTempFilePath({
+        canvasId: 'share-poster',
+        success: (res: { tempFilePath: string }) => {
+          screenshotPath.value = res.tempFilePath
+          console.log('[海报生成成功]', res.tempFilePath)
+        },
+        fail: (err: unknown) => {
+          console.log('[海报生成失败]', err)
         },
       })
-    }
-  }, 800)
-  // #endif
-})
+    })
+  }
+}
+// #endif
 onShareAppMessage(() => ({
-  title: shareTitle.value,
+  title: position.value.title,
   path: sharePath.value,
   imageUrl: screenshotPath.value || 'https://static1.3sbio.com/logo/2.png',
 }))
 
 onShareTimeline(() => ({
   title: shareTitle.value,
-  query: `id=${encodeURIComponent(position.value.id)}`,
+  query: sharePositionId.value
+    ? `id=${encodeURIComponent(position.value.id)}&shareId=${encodeURIComponent(sharePositionId.value)}`
+    : `id=${encodeURIComponent(position.value.id)}`,
 }))
-
-function openCompanyLocation() {
-  if (!hasLocation.value)
-    return
-  if (!isMapRevealed.value) {
-    isMapRevealed.value = true
-    return
-  }
-  uni.openLocation({
-    latitude: position.value.latitude!,
-    longitude: position.value.longitude!,
-    name: position.value.company,
-    address: position.value.address || position.value.location,
-  })
-}
 
 function handleBack() {
   if (getCurrentPages().length > 1) {
@@ -177,7 +273,33 @@ function handleBack() {
   uni.switchTab({ url: POSITION_LIST_PATH })
 }
 
+function callShareApi() {
+  return createPositionShares([position.value.id])
+    .then((res) => {
+      sharePositionId.value = res?.id ?? ''
+      console.log('[分享接口成功]', res)
+    })
+    .catch(err => console.log('[分享接口失败]', err))
+}
+
+function handleShareLogin() {
+  toLoginPage({ queryString: `?redirect=${encodeURIComponent(sharePath.value)}` })
+}
+
 async function handleShare() {
+  if (!tokenStore.updateNowTime().hasLogin) {
+    handleShareLogin()
+    return
+  }
+  if (isShareLoading.value)
+    return
+  isShareLoading.value = true
+  try {
+    await callShareApi()
+  }
+  finally {
+    isShareLoading.value = false
+  }
   // #ifdef H5
   const webNavigator = navigator as Navigator & {
     share?: (data: { title: string, text: string, url: string }) => Promise<void>
@@ -211,7 +333,7 @@ async function handleApply() {
 
   if (!tokenStore.updateNowTime().hasLogin) {
     toLoginPage({
-      queryString: `?redirect=${encodeURIComponent(sharePath.value)}`,
+      queryString: `?redirect=${encodeURIComponent(detailPath.value)}`,
     })
     return
   }
@@ -371,46 +493,17 @@ function openApplyProgress() {
         </view>
       </view>
 
-      <view class="mt-2 bg-white px-4 py-5">
-        <view class="flex cursor-pointer items-center active:opacity-75" role="button" aria-label="查看公司地址" @tap="openCompanyLocation">
-          <view class="h-16 w-16 flex flex-none items-center justify-center overflow-hidden rounded-2xl bg-[#edf5ff]">
-            <image class="h-12 w-12" :src="position.companyLogo" mode="aspectFit" />
-          </view>
-          <view class="ml-3 min-w-0 flex-1">
-            <text class="block overflow-hidden text-ellipsis whitespace-nowrap text-lg text-[#202938] font-700">{{ position.company }}</text>
-            <text class="mt-1 block text-sm text-[#667085]">{{ position.companyIndustry }} · {{ position.companyStage }} · {{ position.companySize }}</text>
-          </view>
-          <view class="i-carbon-chevron-right text-lg text-[#a8b1bf] leading-none" />
-        </view>
-
-        <view v-if="hasLocation && isMapRevealed" class="relative mt-4 h-64 overflow-hidden rounded-2xl bg-[#e9f2fb]" role="button" aria-label="在地图中查看公司地址" @tap="openCompanyLocation">
-          <map class="h-full w-full" :latitude="position.latitude" :longitude="position.longitude" :scale="15" :enable-scroll="false" :enable-zoom="false" />
-          <view class="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
-            <view class="max-w-full flex items-center rounded-xl bg-white/96 px-3 py-2 text-sm text-[#263249] shadow-[0_8rpx_24rpx_rgba(41,78,132,0.15)]">
-              <view class="i-carbon-location-filled mr-1.5 flex-none text-base text-brand-blue leading-none" />
-              <text class="overflow-hidden text-ellipsis whitespace-nowrap">{{ position.address }}</text>
-            </view>
-          </view>
-          <view class="pointer-events-none absolute left-1/2 top-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-brand-blue text-xl text-white shadow-[0_8rpx_20rpx_rgba(45,111,230,0.28)] -translate-x-1/2 -translate-y-full">
-            <view class="i-carbon-location-filled" />
-          </view>
-        </view>
-        <view v-else-if="hasLocation" class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#edf4ff] px-4 py-5 text-sm text-brand-blue active:opacity-75" role="button" aria-label="点击显示地图" @tap="openCompanyLocation">
-          <view class="i-carbon-map text-base leading-none" />
-          <text>点击查看地图</text>
-        </view>
-        <view v-else class="mt-4 rounded-2xl bg-[#f2f4f7] px-4 py-5 text-center text-sm text-[#98a2b3]">
-          暂未提供工作地点坐标
-        </view>
-      </view>
-
       <view class="h-36" />
     </template>
 
     <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-4 pt-2.5 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
       <view class="flex items-center gap-3">
         <!-- #ifdef MP-WEIXIN -->
-        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位">
+        <button v-if="isLoggedIn" class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位" @tap="callShareApi">
+          <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
+          <text>分享</text>
+        </button>
+        <button v-else class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" aria-label="分享职位" @tap="handleShareLogin">
           <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
@@ -433,6 +526,10 @@ function openApplyProgress() {
         </button>
       </view>
     </view>
+
+    <!-- #ifdef MP-WEIXIN -->
+    <canvas canvas-id="share-poster" style="position: fixed; left: -9999px; top: 0; width: 375px; height: 320px;" />
+    <!-- #endif -->
 
     <view v-if="isResumePickerVisible" class="fixed inset-0 z-200 flex items-end bg-black/42" @tap="closeResumePicker">
       <view class="max-h-[78vh] w-full overflow-hidden rounded-t-[28rpx] bg-white shadow-[0_-18rpx_56rpx_rgba(26,48,86,0.16)] pb-safe" @tap.stop>

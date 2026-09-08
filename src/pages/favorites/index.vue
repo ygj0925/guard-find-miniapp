@@ -107,60 +107,42 @@ onShow(() => {
         <view
           v-for="item in shareList"
           :key="item.positionId"
-          class="overflow-hidden rounded-2xl bg-white shadow-[0_4rpx_16rpx_rgba(38,64,105,0.06)] active:opacity-90"
+          class="cursor-pointer rounded-2xl bg-white px-4 py-4 shadow-[0_8rpx_24rpx_rgba(38,64,105,0.05)] active:opacity-74"
+          role="button"
           @tap="handleTapPosition(item.positionId)"
         >
-          <view class="px-4 pb-3 pt-4">
-            <!-- 职位名 + 薪资/停止招聘 -->
-            <view class="flex items-start justify-between gap-2">
-              <text
-                class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base font-700 leading-[1.4]"
-                :class="item.status === 'closed' ? 'text-[#b0bac8]' : 'text-[#1a2640]'"
-              >
-                {{ item.positionName }}
-              </text>
-              <text v-if="item.status === 'closed'" class="flex-shrink-0 text-base text-[#9aa5b5] font-700">
-                停止招聘
-              </text>
-              <text v-else class="flex-shrink-0 text-base text-brand-blue font-700">
-                {{ item.salary }}
-              </text>
-            </view>
-
-            <!-- 公司 -->
-            <text class="mt-1 block text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#6b7a8d]'">{{ item.company }}</text>
-
-            <!-- 地点/经验/学历 -->
-            <view class="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <text v-if="item.location" class="text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.location }}</text>
-              <text v-if="item.location && item.experience" class="text-xs text-[#c8d0dc]">·</text>
-              <text v-if="item.experience" class="text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.experience }}</text>
-              <text v-if="item.edu && (item.location || item.experience)" class="text-xs text-[#c8d0dc]">·</text>
-              <text v-if="item.edu" class="text-xs" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.edu }}</text>
-            </view>
+          <!-- 职位名 + 薪资 -->
+          <view class="flex items-start justify-between gap-3">
+            <text class="min-w-0 flex-1 text-base text-app-ink font-700 leading-[1.35]">{{ item.positionName }}</text>
+            <text
+              class="flex-none text-sm font-700"
+              :class="item.status === 'closed' ? 'text-[#b0bac8]' : 'text-brand-blue'"
+            >
+              {{ item.status === 'closed' ? '停止招聘' : item.salary }}
+            </text>
           </view>
 
-          <!-- 底部：发布人 + 分享时间 -->
-          <view class="flex items-center justify-between border-t-1rpx border-t-[#f0f4fa] border-t-solid px-4 py-3">
-            <!-- 发布人 -->
-            <view class="flex items-center gap-2">
-              <view class="h-56rpx w-56rpx flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e8f0fd]">
-                <image
-                  v-if="item.recruiterAvatar"
-                  class="h-full w-full"
-                  :src="item.recruiterAvatar"
-                  mode="aspectFill"
-                />
-                <view v-else class="i-carbon-user-avatar text-base text-brand-blue leading-none" />
-              </view>
-              <view class="flex flex-col">
-                <text class="text-xs font-600 leading-[1.3]" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#1a2640]'">{{ item.recruiterName }}</text>
-                <text class="text-2xs leading-[1.3]" :class="item.status === 'closed' ? 'text-[#c8d0dc]' : 'text-[#9aa5b5]'">{{ item.recruiterRole }}</text>
-              </view>
-            </view>
+          <!-- 地点 / 学历 / 经验 标签 -->
+          <view v-if="[item.location, item.edu, item.experience].some(Boolean)" class="mt-2.5 flex flex-wrap gap-1.5">
+            <text
+              v-for="meta in [item.location, item.edu, item.experience].filter(Boolean)"
+              :key="meta"
+              class="rounded-10rpx bg-[#f1f5fb] px-2 py-1 text-2xs text-app-ink-soft"
+            >
+              {{ meta }}
+            </text>
+          </view>
 
-            <!-- 分享时间 -->
-            <text class="text-xs text-[#b0bac8]">{{ item.sharedAt }} 分享</text>
+          <!-- 底部：招聘人 + 分享时间 -->
+          <view class="mt-3 flex items-center justify-between border-t-1rpx border-t-[#f1f3f6] border-t-solid pt-3">
+            <view class="flex items-center">
+              <view class="h-42rpx w-42rpx flex flex-none items-center justify-center overflow-hidden rounded-full bg-[#e9f3ff] text-sm text-brand-blue leading-none">
+                <image v-if="item.recruiterAvatar" class="h-full w-full" :src="item.recruiterAvatar" mode="aspectFill" />
+                <view v-else class="i-carbon-user-avatar" />
+              </view>
+              <text class="ml-2 text-xs text-app-ink-soft">{{ item.recruiterName }} · {{ item.recruiterRole }}</text>
+            </view>
+            <text class="ml-3 text-xs text-app-muted">{{ item.sharedAt }} 分享</text>
           </view>
         </view>
       </view>

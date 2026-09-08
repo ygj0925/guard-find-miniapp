@@ -160,6 +160,24 @@ export interface PositionApplyProgress {
   progressList: PositionApplyProgressItem[]
 }
 
+export interface PositionShares {
+  id: string
+  positionCount: number
+  createTime: string
+}
+
+export interface PositionShareListData {
+  list: []
+  total: number
+}
+
+export interface PositionShareItem {
+  id: string
+  positionCount: number
+  positions: PositionListItem[]
+  createTime: string
+}
+
 export function getPositionFilterOptions() {
   return http.get<PositionFilterOptions>('/miniapp/positions/filter-options')
 }
@@ -180,10 +198,39 @@ export function applyPosition(positionId: string, data: PositionApplyForm) {
   return http.post<PositionApplyResult>(`/miniapp/positions/${encodeURIComponent(positionId)}/apply`, data)
 }
 
+/**
+ * 查询投递记录
+ */
 export function getPositionApplies() {
   return http.get<PositionApplyRecord[]>('/miniapp/position-applies')
 }
 
 export function getPositionApplyProgress(id: string | number) {
   return http.get<PositionApplyProgress>(`/miniapp/position-applies/${encodeURIComponent(String(id))}/progress`)
+}
+
+/**
+ * 查询职位分享记录
+ */
+export interface PositionSharesQuery {
+  pageNum: number
+  pageSize: number
+}
+
+export function getPositionShares(query: PositionSharesQuery) {
+  return http.get<PositionShareListData>(`/miniapp/position-shares`, query)
+}
+
+/*
+创建职位分享
+*/
+export function createPositionShares(positionIds: string[]) {
+  return http.post<PositionShares>(`/miniapp/position-shares`, { positionIds })
+}
+
+/*
+查询分享记录中的职位
+*/
+export function getPositionShareList(shareId: string) {
+  return http.get<PositionListItem[]>(`/miniapp/position-shares/${shareId}/positions`)
 }
