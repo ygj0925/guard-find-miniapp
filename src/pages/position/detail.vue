@@ -27,6 +27,7 @@ definePage({
 
 const POSITION_LIST_PATH = '/pages/position/index'
 const DETAIL_PATH = '/pages/position/detail'
+const SHARE_LIST_PATH = '/pages/position/sharelist'
 const POSITION_PROGRESS_PATH = '/pages/position/progress'
 interface PositionDetailView {
   id: string
@@ -86,19 +87,13 @@ const sharePositionId = ref('')
 const isShareLoading = ref(false)
 
 const isApplied = computed(() => position.value.applied)
+const isLoggedIn = computed(() => tokenStore.hasLogin)
+const detailPath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
 const sharePath = computed(() => {
-  const base = `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`
+  const base = `${SHARE_LIST_PATH}?id=${encodeURIComponent(position.value.id)}`
   return sharePositionId.value ? `${base}&shareId=${encodeURIComponent(sharePositionId.value)}` : base
 })
-const shareTitle = computed(() => {
-  const line1 = [position.value.title, position.value.salary].filter(Boolean).join('  ')
-  const meta = [
-    position.value.location && `📍 ${position.value.location}`,
-    position.value.experience && `🗓 ${position.value.experience}`,
-    position.value.education && `🎓 ${position.value.education}`,
-  ].filter(Boolean).join('  ')
-  return meta ? `${line1}\n${meta}` : line1
-})
+const shareTitle = computed(() => position.value.title)
 const hasLocation = computed(() => position.value.latitude != null && position.value.longitude != null)
 
 function normalizeTextList(value?: string[] | string) {
@@ -154,87 +149,116 @@ onLoad(async (options) => {
 
 // #ifdef MP-WEIXIN
 function drawSharePoster() {
-  const ctx = uni.createCanvasContext('share-poster')
-  const W = 375
-  const H = 220
-
-  ctx.setFillStyle('#ffffff')
-  ctx.fillRect(0, 0, W, H)
-
-  // 蓝色顶部
-  ctx.setFillStyle('#2d6fe6')
-  ctx.fillRect(0, 0, W, 52)
-  ctx.setFillStyle('#ffffff')
-  ctx.font = '600 16px sans-serif'
-  ctx.setTextAlign('center')
-  ctx.fillText('三生制药招聘', W / 2, 32)
-
-  // 职位名 + 薪资
-  const title = position.value.title || ''
-  const titleShort = title.length > 14 ? `${title.slice(0, 14)}…` : title
-  ctx.font = 'bold 17px sans-serif'
-  ctx.setFillStyle('#1a2640')
-  ctx.setTextAlign('left')
-  ctx.fillText(titleShort, 16, 82)
-  ctx.font = '600 15px sans-serif'
-  ctx.setFillStyle('#2d6fe6')
-  ctx.setTextAlign('right')
-  ctx.fillText(position.value.salary || '', W - 16, 82)
-
-  // 分隔线
-  ctx.setStrokeStyle('#edf0f5')
-  ctx.setLineWidth(1)
-  ctx.beginPath()
-  ctx.moveTo(16, 96)
-  ctx.lineTo(W - 16, 96)
-  ctx.stroke()
-
-  // 工作信息
-  const metas = [
-    position.value.location,
-    position.value.experience,
-    position.value.education,
-  ].filter(Boolean).join('   ·   ')
-  ctx.font = '12px sans-serif'
-  ctx.setFillStyle('#6b7a8d')
-  ctx.setTextAlign('left')
-  ctx.fillText(metas, 16, 118)
-
-  // 标签
-  const tags = position.value.tags.filter(Boolean).slice(0, 4)
-  let tagX = 16
-  for (const tag of tags) {
-    const tagW = tag.length * 11 + 16
-    if (tagX + tagW > W - 16)
-      break
-    ctx.setFillStyle('#eef4ff')
-    ctx.fillRect(tagX, 130, tagW, 22)
-    ctx.font = '11px sans-serif'
-    ctx.setFillStyle('#4c7fd4')
-    ctx.fillText(tag, tagX + 8, 145)
-    tagX += tagW + 8
-  }
-
-  // 灰色底部
-  ctx.setFillStyle('#f5f7fa')
-  ctx.fillRect(0, 184, W, H - 184)
-  ctx.font = '11px sans-serif'
-  ctx.setFillStyle('#9aa5b5')
-  ctx.setTextAlign('center')
-  ctx.fillText('三生制药 · 期待您的加入', W / 2, 198)
-
-  ctx.draw(false, () => {
-    uni.canvasToTempFilePath({
-      canvasId: 'share-poster',
-      success: (res: { tempFilePath: string }) => {
-        screenshotPath.value = res.tempFilePath
-        console.log('[海报生成成功]', res.tempFilePath)
-      },
-      fail: (err: unknown) => {
-        console.log('[海报生成失败]', err)
-      },
-    })
+  uni.downloadFile({
+    url: 'https://static1.3sbio.com/logo/2.png',
+    success: ({ statusCode, tempFilePath }: { statusCode: number, tempFilePath: string }) => {
+      renderCanvas(statusCode === 200 ? tempFilePath : '')
+    },
+    fail: () => renderCanvas(''),
   })
+
+  function renderCanvas(logoPath: string) {
+    const ctx = uni.createCanvasContext('share-poster')
+    const W = 375
+    const H = 320
+    const PAD = 16
+    const MAX_CHARS = 22
+    const LOGO_SIZE = 21
+    const TITLE_X = logoPath ? PAD + LOGO_SIZE + 8 : PAD
+
+    ctx.setFillStyle('#ffffff')
+    ctx.fillRect(0, 0, W, H)
+
+    // Logo（与标题行垂直居中）
+    if (logoPath) {
+      ctx.drawImage(logoPath, PAD, 16, LOGO_SIZE, LOGO_SIZE)
+    }
+
+    // 职位名 + 薪资
+    const title = position.value.title || ''
+    const titleShort = title.length > 14 ? `${title.slice(0, 14)}…` : title
+    ctx.font = 'bold 17px sans-serif'
+    ctx.setFillStyle('#1a2640')
+    ctx.setTextAlign('left')
+    ctx.fillText(titleShort, TITLE_X, 36)
+    ctx.font = '600 14px sans-serif'
+    ctx.setFillStyle('#2d6fe6')
+    ctx.setTextAlign('right')
+    ctx.fillText(position.value.salary || '', W - PAD, 36)
+
+    // 工作信息行
+    const metas = [
+      position.value.location,
+      position.value.experience,
+      position.value.education,
+    ].filter(Boolean).join('   ·   ')
+    ctx.font = '12px sans-serif'
+    ctx.setFillStyle('#6b7a8d')
+    ctx.setTextAlign('left')
+    ctx.fillText(metas, PAD, 58)
+
+    // 分隔线
+    ctx.setStrokeStyle('#edf0f5')
+    ctx.setLineWidth(1)
+    ctx.beginPath()
+    ctx.moveTo(PAD, 70)
+    ctx.lineTo(W - PAD, 70)
+    ctx.stroke()
+
+    // 职位详情
+    ctx.font = 'bold 14px sans-serif'
+    ctx.setFillStyle('#1a2640')
+    ctx.fillText('职位详情', PAD, 90)
+
+    const resps = position.value.responsibilities.slice(0, 4)
+    resps.forEach((text, i) => {
+      const truncated = text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS)}…` : text
+      ctx.font = '13px sans-serif'
+      ctx.setFillStyle('#4b5565')
+      ctx.fillText(`${i + 1}. ${truncated}`, PAD, 112 + i * 22)
+    })
+
+    // 分隔线
+    ctx.setStrokeStyle('#edf0f5')
+    ctx.beginPath()
+    ctx.moveTo(PAD, 192)
+    ctx.lineTo(W - PAD, 192)
+    ctx.stroke()
+
+    // 任职要求
+    ctx.font = 'bold 14px sans-serif'
+    ctx.setFillStyle('#1a2640')
+    ctx.fillText('任职要求', PAD, 212)
+
+    const reqs = position.value.requirements.slice(0, 3)
+    reqs.forEach((text, i) => {
+      const truncated = text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS)}…` : text
+      ctx.font = '13px sans-serif'
+      ctx.setFillStyle('#4b5565')
+      ctx.fillText(`${i + 1}. ${truncated}`, PAD, 234 + i * 22)
+    })
+
+    // 灰色底部
+    ctx.setFillStyle('#f5f7fa')
+    ctx.fillRect(0, 292, W, H - 292)
+    ctx.font = '11px sans-serif'
+    ctx.setFillStyle('#9aa5b5')
+    ctx.setTextAlign('center')
+    ctx.fillText('三生制药 · 期待您的加入', W / 2, 308)
+
+    ctx.draw(false, () => {
+      uni.canvasToTempFilePath({
+        canvasId: 'share-poster',
+        success: (res: { tempFilePath: string }) => {
+          screenshotPath.value = res.tempFilePath
+          console.log('[海报生成成功]', res.tempFilePath)
+        },
+        fail: (err: unknown) => {
+          console.log('[海报生成失败]', err)
+        },
+      })
+    })
+  }
 }
 // #endif
 onShareAppMessage(() => ({
@@ -282,7 +306,15 @@ function callShareApi() {
     .catch(err => console.log('[分享接口失败]', err))
 }
 
+function handleShareLogin() {
+  toLoginPage({ queryString: `?redirect=${encodeURIComponent(sharePath.value)}` })
+}
+
 async function handleShare() {
+  if (!tokenStore.updateNowTime().hasLogin) {
+    handleShareLogin()
+    return
+  }
   if (isShareLoading.value)
     return
   isShareLoading.value = true
@@ -325,7 +357,7 @@ async function handleApply() {
 
   if (!tokenStore.updateNowTime().hasLogin) {
     toLoginPage({
-      queryString: `?redirect=${encodeURIComponent(sharePath.value)}`,
+      queryString: `?redirect=${encodeURIComponent(detailPath.value)}`,
     })
     return
   }
@@ -524,7 +556,11 @@ function openApplyProgress() {
     <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-4 pt-2.5 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
       <view class="flex items-center gap-3">
         <!-- #ifdef MP-WEIXIN -->
-        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位" @tap="callShareApi">
+        <button v-if="isLoggedIn" class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位" @tap="callShareApi">
+          <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
+          <text>分享</text>
+        </button>
+        <button v-else class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" aria-label="分享职位" @tap="handleShareLogin">
           <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
@@ -549,7 +585,7 @@ function openApplyProgress() {
     </view>
 
     <!-- #ifdef MP-WEIXIN -->
-    <canvas canvas-id="share-poster" style="position: fixed; left: -9999px; top: 0; width: 375px; height: 220px;" />
+    <canvas canvas-id="share-poster" style="position: fixed; left: -9999px; top: 0; width: 375px; height: 320px;" />
     <!-- #endif -->
 
     <view v-if="isResumePickerVisible" class="fixed inset-0 z-200 flex items-end bg-black/42" @tap="closeResumePicker">
