@@ -438,6 +438,7 @@ function openApplyProgress() {
       <view class="bg-white px-4 pb-5 pt-4">
         <view class="skeleton-block h-10 w-3/5 rounded-xl" />
         <view class="mt-3 flex gap-2">
+          <view class="skeleton-block h-6 w-24 rounded-lg" />
           <view class="skeleton-block h-6 w-20 rounded-lg" />
           <view class="skeleton-block h-6 w-20 rounded-lg" />
         </view>
@@ -456,7 +457,11 @@ function openApplyProgress() {
           <text class="min-w-0 flex-1 text-2xl text-app-ink font-700 leading-[1.3]">{{ position.title }}</text>
           <text class="flex-none pt-1 text-xl text-brand-blue font-700 leading-none">{{ position.salary }}</text>
         </view>
-        <view v-if="position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-app-ink-soft">
+        <view v-if="position.location || position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-app-ink-soft">
+          <view v-if="position.location" class="flex items-center gap-1.5">
+            <view class="i-carbon-location text-base text-app-muted leading-none" />
+            <text>{{ position.location }}</text>
+          </view>
           <view v-if="position.experience" class="flex items-center gap-1.5">
             <view class="i-carbon-portfolio text-base text-app-muted leading-none" />
             <text>{{ position.experience }}</text>
