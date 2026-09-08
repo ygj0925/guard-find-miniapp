@@ -2,6 +2,7 @@
 import { computed, onUnmounted, reactive, ref } from 'vue'
 import { phoneLogin, sendSmsCaptcha } from '@/api/login'
 import { AGREEMENT_PAGE, BIND_PHONE_PAGE, PRIVACY_PAGE } from '@/router/config'
+import { startWechatAuthorization } from '@/service/auth/wechat-auth'
 import { useTokenStore } from '@/store/token'
 import { navigateAfterAuthenticated } from './navigation'
 import AuthBehaviorCaptchaModal from './components/AuthBehaviorCaptchaModal.vue'
@@ -134,6 +135,19 @@ async function sendCodeAfterCaptcha(captchaVerification: string) {
   }
 }
 
+async function getWechatLoginCodeForPhoneLogin(): Promise<string | undefined> {
+  // #ifdef MP-WEIXIN
+  const authorization = await startWechatAuthorization()
+  if (authorization.status !== 'binding_required') {
+    throw new Error(authorization.message)
+  }
+  return authorization.code
+  // #endif
+  // #ifndef MP-WEIXIN
+  return undefined
+  // #endif
+}
+
 async function performPhoneLogin() {
   if (loading.value)
     return
@@ -143,11 +157,13 @@ async function performPhoneLogin() {
   loading.value = true
   feedback.value = ''
   try {
+    const wxLoginCode = await getWechatLoginCodeForPhoneLogin()
     const token = await phoneLogin({
       clientId: authClientId,
       authType: 'PHONE',
       phone: form.phone,
       captcha: form.code,
+      wxLoginCode,
     })
     const committed = await tokenStore.completeExternalLogin(token, attemptId)
     if (!committed)
