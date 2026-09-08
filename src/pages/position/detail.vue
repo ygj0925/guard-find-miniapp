@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { applyPosition, getPositionDetail } from '@/api/position'
+import { computed, nextTick, ref } from 'vue'
+import { applyPosition, createPositionShares, getPositionDetail } from '@/api/position'
 import type { PositionDetail as PositionDetailResponse } from '@/api/position'
 import { getResumes } from '@/api/resume'
 import type { ResumeItem } from '@/api/resume'
@@ -75,11 +75,24 @@ const resumes = ref<ResumeItem[]>([])
 const selectedResumeId = ref<string>()
 const screenshotPath = ref('')
 const isMapRevealed = ref(false)
+const sharePositionId = ref('')
+const isShareLoading = ref(false)
 
 const isApplied = computed(() => position.value.applied)
+const sharePath = computed(() => {
+  const base = `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`
+  return sharePositionId.value ? `${base}&shareId=${encodeURIComponent(sharePositionId.value)}` : base
+})
+const shareTitle = computed(() => {
+  const line1 = [position.value.title, position.value.salary].filter(Boolean).join('  ')
+  const meta = [
+    position.value.location && `📍 ${position.value.location}`,
+    position.value.experience && `🗓 ${position.value.experience}`,
+    position.value.education && `🎓 ${position.value.education}`,
+  ].filter(Boolean).join('  ')
+  return meta ? `${line1}\n${meta}` : line1
+})
 const hasLocation = computed(() => typeof position.value.latitude === 'number' && typeof position.value.longitude === 'number')
-const sharePath = computed(() => `${DETAIL_PATH}?id=${encodeURIComponent(position.value.id)}`)
-const shareTitle = computed(() => `${position.value.title}｜${position.value.company}正在招聘`)
 
 function normalizeTextList(value?: string[] | string) {
   const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\\r?\\n|\r?\n/) : []
@@ -120,6 +133,9 @@ onLoad(async (options) => {
   }
   try {
     position.value = toPositionDetail(await getPositionDetail(options.id))
+    // #ifdef MP-WEIXIN
+    nextTick(() => drawSharePoster())
+    // #endif
   }
   catch {
     uni.showToast({ title: '职位加载失败，请稍后重试', icon: 'none' })
@@ -129,29 +145,102 @@ onLoad(async (options) => {
   }
 })
 
-onReady(() => {
-  // #ifdef MP-WEIXIN
-  // 延迟截图避免与 map 原生组件初始化竞争，防止模拟器卡顿
-  setTimeout(() => {
-    if (typeof wx.takeScreenshot === 'function') {
-      wx.takeScreenshot({
-        success: (res: { tempImagePath: string }) => {
-          screenshotPath.value = res.tempImagePath
-        },
-      })
-    }
-  }, 800)
-  // #endif
-})
+// #ifdef MP-WEIXIN
+function drawSharePoster() {
+  const ctx = uni.createCanvasContext('share-poster')
+  const W = 375
+  const H = 220
+
+  ctx.setFillStyle('#ffffff')
+  ctx.fillRect(0, 0, W, H)
+
+  // 蓝色顶部
+  ctx.setFillStyle('#2d6fe6')
+  ctx.fillRect(0, 0, W, 52)
+  ctx.setFillStyle('#ffffff')
+  ctx.font = '600 16px sans-serif'
+  ctx.setTextAlign('center')
+  ctx.fillText('三生制药招聘', W / 2, 32)
+
+  // 职位名 + 薪资
+  const title = position.value.title || ''
+  const titleShort = title.length > 14 ? `${title.slice(0, 14)}…` : title
+  ctx.font = 'bold 17px sans-serif'
+  ctx.setFillStyle('#1a2640')
+  ctx.setTextAlign('left')
+  ctx.fillText(titleShort, 16, 82)
+  ctx.font = '600 15px sans-serif'
+  ctx.setFillStyle('#2d6fe6')
+  ctx.setTextAlign('right')
+  ctx.fillText(position.value.salary || '', W - 16, 82)
+
+  // 分隔线
+  ctx.setStrokeStyle('#edf0f5')
+  ctx.setLineWidth(1)
+  ctx.beginPath()
+  ctx.moveTo(16, 96)
+  ctx.lineTo(W - 16, 96)
+  ctx.stroke()
+
+  // 工作信息
+  const metas = [
+    position.value.location,
+    position.value.experience,
+    position.value.education,
+  ].filter(Boolean).join('   ·   ')
+  ctx.font = '12px sans-serif'
+  ctx.setFillStyle('#6b7a8d')
+  ctx.setTextAlign('left')
+  ctx.fillText(metas, 16, 118)
+
+  // 标签
+  const tags = position.value.tags.filter(Boolean).slice(0, 4)
+  let tagX = 16
+  for (const tag of tags) {
+    const tagW = tag.length * 11 + 16
+    if (tagX + tagW > W - 16)
+      break
+    ctx.setFillStyle('#eef4ff')
+    ctx.fillRect(tagX, 130, tagW, 22)
+    ctx.font = '11px sans-serif'
+    ctx.setFillStyle('#4c7fd4')
+    ctx.fillText(tag, tagX + 8, 145)
+    tagX += tagW + 8
+  }
+
+  // 灰色底部
+  ctx.setFillStyle('#f5f7fa')
+  ctx.fillRect(0, 184, W, H - 184)
+  ctx.font = '11px sans-serif'
+  ctx.setFillStyle('#9aa5b5')
+  ctx.setTextAlign('center')
+  ctx.fillText('三生制药 · 期待您的加入', W / 2, 198)
+
+  ctx.draw(false, () => {
+    uni.canvasToTempFilePath({
+      canvasId: 'share-poster',
+      success: (res: { tempFilePath: string }) => {
+        screenshotPath.value = res.tempFilePath
+        console.log('[海报生成成功]', res.tempFilePath)
+      },
+      fail: (err: unknown) => {
+        console.log('[海报生成失败]', err)
+      },
+    })
+  })
+}
+// #endif
 onShareAppMessage(() => ({
-  title: shareTitle.value,
+  title: position.value.title,
   path: sharePath.value,
   imageUrl: screenshotPath.value || 'https://static1.3sbio.com/logo/2.png',
 }))
 
 onShareTimeline(() => ({
   title: shareTitle.value,
-  query: `id=${encodeURIComponent(position.value.id)}`,
+  query: sharePositionId.value
+    ? `id=${encodeURIComponent(position.value.id)}&shareId=${encodeURIComponent(sharePositionId.value)}`
+    : `id=${encodeURIComponent(position.value.id)}`,
 }))
 
 function openCompanyLocation() {
@@ -177,7 +266,25 @@ function handleBack() {
   uni.switchTab({ url: POSITION_LIST_PATH })
 }
 
+function callShareApi() {
+  return createPositionShares([position.value.id])
+    .then((res) => {
+      sharePositionId.value = res?.id ?? ''
+      console.log('[分享接口成功]', res)
+    })
+    .catch(err => console.log('[分享接口失败]', err))
+}
+
 async function handleShare() {
+  if (isShareLoading.value)
+    return
+  isShareLoading.value = true
+  try {
+    await callShareApi()
+  }
+  finally {
+    isShareLoading.value = false
+  }
   // #ifdef H5
   const webNavigator = navigator as Navigator & {
     share?: (data: { title: string, text: string, url: string }) => Promise<void>
@@ -410,7 +517,7 @@ function openApplyProgress() {
     <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-4 pt-2.5 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
       <view class="flex items-center gap-3">
         <!-- #ifdef MP-WEIXIN -->
-        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位">
+        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位" @tap="callShareApi">
           <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
@@ -433,6 +540,10 @@ function openApplyProgress() {
         </button>
       </view>
     </view>
+
+    <!-- #ifdef MP-WEIXIN -->
+    <canvas canvas-id="share-poster" style="position: fixed; left: -9999px; top: 0; width: 375px; height: 220px;" />
+    <!-- #endif -->
 
     <view v-if="isResumePickerVisible" class="fixed inset-0 z-200 flex items-end bg-black/42" @tap="closeResumePicker">
       <view class="max-h-[78vh] w-full overflow-hidden rounded-t-[28rpx] bg-white shadow-[0_-18rpx_56rpx_rgba(26,48,86,0.16)] pb-safe" @tap.stop>
