@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import AppPageHeader from '@/components/AppPageHeader.vue'
-import { AGREEMENT_PAGE, PRIVACY_PAGE } from '@/router/config'
+import { PRIVACY_PAGE } from '@/router/config'
 import { useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
@@ -215,18 +215,6 @@ function handleLogout() {
           <view class="min-w-0 flex flex-1 flex-col">
             <text class="text-sm text-[#263249] font-600">账号设置</text>
             <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">个人信息</text>
-          </view>
-          <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
-        </view>
-        <view
-          class="min-h-116rpx flex cursor-pointer items-center border-b-1rpx border-b-[#edf1f7] border-b-solid last:border-b-0 active:opacity-70"
-          role="link"
-          @tap="handleLegalTap(AGREEMENT_PAGE)"
-        >
-          <view class="i-carbon-document mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
-          <view class="min-w-0 flex flex-1 flex-col">
-            <text class="text-sm text-[#263249] font-600">服务使用协议</text>
-            <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">了解服务使用规则</text>
           </view>
           <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
         </view>

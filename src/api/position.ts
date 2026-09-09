@@ -133,6 +133,7 @@ export interface PositionApplyResult {
 export interface PositionApplyRecord {
   id: string | number
   resumeId: string
+  resumeName?: string
   positionId: string
   importStatus: string
   failedReason?: string

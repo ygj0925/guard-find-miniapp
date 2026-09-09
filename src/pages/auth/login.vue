@@ -438,8 +438,6 @@ function skipLogin() {
         </view>
         <view class="min-w-0 flex flex-1 flex-wrap">
           <text>我已阅读并同意</text>
-          <text class="tap-link text-[#087ff5]" role="link" @tap.stop="goTo(AGREEMENT_PAGE)">《服务使用协议》</text>
-          <text>和</text>
           <text class="tap-link text-[#087ff5]" role="link" @tap.stop="goTo(PRIVACY_PAGE)">《隐私政策》</text>
           <text>，首次登录将自动创建会员账号</text>
         </view>

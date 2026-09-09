@@ -46,23 +46,6 @@ function toDayLabel(dateStr: string) {
   return `${m}月${day}日`
 }
 
-function toTime(dateStr: string) {
-  if (!dateStr)
-    return ''
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime()))
-    return ''
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function statusColor(statusName: string) {
-  if (['已拒绝', '不合适', '失败'].includes(statusName))
-    return 'text-[#9aa5b5]'
-  if (['已通过', '录用', '已完成'].includes(statusName))
-    return 'text-[#16a34a]'
-  return 'text-[#9aa5b5]'
-}
-
 async function load() {
   isLoading.value = true
   isError.value = false
@@ -131,7 +114,7 @@ onLoad(() => load())
       <text class="text-base text-[#1a2640] font-700">暂无投递记录</text>
       <text class="mt-2 block text-center text-sm text-[#9aa5b5] leading-[1.6]">投递感兴趣的职位后，记录会在这里展示</text>
       <button
-        class="plain-button mt-6 h-10 flex items-center gap-1.5 rounded-xl border-0 bg-brand-blue px-5 text-sm text-white font-600"
+        class="plain-button mt-6 h-10 flex items-center gap-1.5 border-0 rounded-xl bg-brand-blue px-5 text-sm text-white font-600"
         @tap="() => uni.switchTab({ url: '/pages/position/index' })"
       >
         <view class="i-carbon-search text-base leading-none" />
@@ -144,7 +127,7 @@ onLoad(() => load())
       <view class="i-carbon-warning mb-4 text-6xl text-[#dce3f0]" />
       <text class="text-base text-[#1a2640] font-700">加载失败</text>
       <button
-        class="plain-button mt-4 h-10 rounded-xl border border-solid border-[#dce2ea] bg-white px-5 text-sm text-[#4b5565] font-600"
+        class="plain-button mt-4 h-10 border border-[#dce2ea] rounded-xl border-solid bg-white px-5 text-sm text-[#4b5565] font-600"
         @tap="load"
       >
         重新加载
@@ -171,33 +154,40 @@ onLoad(() => load())
             <view v-if="idx > 0" class="mx-4 h-px bg-[#f0f4fa]" />
 
             <view class="px-4 py-4">
-              <!-- 第一行：职位名 + 薪资 -->
-              <view class="flex items-start justify-between gap-3">
-                <text class="min-w-0 flex-1 text-base text-[#1a2640] font-700 leading-[1.4]">
-                  {{ record.positionName || record.jobTitle }}
-                </text>
-                <text class="flex-none pt-px text-sm text-brand-blue font-700 leading-[1.5]">
-                  {{ formatPositionSalary(record) }}
-                </text>
-              </view>
+              <view class="flex items-center gap-2">
+                <!-- 左侧主要内容 -->
+                <view class="min-w-0 flex-1">
+                  <!-- 第一行：职位名 + 薪资 -->
+                  <view class="flex items-start justify-between gap-3">
+                    <text class="min-w-0 flex-1 text-base text-[#1a2640] font-700 leading-[1.4]">
+                      {{ record.positionName || record.jobTitle }}
+                    </text>
+                    <text class="flex-none pt-px text-sm text-brand-blue font-700 leading-[1.5]">
+                      {{ formatPositionSalary(record) }}
+                    </text>
+                  </view>
 
-              <!-- 第二行：流程名称 + 状态 -->
-              <view class="mt-1.5 flex items-center justify-between gap-3 text-sm text-[#6b7a8d]">
-                <text>{{ record.processName }}</text>
-                <text class="flex-none text-xs leading-[1.5]" :class="statusColor(record.statusName)">
-                  {{ record.statusName }}
-                </text>
-              </view>
+                  <!-- 第二行：流程名称 -->
+                  <text class="mt-1.5 block text-sm text-[#6b7a8d]">{{ record.processName }}</text>
 
-              <!-- 失败原因 -->
-              <view v-if="record.failedReason" class="mt-2 flex items-start gap-1.5 text-xs text-[#ef4444]">
-                <view class="i-carbon-warning-alt mt-px flex-none text-sm leading-none" />
-                <text class="leading-[1.5]">{{ record.failedReason }}</text>
-              </view>
+                  <!-- 当前进度 -->
+                  <text class="mt-1.5 block text-xs text-[#6b7a8d]">当前进度：{{ record.statusName }}</text>
 
-              <!-- 第三行：时间 -->
-              <view class="mt-3 flex items-center justify-end">
-                <text class="text-xs text-[#b0bac8]">{{ toTime(record.createTime) }}</text>
+                  <!-- 简历名称 -->
+                  <view v-if="record.resumeName" class="mt-2">
+                    <text class="text-xs text-[#6b7a8d]">投递简历：</text>
+                    <text class="text-xs text-brand-blue font-500">{{ record.resumeName }}</text>
+                  </view>
+
+                  <!-- 失败原因 -->
+                  <view v-if="record.failedReason" class="mt-2 flex items-start gap-1.5 text-xs text-[#ef4444]">
+                    <view class="i-carbon-warning-alt mt-px flex-none text-sm leading-none" />
+                    <text class="leading-[1.5]">{{ record.failedReason }}</text>
+                  </view>
+                </view>
+
+                <!-- 右侧箭头 -->
+                <view class="i-carbon-chevron-right flex-none text-base text-[#bec7d4] leading-none" />
               </view>
             </view>
           </view>
@@ -205,9 +195,6 @@ onLoad(() => load())
       </view>
 
       <!-- 底部提示 -->
-      <text class="mx-auto mt-6 block px-8 text-center text-xs text-[#b0bac8] leading-[1.6]">
-        仅显示最近的投递记录，最多 200 条
-      </text>
     </view>
   </view>
 </template>
@@ -224,11 +211,17 @@ onLoad(() => load())
 }
 
 @keyframes skeleton-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: 0 0; }
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-block { animation: none; }
+  .skeleton-block {
+    animation: none;
+  }
 }
 </style>
