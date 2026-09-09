@@ -442,7 +442,7 @@ onPageScroll(({ scrollTop }) => {
 
     <view class="px-3 pt-1">
       <view
-        class="relative cursor-pointer overflow-hidden rounded-32rpx bg-[linear-gradient(118deg,#3f61f2_0%,#6a5bf0_52%,#9a63f2_100%)] px-3.5 py-3 shadow-[0_16rpx_36rpx_rgba(72,78,214,0.24)] active:opacity-88"
+        class="relative cursor-pointer overflow-hidden rounded-32rpx px-3.5 py-3 shadow-[0_16rpx_36rpx_rgba(45,111,230,0.24)] bg-brand-hero active:opacity-88"
         role="button"
         @tap="openPage('pages/ai-chat/index')"
       >
@@ -462,7 +462,7 @@ onPageScroll(({ scrollTop }) => {
             <text class="mt-1.5 block text-2xs text-white/82">说出期望，AI 帮你匹配岗位并一键投递</text>
           </view>
 
-          <view class="ml-2 h-60rpx flex flex-none items-center rounded-full bg-white px-3 text-xs text-[#5347e8] font-700 shadow-[0_8rpx_18rpx_rgba(28,32,110,0.18)]">
+          <view class="ml-2 h-60rpx flex flex-none items-center rounded-full bg-white px-3 text-xs text-brand-blue font-700 shadow-[0_8rpx_18rpx_rgba(45,111,230,0.18)]">
             <text>聊一聊</text>
             <view class="i-carbon-arrow-right ml-0.5 text-xs leading-none" />
           </view>
