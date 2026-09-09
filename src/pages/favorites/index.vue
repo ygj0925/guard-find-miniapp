@@ -159,7 +159,7 @@ onReachBottom(() => load())
             <!-- 职位名 + 薪资/停止招聘 -->
             <view class="flex items-start justify-between gap-3">
               <text class="min-w-0 flex-1 text-base text-app-ink font-700 leading-[1.35]">{{ job.positionName }}</text>
-              <text v-if="job.status === 'active'" class="flex-none pt-px text-sm text-brand-blue font-700 leading-[1.5]">{{ formatPositionSalary(job) }}</text>
+              <text v-if="job.status === '1'" class="flex-none pt-px text-sm text-brand-blue font-700 leading-[1.5]">{{ formatPositionSalary(job) }}</text>
               <text v-else class="flex-none pt-px text-base text-[#999] font-700 leading-[1.35]">停止招聘</text>
             </view>
 
