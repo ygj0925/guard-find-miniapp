@@ -182,8 +182,11 @@ onHide(() => {
 
 // 停留在本页时收到 WS 推送只会更新未读数，列表不会自动重拉；未读数变多时主动重新拉取，
 // 保证新消息不需要切出再切回才能看到。
+// loading 中跳过：onShow 本身会同时触发 refreshUnreadCount 和 loadMessages，未读数
+// 刷新更快时会在 loadMessages 请求还没返回前先触发这里，形成两个并发的 reset 请求，
+// requestVersion 竞态会导致先完成、真正带着新数据的那个请求被当成"过期响应"丢弃。
 watch(unreadCount, (val, oldVal) => {
-  if (pageVisible.value && isLoggedIn.value && val > oldVal)
+  if (pageVisible.value && isLoggedIn.value && val > oldVal && !loading.value)
     loadMessages(true)
 })
 
