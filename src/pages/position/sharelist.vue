@@ -49,8 +49,9 @@ onLoad(async (options) => {
     return
   }
 
-  // 保存 shareId 到本地
-  uni.setStorageSync('shareId', options.shareId)
+  // 保存 shareId 到本地，以逗号拼接方式累积
+  const existing = uni.getStorageSync('shareIds')
+  uni.setStorageSync('shareIds', existing ? `${existing},${options.shareId}` : options.shareId)
 
   // 调用分享列表接口
   await load(options.shareId)
