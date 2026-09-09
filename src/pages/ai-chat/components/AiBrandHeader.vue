@@ -29,11 +29,12 @@ function goHome() {
   <view class="ai-brand-header" :style="headerStyle">
     <view class="header-left">
       <view class="brand-logo" role="button" aria-label="返回首页" @tap="goHome">
-        <view class="brand-mark">
-          <view class="brand-dot brand-dot-left" />
-          <view class="brand-dot brand-dot-right" />
-          <view class="brand-body" />
-        </view>
+        <image
+          class="brand-logo-image"
+          src="https://static1.3sbio.com/assets/lingcai/%E5%9B%BE%E6%A0%87.png"
+          mode="aspectFill"
+          aria-hidden="true"
+        />
       </view>
       <view class="back-button" role="button" aria-label="返回首页" @tap="goHome">
         <view class="i-carbon-chevron-left back-icon" />
@@ -88,50 +89,12 @@ function goHome() {
   justify-content: center;
 }
 
-.brand-mark {
-  position: relative;
-  width: 54rpx;
-  height: 54rpx;
-}
-
-.brand-dot {
-  position: absolute;
-  top: 2rpx;
-  width: 17rpx;
-  height: 17rpx;
+.brand-logo-image {
+  width: 60rpx;
+  height: 60rpx;
+  overflow: hidden;
   border-radius: 50%;
-}
-
-.brand-dot-left {
-  left: 5rpx;
-  background: var(--app-brand-sky);
-}
-
-.brand-dot-right {
-  right: 5rpx;
-  background: var(--app-brand-mint);
-}
-
-.brand-body {
-  position: absolute;
-  right: 5rpx;
-  bottom: 2rpx;
-  left: 5rpx;
-  height: 36rpx;
-  border-radius: 25rpx 25rpx 18rpx 18rpx;
-  background: linear-gradient(135deg, #0879ff 12%, #13b8ed 55%, #4de3ba 100%);
-  transform: rotate(3deg);
-}
-
-.brand-body::after {
-  position: absolute;
-  top: 7rpx;
-  left: 16rpx;
-  width: 15rpx;
-  height: 21rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  content: '';
+  box-shadow: 0 4rpx 14rpx rgba(45, 111, 230, 0.16);
 }
 
 .back-button,

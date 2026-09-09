@@ -30,9 +30,7 @@ onMounted(() => {
   // #ifdef H5
   previouslyFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
   nextTick(() => {
-    const dialog = getDialogElement()
-    const firstInput = dialog?.querySelector<HTMLElement>('input:not([disabled])')
-    ;(firstInput || dialog)?.focus()
+    getDialogElement()?.focus({ preventScroll: true })
   })
   // #endif
 })
@@ -83,7 +81,7 @@ function handleDialogKeydown(event: KeyboardEvent) {
 
   const firstElement = focusableElements[0]
   const lastElement = focusableElements[focusableElements.length - 1]
-  if (event.shiftKey && document.activeElement === firstElement) {
+  if (event.shiftKey && (document.activeElement === firstElement || document.activeElement === dialog)) {
     event.preventDefault()
     lastElement.focus()
   }
@@ -98,7 +96,7 @@ function handleDialogKeydown(event: KeyboardEvent) {
 <template>
   <view
     ref="dialogRef"
-    class="fixed inset-0 z-200 flex items-end justify-center bg-[rgba(9,24,52,0.56)] px-3 backdrop-blur-4rpx pt-safe"
+    class="fixed inset-0 z-[1200] flex items-end justify-center bg-[rgba(9,24,52,0.56)] px-3 backdrop-blur-4rpx pt-safe"
     role="dialog"
     aria-modal="true"
     aria-label="员工内推认证"
@@ -112,18 +110,17 @@ function handleDialogKeydown(event: KeyboardEvent) {
       @tap.stop
       @touchmove.stop
     >
-      <view class="relative overflow-hidden rounded-t-40rpx bg-[linear-gradient(130deg,#e9f2ff_0%,#f0f7ff_52%,#e9fbf5_100%)] px-5 pb-4 pt-4.5">
+      <view class="relative overflow-hidden rounded-t-40rpx bg-[linear-gradient(135deg,#eaf3ff_0%,#f4f8ff_52%,#e5f0ff_100%)] px-5 pb-4 pt-4.5">
         <view class="pointer-events-none absolute h-180rpx w-180rpx rounded-full bg-white/52 -right-48rpx -top-72rpx" />
         <view class="relative z-1 flex items-start">
-          <view class="h-80rpx w-80rpx center flex-none rounded-24rpx shadow-[0_10rpx_24rpx_rgba(45,111,230,0.22)] bg-brand-hero">
+          <view class="h-80rpx w-80rpx center flex-none rounded-24rpx bg-[linear-gradient(135deg,#2f6fe8_0%,#438fea_100%)] shadow-[0_10rpx_24rpx_rgba(45,111,230,0.22)]">
             <view class="i-carbon-share-knowledge text-2xl text-white leading-none" aria-hidden="true" />
           </view>
           <view class="ml-3 min-w-0 flex-1 pt-0.5">
             <view class="flex flex-wrap items-center gap-2">
               <text class="text-xl text-app-ink font-800 leading-tight">员工内推</text>
-              <text class="rounded-full bg-[#daf6eb] px-2 py-0.5 text-3xs text-[#108761] font-700">员工专属</text>
+              <text class="rounded-full bg-[#e3efff] px-2 py-0.5 text-3xs text-brand-blue font-700">员工专属</text>
             </view>
-            <text class="mt-1.5 block text-xs text-app-ink-soft leading-[1.55]">完成员工认证后，内推身份将同步到账号；暂时不方便认证，也可以先浏览在招岗位。</text>
           </view>
           <button
             class="close-button ml-2 h-64rpx w-64rpx center flex-none border-0 rounded-full bg-white/72 p-0 text-lg text-app-muted active:bg-white"
@@ -144,8 +141,8 @@ function handleDialogKeydown(event: KeyboardEvent) {
         />
 
         <button
-          class="skip-button mt-3 h-84rpx w-full flex items-center justify-center border-0 rounded-42rpx bg-[#f3f6fa] p-0 text-sm text-app-ink-soft font-600"
-          :class="busy ? 'opacity-48' : 'active:bg-[#e9eef5]'"
+          class="skip-button mt-3 h-84rpx w-full flex items-center justify-center border-0 rounded-42rpx bg-[#f1f6fd] p-0 text-sm text-[#4b6687] font-600"
+          :class="busy ? 'opacity-48' : 'active:bg-[#e6effa]'"
           :disabled="busy"
           aria-label="暂不认证，直接查看职位"
           @tap="skipCertification"

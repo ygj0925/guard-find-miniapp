@@ -5,9 +5,7 @@ import { computed, ref } from 'vue'
 import { batchDeleteAgentChatSessions, listAgentChatSessions } from '@/api/agent'
 import { safeAreaInsets } from '@/utils/systemInfo'
 import {
-  clearNewConversationRequest,
   markDeletedConversationIds,
-  markNewConversationRequest,
   setActiveHistoryConversation,
 } from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
@@ -181,17 +179,6 @@ function goBack() {
   uni.navigateBack({ complete: () => (isNavigatingBack.value = false) })
 }
 
-function startNewConversationFromHistory() {
-  if (isEditing.value || isDeleting.value || isNavigatingBack.value)
-    return
-  isNavigatingBack.value = true
-  markNewConversationRequest()
-  uni.navigateBack({
-    fail: clearNewConversationRequest,
-    complete: () => (isNavigatingBack.value = false),
-  })
-}
-
 function toggleEditing() {
   if (isDeleting.value)
     return
@@ -338,11 +325,11 @@ onShow(() => {
         <view class="brand-identity">
           <image
             class="brand-logo"
-            src="https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/%E4%B8%89%E7%94%9F%E7%9B%8A%E5%AE%B6logo.png"
-            mode="aspectFit"
+            src="https://static1.3sbio.com/assets/lingcai/%E5%9B%BE%E6%A0%87.png"
+            mode="aspectFill"
             aria-hidden="true"
           />
-          <text class="brand-name">三生益家</text>
+          <text class="brand-name">生生智家</text>
         </view>
       </view>
 
@@ -351,16 +338,6 @@ onShow(() => {
           <view class="i-carbon-arrow-left nav-icon" aria-hidden="true" />
           <text>返回</text>
         </button>
-        <button
-          v-if="!isEditing"
-          class="nav-button new-conversation-button"
-          aria-label="新建对话"
-          @tap="startNewConversationFromHistory"
-        >
-          <view class="i-carbon-add nav-icon" aria-hidden="true" />
-          <text>新建对话</text>
-        </button>
-        <view v-else class="nav-placeholder" aria-hidden="true" />
         <button class="nav-button edit-button" :aria-label="isEditing ? '完成编辑' : '编辑对话'" @tap="toggleEditing">
           {{ isEditing ? '完成' : '编辑' }}
         </button>
@@ -535,6 +512,9 @@ button::after {
   width: 60rpx;
   height: 60rpx;
   flex: 0 0 60rpx;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 4rpx 14rpx rgba(45, 111, 230, 0.16);
 }
 
 .brand-name {
@@ -548,7 +528,7 @@ button::after {
 
 .history-nav {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 14rpx;
   padding: 8rpx 24rpx 0;
@@ -583,36 +563,14 @@ button::after {
 }
 
 .back-button {
-  min-width: 142rpx;
   justify-self: start;
-  padding: 0 22rpx;
+  padding: 0 16rpx;
 }
 
 .edit-button {
-  min-width: 112rpx;
   grid-column: 3;
   justify-self: end;
-  padding: 0 22rpx;
-}
-
-.new-conversation-button,
-.nav-placeholder {
-  min-width: 220rpx;
-  grid-column: 2;
-}
-
-.new-conversation-button {
-  padding: 0 30rpx;
-  border-color: rgba(84, 128, 232, 0.45);
-  background: linear-gradient(110deg, #6d96ff, #4c7ff4);
-  box-shadow: 0 10rpx 24rpx rgba(68, 105, 192, 0.22);
-  color: #fff;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.new-conversation-button:active {
-  background: linear-gradient(110deg, #5f8af4, #406fdf);
+  padding: 0 20rpx;
 }
 
 .search-row {
@@ -957,11 +915,6 @@ button::after {
 @media (max-width: 360px) {
   .brand-name {
     font-size: 31rpx;
-  }
-
-  .new-conversation-button,
-  .nav-placeholder {
-    min-width: 198rpx;
   }
 }
 

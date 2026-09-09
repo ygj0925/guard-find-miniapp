@@ -250,7 +250,7 @@ async function handleSubmit() {
         <text class="text-app-danger font-700">*</text>
         <text class="text-sm text-app-ink font-700">企业邮箱</text>
       </view>
-      <view class="box-border h-92rpx flex items-center border-2rpx rounded-20rpx border-solid bg-white px-3.5 transition-colors" :class="emailError ? 'border-app-danger' : 'border-[#dfe7f2]'">
+      <view class="box-border h-92rpx flex items-center border-2rpx rounded-20rpx border-solid bg-white px-3.5" :class="emailError ? 'border-app-danger' : 'border-[#dfe7f2]'">
         <view class="i-carbon-email mr-2.5 flex-none text-lg text-brand-blue leading-none" aria-hidden="true" />
         <input
           class="h-full min-w-0 flex-1 text-sm text-app-ink"
@@ -271,7 +271,7 @@ async function handleSubmit() {
         <text class="text-app-danger font-700">*</text>
         <text class="text-sm text-app-ink font-700">邮箱验证码</text>
       </view>
-      <view class="box-border h-92rpx flex items-center border-2rpx rounded-20rpx border-solid bg-white pl-3.5 pr-1.5 transition-colors" :class="codeError ? 'border-app-danger' : 'border-[#dfe7f2]'">
+      <view class="box-border h-92rpx flex items-center border-2rpx rounded-20rpx border-solid bg-white pl-3.5 pr-1.5" :class="codeError ? 'border-app-danger' : 'border-[#dfe7f2]'">
         <view class="i-carbon-password mr-2.5 flex-none text-lg text-brand-blue leading-none" aria-hidden="true" />
         <input
           class="h-full min-w-0 flex-1 text-sm text-app-ink"
@@ -311,7 +311,7 @@ async function handleSubmit() {
     </view>
 
     <button
-      class="certification-button mt-6 h-92rpx w-full flex items-center justify-center border-0 rounded-46rpx p-0 text-base text-white font-700 shadow-[0_12rpx_28rpx_rgba(45,111,230,0.24)] bg-brand-hero"
+      class="certification-button mt-6 h-92rpx w-full flex items-center justify-center border-0 rounded-46rpx bg-[linear-gradient(135deg,#2f6fe8_0%,#438fea_100%)] p-0 text-base text-white font-700 shadow-[0_12rpx_28rpx_rgba(45,111,230,0.24)]"
       :class="canSubmit ? 'active:opacity-84' : 'opacity-48'"
       :disabled="!canSubmit"
       :loading="busy"
