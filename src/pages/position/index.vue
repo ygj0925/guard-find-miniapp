@@ -736,6 +736,35 @@ onUnload(() => {
 
       <scroll-view class="box-border min-h-0 w-full flex-1" scroll-y :show-scrollbar="false">
         <view class="px-4 pb-8 pt-5">
+          <view>
+            <view
+              v-for="section in filterSections"
+              :key="section.key"
+              class="mb-7"
+            >
+              <text class="mb-3 block text-sm text-app-ink font-650">{{ section.label }}</text>
+              <view v-if="section.options.length" class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="option in section.options"
+                  :key="option.value"
+                  tabindex="0"
+                  class="m-0 box-border min-h-84rpx min-w-0 flex cursor-pointer items-center justify-center rounded-xl px-2 py-2 text-center text-xs leading-none transition-[transform,background-color,color] duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-98 after:border-0 motion-reduce:transition-none"
+                  :class="selectedFilters[section.key].includes(option.value)
+                    ? 'bg-[#e5f1ff] text-brand-blue font-650 shadow-[inset_0_0_0_2rpx_rgba(47,111,232,0.42)]'
+                    : 'bg-white text-app-ink-soft shadow-[0_6rpx_20rpx_rgba(39,74,125,0.055)]'"
+                  role="checkbox"
+                  :aria-checked="selectedFilters[section.key].includes(option.value)"
+                  :aria-label="option.label"
+                  @keydown="activateButtonWithKeyboard"
+                  @tap="toggleFilter(section.key, option.value)"
+                >
+                  <text class="max-w-full break-words leading-snug">{{ option.label }}</text>
+                </button>
+              </view>
+              <text v-else class="block rounded-xl bg-white px-3 py-4 text-xs text-app-muted">暂无可选条件</text>
+            </view>
+          </view>
+
           <view class="mb-8">
             <view class="mb-3">
               <text class="block text-base text-app-ink font-700">工作地点</text>
@@ -764,35 +793,6 @@ onUnload(() => {
               :model-value="selectedFilters.locIds"
               @update:model-value="updateSelectedLocations"
             />
-          </view>
-
-          <view>
-            <view
-              v-for="section in filterSections"
-              :key="section.key"
-              class="mb-7"
-            >
-              <text class="mb-3 block text-sm text-app-ink font-650">{{ section.label }}</text>
-              <view v-if="section.options.length" class="grid grid-cols-3 gap-2">
-                <button
-                  v-for="option in section.options"
-                  :key="option.value"
-                  tabindex="0"
-                  class="m-0 box-border min-h-84rpx min-w-0 flex cursor-pointer items-center justify-center rounded-xl px-2 py-2 text-center text-xs leading-none transition-[transform,background-color,color] duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-98 after:border-0 motion-reduce:transition-none"
-                  :class="selectedFilters[section.key].includes(option.value)
-                    ? 'bg-[#e5f1ff] text-brand-blue font-650 shadow-[inset_0_0_0_2rpx_rgba(47,111,232,0.42)]'
-                    : 'bg-white text-app-ink-soft shadow-[0_6rpx_20rpx_rgba(39,74,125,0.055)]'"
-                  role="checkbox"
-                  :aria-checked="selectedFilters[section.key].includes(option.value)"
-                  :aria-label="option.label"
-                  @keydown="activateButtonWithKeyboard"
-                  @tap="toggleFilter(section.key, option.value)"
-                >
-                  <text class="max-w-full break-words leading-snug">{{ option.label }}</text>
-                </button>
-              </view>
-              <text v-else class="block rounded-xl bg-white px-3 py-4 text-xs text-app-muted">暂无可选条件</text>
-            </view>
           </view>
         </view>
       </scroll-view>
