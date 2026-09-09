@@ -102,6 +102,19 @@ async function loadMessages(reset = false) {
     pageNum.value = nextPageNum
     loadFailed.value = false
     console.log('[msg-debug] 赋值完成 notifications.length=', notifications.value?.length, 'total=', total.value)
+    // 模板里 toDisplayTime/typeMetaOf 是渲染期调用的，一旦抛错整个 render 会失败、
+    // setData 不生效，界面就会停留在上一次的空状态。这里在 JS 侧预演算一遍定位。
+    try {
+      console.log('[msg-debug] 渲染字段预演算=', JSON.stringify(notifications.value.map(i => ({
+        id: i.id,
+        time: toDisplayTime(i.createTime),
+        label: typeMetaOf(i.type).label,
+        icon: typeMetaOf(i.type).iconClass,
+      }))))
+    }
+    catch (e) {
+      console.error('[msg-debug] !!! 渲染字段计算抛错，这就是列表不显示的原因', e)
+    }
   }
   catch (err) {
     console.error('[msg-debug] !!! loadMessages 请求失败', err)
