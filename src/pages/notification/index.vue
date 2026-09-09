@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
-import { computed, ref } from 'vue'
+import { onHide, onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
+import { computed, ref, watch } from 'vue'
 import { getMiniappMessageDetail, getMiniappMessagePage, readAllMiniappMessages } from '@/api/message'
 import type { MiniappMessage } from '@/api/message'
 import AppPageHeader from '@/components/AppPageHeader.vue'
@@ -72,6 +72,7 @@ let requestVersion = 0
 const isLoggedIn = computed(() => tokenStore.hasLogin)
 const hasMore = computed(() => notifications.value.length < total.value)
 const unreadCount = computed(() => messageStore.unreadCount)
+const pageVisible = ref(false)
 
 async function loadMessages(reset = false) {
   if (!isLoggedIn.value)
@@ -166,11 +167,23 @@ async function handleMarkAllRead() {
 }
 
 onShow(() => {
+  pageVisible.value = true
   tokenStore.updateNowTime()
   if (isLoggedIn.value) {
     messageStore.refreshUnreadCount()
     loadMessages(true)
   }
+})
+
+onHide(() => {
+  pageVisible.value = false
+})
+
+// 停留在本页时收到 WS 推送只会更新未读数，列表不会自动重拉；未读数变多时主动重新拉取，
+// 保证新消息不需要切出再切回才能看到。
+watch(unreadCount, (val, oldVal) => {
+  if (pageVisible.value && isLoggedIn.value && val > oldVal)
+    loadMessages(true)
 })
 
 onPullDownRefresh(async () => {
