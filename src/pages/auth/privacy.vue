@@ -43,7 +43,7 @@ function goBack() {
       <text>
         若您在小程序中注册了账号，您可以通过以下方式与开发者联系，申请注销您在小程序中使用的账号。在受理您的申请后，开发者承诺在十五个工作日内完成核查和处理，并按照法律法规要求处理您的相关信息。
       </text>
-      <text>邮箱：IT-miniapp@3sbio.com</text>
+      <text>邮箱：3sbioHR2@3sbio.com</text>
 
       <text class="mt-1 block text-sm text-app-ink font-700">开发者对信息的存储</text>
       <text>
@@ -79,7 +79,7 @@ function goBack() {
       <text>
         若您认为开发者未遵守本隐私政策的约定，或有其他的投诉建议、或未成年人个人信息保护相关问题，可通过以下方式与开发者联系：
       </text>
-      <text>邮箱：IT-miniapp@3sbio.com</text>
+      <text>邮箱：3sbioHR2@3sbio.com</text>
 
       <text class="mt-1 block text-sm text-app-ink font-700">本隐私政策的更新</text>
       <text>
