@@ -9,6 +9,8 @@ export interface PhoneLoginForm {
   captcha: string
   /** wx.login() 返回的临时凭证，用于关联微信身份。 */
   wxLoginCode?: string
+  /** 分享岗位的分享id */
+  shareIds: string[]
 }
 
 export interface BehaviorCaptcha {

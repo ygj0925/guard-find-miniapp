@@ -164,10 +164,12 @@ async function performPhoneLogin() {
       phone: form.phone,
       captcha: form.code,
       wxLoginCode,
+      shareIds: (uni.getStorageSync('shareIds') || '').split(',').filter(Boolean),
     })
     const committed = await tokenStore.completeExternalLogin(token, attemptId)
     if (!committed)
       return
+    uni.removeStorageSync('shareIds')
     if (activeLoginAttemptId === attemptId)
       activeLoginAttemptId = null
     navigateAfterAuthenticated(redirectUrl.value)
