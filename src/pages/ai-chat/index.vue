@@ -81,6 +81,8 @@ const recommendMessagesFailed = ref(false)
 
 const hasStarted = ref(false)
 const inputValue = ref('')
+const voiceMode = ref(false)
+const voicePermissionPending = ref(false)
 const currentConversation = ref<AiChatConversation | null>(null)
 const isReplying = ref(false)
 const isRestoringHistory = ref(false)
@@ -124,9 +126,13 @@ let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
 const speech = useSpeechRecognition({
   onResult(text) {
     inputValue.value = text
+    voiceMode.value = false
   },
   onError(message) {
     uni.showToast({ title: message, icon: 'none' })
+  },
+  onPermissionRequired() {
+    voiceMode.value = false
   },
 })
 
@@ -1145,8 +1151,71 @@ function toggleReasoning(messageId: string) {
     : [...expandedReasoningIds.value, messageId]
 }
 
-function handleRecordStart() {
-  speech.start()
+function confirmMicrophoneSettings() {
+  return new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '开启麦克风权限',
+      content: '语音输入需要使用麦克风。请在设置中开启“录音”权限，开启后即可按住说话。',
+      confirmText: '去设置',
+      cancelText: '暂不使用',
+      success: result => resolve(result.confirm),
+      fail: () => resolve(false),
+    })
+  })
+}
+
+async function handleVoiceModeRequest(enabled: boolean) {
+  if (!enabled) {
+    voiceMode.value = false
+    return
+  }
+  if (voicePermissionPending.value || isReplying.value || isRestoringHistory.value)
+    return
+
+  voiceMode.value = false
+  voicePermissionPending.value = true
+  try {
+    let permissionResult = await speech.requestPermission()
+    if (permissionResult === 'granted') {
+      voiceMode.value = true
+      return
+    }
+
+    if (permissionResult === 'denied') {
+      const shouldOpenSettings = await confirmMicrophoneSettings()
+      if (!shouldOpenSettings)
+        return
+
+      permissionResult = await speech.openPermissionSettings()
+      if (permissionResult === 'granted') {
+        voiceMode.value = true
+        return
+      }
+      if (permissionResult === 'denied') {
+        uni.showToast({ title: '未开启麦克风权限，已保留文字输入', icon: 'none' })
+        return
+      }
+    }
+
+    uni.showToast({
+      title: permissionResult === 'unsupported'
+        ? '当前环境暂不支持语音输入'
+        : '暂时无法检查麦克风权限，请稍后重试',
+      icon: 'none',
+    })
+  }
+  finally {
+    voicePermissionPending.value = false
+  }
+}
+
+async function handleRecordStart() {
+  const startResult = await speech.start()
+  if (startResult !== 'permission-required')
+    return
+
+  voiceMode.value = false
+  uni.showToast({ title: '麦克风权限已关闭，请重新点击语音图标', icon: 'none' })
 }
 
 function handleRecordStop() {
@@ -1405,8 +1474,11 @@ onUnmounted(() => {
           :chat-mode="Boolean(currentConversation)"
           :speech-state="speechState"
           :speech-state-text="speechStateText"
+          :voice-mode="voiceMode"
+          :voice-permission-pending="voicePermissionPending"
           @send="sendMessage()"
           @stop="cancelReply"
+          @voice-mode-request="handleVoiceModeRequest"
           @record-start="handleRecordStart"
           @record-stop="handleRecordStop"
           @record-cancel="handleRecordCancel"

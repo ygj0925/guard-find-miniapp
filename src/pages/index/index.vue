@@ -12,7 +12,7 @@ import { useTokenStore } from '@/store/token'
 import { normalizeTrustedBannerUrl } from '@/utils/bannerTarget'
 import { clearInternalReferralIntent, consumeInternalReferralIntent, saveInternalReferralIntent } from '@/utils/internalReferralIntent'
 import { formatPositionSalary } from '@/utils/positionSalary'
-import { toLoginPage } from '@/utils/toLoginPage'
+import { navigateToLoginPage } from '@/utils/toLoginPage'
 import InternalReferralModal from './components/InternalReferralModal.vue'
 
 defineOptions({
@@ -110,12 +110,16 @@ const headerScrolled = ref(false)
 const bannerIndex = ref(0)
 const entryPageIndex = ref(0)
 const showInternalReferralModal = ref(false)
+const internalReferralOpening = ref(false)
 
 const positionStore = usePositionStore()
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
-const internalReferralEmail = computed(() => userInfo.value.email?.trim() || '')
+const internalReferralEmail = computed(() => {
+  const email = userInfo.value?.email
+  return typeof email === 'string' ? email.trim() : ''
+})
 
 const banners = computed<HomeBanner[]>(() => {
   const normalizedBanners = remoteBanners.value
@@ -170,34 +174,75 @@ function openBanner(banner: HomeBanner) {
   })
 }
 
+function showInternalReferralError(title: string) {
+  uni.showToast({ title, icon: 'none' })
+}
+
 function openPositionList() {
   positionStore.setPendingCategory('')
-  uni.switchTab({ url: '/pages/position/index' })
-}
+  uni.showLoading({ title: '正在打开职位', mask: true })
 
-function openAuthenticatedInternalReferral() {
-  clearInternalReferralIntent()
-  if (userInfo.value.isInternalEmployee === true) {
-    openPositionList()
-    return
-  }
-  showInternalReferralModal.value = true
-}
-
-function handleInternalReferralEntry() {
-  if (!tokenStore.updateNowTime().hasLogin) {
-    if (!saveInternalReferralIntent()) {
-      uni.showToast({
-        title: '登录后请再次点击内部推荐',
-        icon: 'none',
-      })
-    }
-    toLoginPage({
-      queryString: `?redirect=${encodeURIComponent('/pages/index/index')}`,
+  return new Promise<boolean>((resolve) => {
+    uni.switchTab({
+      url: '/pages/position/index',
+      success: () => {
+        uni.hideLoading()
+        resolve(true)
+      },
+      fail: () => {
+        uni.hideLoading()
+        showInternalReferralError('职位页面打开失败，请重试')
+        resolve(false)
+      },
     })
-    return
+  })
+}
+
+async function openAuthenticatedInternalReferral() {
+  try {
+    if (userInfo.value?.isInternalEmployee === true) {
+      if (await openPositionList())
+        clearInternalReferralIntent()
+      return
+    }
+
+    showInternalReferralModal.value = true
+    clearInternalReferralIntent()
   }
-  openAuthenticatedInternalReferral()
+  catch {
+    showInternalReferralError('暂时无法打开内部推荐，请重试')
+  }
+}
+
+async function handleInternalReferralEntry() {
+  if (internalReferralOpening.value)
+    return
+
+  internalReferralOpening.value = true
+  try {
+    if (!tokenStore.updateNowTime().hasLogin) {
+      const intentSaved = saveInternalReferralIntent()
+      const navigation = await navigateToLoginPage({
+        queryString: `?redirect=${encodeURIComponent('/pages/index/index')}`,
+      })
+
+      if (navigation.status === 'failed') {
+        showInternalReferralError('登录页打开失败，请重试')
+        return
+      }
+      if (!intentSaved)
+        showInternalReferralError('登录后请再次点击内部推荐')
+      return
+    }
+
+    await openAuthenticatedInternalReferral()
+  }
+  catch {
+    showInternalReferralError('暂时无法打开内部推荐，请重试')
+  }
+  finally {
+    internalReferralOpening.value = false
+  }
 }
 
 function closeInternalReferralModal() {
@@ -205,15 +250,17 @@ function closeInternalReferralModal() {
   clearInternalReferralIntent()
 }
 
-function continueToPositionList() {
+async function continueToPositionList() {
+  if (!await openPositionList())
+    return
+
   showInternalReferralModal.value = false
   clearInternalReferralIntent()
-  openPositionList()
 }
 
 function openEntry(entry: QuickEntry) {
   if (entry.action === 'internalReferral') {
-    handleInternalReferralEntry()
+    void handleInternalReferralEntry()
     return
   }
   if (entry.category)
@@ -299,7 +346,7 @@ onShow(() => {
     return
   }
   if (consumeInternalReferralIntent())
-    openAuthenticatedInternalReferral()
+    void openAuthenticatedInternalReferral()
 })
 
 onPageScroll(({ scrollTop }) => {

@@ -335,11 +335,15 @@ onShow(() => {
 
       <view class="history-nav">
         <button class="nav-button back-button" aria-label="返回 AI 对话" @tap="goBack">
-          <view class="i-carbon-arrow-left nav-icon" aria-hidden="true" />
-          <text>返回</text>
+          <view class="nav-button-pill">
+            <view class="i-carbon-arrow-left nav-icon" aria-hidden="true" />
+            <text>返回</text>
+          </view>
         </button>
         <button class="nav-button edit-button" :aria-label="isEditing ? '完成编辑' : '编辑对话'" @tap="toggleEditing">
-          {{ isEditing ? '完成' : '编辑' }}
+          <view class="nav-button-pill">
+            <text>{{ isEditing ? '完成' : '编辑' }}</text>
+          </view>
         </button>
       </view>
 
@@ -536,25 +540,43 @@ button::after {
 
 .nav-button {
   box-sizing: border-box;
+  min-width: 44px;
   height: 88rpx;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #2d374a;
+  font-size: 27rpx;
+  transition: opacity 0.15s ease;
+}
+
+.nav-button-pill {
+  box-sizing: border-box;
+  height: 56rpx;
+  min-height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  border: 1rpx solid rgba(113, 145, 211, 0.18);
-  border-radius: 44rpx;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 6rpx 18rpx rgba(61, 89, 148, 0.09);
-  color: #2d374a;
-  font-size: 27rpx;
-  transition:
-    background-color 0.15s ease,
-    opacity 0.15s ease;
+  border: 1rpx solid rgba(113, 145, 211, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  font-weight: 500;
+  transition: background-color 0.15s ease;
 }
 
 .nav-button:active {
-  background: #eef4ff;
   opacity: 0.78;
+}
+
+.nav-button:active .nav-button-pill {
+  background: #eef4ff;
 }
 
 .nav-icon {
@@ -564,12 +586,18 @@ button::after {
 
 .back-button {
   justify-self: start;
-  padding: 0 16rpx;
 }
 
 .edit-button {
   grid-column: 3;
   justify-self: end;
+}
+
+.back-button .nav-button-pill {
+  padding: 0 16rpx;
+}
+
+.edit-button .nav-button-pill {
   padding: 0 20rpx;
 }
 
