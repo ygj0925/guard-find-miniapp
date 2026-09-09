@@ -125,6 +125,17 @@ async function loadMessages(reset = false) {
         console.log('[msg-debug] 页面栈深度=', pages.length, '路由=', pages.map((p: any) => p?.route).join(','))
         console.log('[msg-debug] 视图层数据 j=', cur?.data?.j, 'k=', cur?.data?.k, 'n.length=', cur?.data?.n?.length, 'd=', cur?.data?.d)
         console.log('[msg-debug] 视图层 keys=', cur?.data ? Object.keys(cur.data).join(',') : '(取不到 data)')
+        // k=true 说明列表分支该渲染，这里查真实节点树：节点在不在、尺寸位置是多少，
+        // 用来区分"节点没渲染出来"和"渲染了但看不见（高度 0 / 被挤出屏幕 / 被遮挡）"。
+        uni.createSelectorQuery().selectAll('.message-list-card').boundingClientRect((r) => {
+          console.log('[msg-debug] 节点 .message-list-card =', JSON.stringify(r))
+        }).exec()
+        uni.createSelectorQuery().selectAll('.message-row').boundingClientRect((r) => {
+          console.log('[msg-debug] 节点 .message-row 数量=', Array.isArray(r) ? r.length : r, JSON.stringify(r))
+        }).exec()
+        uni.createSelectorQuery().selectAll('.empty-card').boundingClientRect((r) => {
+          console.log('[msg-debug] 节点 .empty-card =', JSON.stringify(r))
+        }).exec()
       }
       catch (e) {
         console.error('[msg-debug] 读取视图层数据失败', e)
