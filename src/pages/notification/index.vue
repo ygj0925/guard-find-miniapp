@@ -88,16 +88,23 @@ async function loadMessages(reset = false) {
   }
   loading.value = true
   const nextPageNum = reset ? 1 : pageNum.value + 1
+  console.log('[msg-debug] loadMessages 开始 reset=', reset, 'version=', version, 'requestVersion=', requestVersion, 'page=', nextPageNum)
   try {
     const page = await getMiniappMessagePage({ page: nextPageNum, size: PAGE_SIZE })
-    if (version !== requestVersion)
+    console.log('[msg-debug] 响应到手 raw=', JSON.stringify(page))
+    console.log('[msg-debug] 响应解析 isArray=', Array.isArray((page as any)?.list), 'list.length=', (page as any)?.list?.length, 'total=', (page as any)?.total)
+    if (version !== requestVersion) {
+      console.warn('[msg-debug] !!! 响应被当成过期丢弃 version=', version, 'requestVersion=', requestVersion)
       return
+    }
     notifications.value = reset ? page.list : [...notifications.value, ...page.list]
     total.value = page.total
     pageNum.value = nextPageNum
     loadFailed.value = false
+    console.log('[msg-debug] 赋值完成 notifications.length=', notifications.value?.length, 'total=', total.value)
   }
-  catch {
+  catch (err) {
+    console.error('[msg-debug] !!! loadMessages 请求失败', err)
     if (reset && version === requestVersion)
       loadFailed.value = true
   }
@@ -170,10 +177,16 @@ async function handleMarkAllRead() {
 onShow(() => {
   pageVisible.value = true
   tokenStore.updateNowTime()
+  console.log('[msg-debug] onShow 触发 isLoggedIn=', isLoggedIn.value, 'unreadCount=', unreadCount.value, 'notifications.length=', notifications.value?.length)
   if (isLoggedIn.value) {
     messageStore.refreshUnreadCount()
     loadMessages(true)
   }
+})
+
+// 监控赋值之后 notifications 是否被别的逻辑清空（渲染看到空列表的另一种可能）
+watch(notifications, (val) => {
+  console.log('[msg-debug] notifications 变化 length=', val?.length, 'loading=', loading.value, 'loadFailed=', loadFailed.value)
 })
 
 onHide(() => {
