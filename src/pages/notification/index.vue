@@ -44,7 +44,8 @@ function typeMetaOf(type: number): TypeMeta {
 function toDisplayTime(dateStr: string) {
   if (!dateStr)
     return ''
-  const d = new Date(dateStr)
+  // iOS 的 Date 构造函数不支持 "yyyy-MM-dd HH:mm:ss"（空格分隔），要转成 "yyyy-MM-ddTHH:mm:ss"
+  const d = new Date(dateStr.replace(' ', 'T'))
   if (Number.isNaN(d.getTime()))
     return ''
   const now = new Date()
