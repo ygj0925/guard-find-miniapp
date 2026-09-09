@@ -2,7 +2,7 @@
 import { onHide, onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import { computed, ref, watch } from 'vue'
 import { getMiniappMessageDetail, getMiniappMessagePage, readAllMiniappMessages } from '@/api/message'
-import type { MiniappMessage } from '@/api/message'
+import type { ApplyProgressData, MiniappMessage, OfferConfirmData, PreOnboardData } from '@/api/message'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { useMessageStore } from '@/store/message'
 import { useTokenStore } from '@/store/token'
@@ -39,6 +39,36 @@ const DEFAULT_TYPE_META: TypeMeta = { iconClass: 'i-carbon-notification', surfac
 
 function typeMetaOf(type: number): TypeMeta {
   return typeMetaMap[type] ?? DEFAULT_TYPE_META
+}
+
+/**
+ * 列表项副标题：按业务类型渲染真实业务信息，让用户不点进去也能看到关键内容。
+ *
+ * 未知 bizType（后端新增了小程序还不认识的类型）或历史纯文本消息，回退显示类型描述，
+ * 保证卡片不会出现空白行。
+ */
+function summaryOf(message: MiniappMessage): string {
+  switch (message.bizType) {
+    case 'APPLY_PROGRESS': {
+      const data = message.data as ApplyProgressData
+      return `${data.positionName} · ${data.phaseName}`
+    }
+    case 'OFFER_CONFIRM': {
+      const data = message.data as OfferConfirmData
+      return `${data.positionName} · ${data.deadline} 前确认`
+    }
+    case 'PRE_ONBOARD': {
+      const data = message.data as PreOnboardData
+      return `${data.positionName} · ${data.onboardDate} 报到`
+    }
+    default:
+      return typeMetaOf(message.type).label
+  }
+}
+
+/** 投递进度卡片专有的第二行：当前状态；其它类型返回空串不渲染该行。 */
+function applyStatusOf(message: MiniappMessage): string {
+  return message.bizType === 'APPLY_PROGRESS' ? (message.data as ApplyProgressData).statusName : ''
 }
 
 function toDisplayTime(dateStr: string) {
@@ -310,8 +340,11 @@ onReachBottom(() => {
                 </view>
                 <text class="flex-none text-2xs text-app-muted">{{ toDisplayTime(notification.createTime) }}</text>
               </view>
-              <text class="mt-1 block text-xs text-app-ink-soft font-500 leading-[1.45]">
-                {{ typeMetaOf(notification.type).label }}
+              <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-ink-soft font-500 leading-[1.45]">
+                {{ summaryOf(notification) }}
+              </text>
+              <text v-if="applyStatusOf(notification)" class="mt-0.5 block text-2xs text-app-muted leading-[1.45]">
+                当前状态：{{ applyStatusOf(notification) }}
               </text>
             </view>
           </view>

@@ -13,10 +13,30 @@ const RECONNECT_BASE_DELAY_MS = 3000
 const RECONNECT_MAX_DELAY_MS = 30000
 
 /**
+ * 从 WebSocket 推送帧里取未读数。
+ *
+ * 拿不到时返回 null，调用方回退为主动查询未读数接口——覆盖三种情况：帧不是合法 JSON、
+ * 后端因群发而未下发 unreadCount、以及将来推送帧格式演进导致字段缺失。保留这条回退路径，
+ * 红点才不会因为一次格式变化就失效。
+ */
+function parseUnreadCount(raw: unknown): number | null {
+  if (typeof raw !== 'string')
+    return null
+  try {
+    const count = (JSON.parse(raw) as { unreadCount?: unknown })?.unreadCount
+    return typeof count === 'number' && Number.isFinite(count) ? count : null
+  }
+  catch {
+    return null
+  }
+}
+
+/**
  * 小程序站内消息未读数与 WebSocket 接入。
  *
- * 复用现有 `/websocket?token=xxx` 端点；推送载荷只当作"有变化"的信号，收到后重新查未读数取真值，
- * 不解析载荷内容（与管理端 use-message-count.ts 语义保持一致）。断线或连接失败时回退定时轮询。
+ * 复用现有 `/websocket?token=xxx` 端点；推送帧只承载"有变化"信号与未读数，不带消息体——消息体走
+ * HTTP 列表接口，避免客户端处理丢帧后列表缺条、与列表去重、多端已读同步这三类问题。帧里带上
+ * unreadCount 可直接更新红点，取不到时回退为主动查询。断线或连接失败时回退定时轮询。
  */
 export const useMessageStore = defineStore('message', () => {
   const unreadCount = ref(0)
@@ -113,9 +133,16 @@ export const useMessageStore = defineStore('message', () => {
       stopPolling()
     })
 
-    task.onMessage(() => {
-      // 只当作"有变化"信号，不解析内容
-      refreshUnreadCount()
+    task.onMessage((res) => {
+      // 推送帧形如 {"event":"MESSAGE_CREATED","unreadCount":3}，带未读数时直接更新红点，
+      // 省掉一次回查请求；群发/全员广播时各人未读数不同，后端不下发该字段，此时回退到主动回查。
+      const pushed = parseUnreadCount(res?.data)
+      if (pushed === null) {
+        refreshUnreadCount()
+        return
+      }
+      unreadCount.value = pushed
+      syncBadge()
     })
 
     task.onError(() => {

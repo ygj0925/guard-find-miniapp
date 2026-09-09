@@ -169,9 +169,10 @@ export function getEnvBaseUrl() {
 
 /**
  * 站内消息 WebSocket 地址：显式配置 VITE_SERVER_WS_URL 时优先使用（可按渠道单独部署），
- * 否则从当前生效的 baseUrl 推导（同一域名、协议换成 ws/wss、丢弃接口前缀），
+ * 否则从当前生效的 baseUrl 推导（只把 http/https 换成 ws/wss，其余原样保留），
  * 保证跟随 getEnvBaseUrl() 的渠道判断结果，不会体验版/正式版连到开发环境。
- * 后端端点不挂在接口前缀下（如 /sss-recruitment），因此只取协议+host。
+ * 后端 WS 端点由 Spring WebSocketConfigurer 注册在 /websocket，走 servlet context，
+ * 因此必须保留 baseUrl 里的 context-path（如 /sss-recruitment），不能只取协议+host。
  */
 export function getEnvWsUrl() {
   const configured = import.meta.env.VITE_SERVER_WS_URL
@@ -179,12 +180,10 @@ export function getEnvWsUrl() {
     return configured
 
   const baseUrl = getEnvBaseUrl()
-  const match = /^(https?):\/\/([^/]+)/i.exec(baseUrl)
-  if (!match)
+  if (!/^https?:\/\//i.test(baseUrl))
     return ''
 
-  const wsProtocol = match[1].toLowerCase() === 'https' ? 'wss' : 'ws'
-  return `${wsProtocol}://${match[2]}`
+  return baseUrl.replace(/^http(s?):\/\//i, (_, s) => `ws${s ? 's' : ''}://`).replace(/\/+$/, '')
 }
 
 /**
