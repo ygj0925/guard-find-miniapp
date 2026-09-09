@@ -1,3 +1,4 @@
+import type { MiniappMessageBizType, MiniappMessageData } from '@/api/message'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getMiniappMessageUnreadCount } from '@/api/message'
@@ -12,19 +13,40 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000
 const RECONNECT_BASE_DELAY_MS = 3000
 const RECONNECT_MAX_DELAY_MS = 30000
 
+/** 推送事件名，对应后端 MessageServiceImpl 的常量。 */
+type MessagePushEvent = 'MESSAGE_CREATED' | 'UNREAD_CHANGED'
+
+/** 随推送帧下发的新消息体，字段够渲染弹窗与点击跳转。 */
+export interface PushedMessage {
+  id: string
+  title: string
+  path?: string
+  /** 业务类型，后台纯文本消息（如系统公告）没有此字段，不应弹窗给候选人 */
+  bizType?: MiniappMessageBizType
+  data?: MiniappMessageData
+}
+
+/** WebSocket 推送帧。 */
+interface MessagePushFrame {
+  event?: MessagePushEvent
+  /** 收件人未读数；群发/全员广播时各人不同，后端不下发，此时需主动回查 */
+  unreadCount?: number | null
+  /** 新消息体，仅 MESSAGE_CREATED 事件带 */
+  message?: PushedMessage
+}
+
 /**
- * 从 WebSocket 推送帧里取未读数。
+ * 解析 WebSocket 推送帧。
  *
- * 拿不到时返回 null，调用方回退为主动查询未读数接口——覆盖三种情况：帧不是合法 JSON、
- * 后端因群发而未下发 unreadCount、以及将来推送帧格式演进导致字段缺失。保留这条回退路径，
- * 红点才不会因为一次格式变化就失效。
+ * 解析失败返回 null，调用方回退为主动查询未读数——覆盖帧不是合法 JSON、以及将来帧格式演进的情况。
+ * 保留这条回退路径，红点才不会因为一次格式变化就失效。
  */
-function parseUnreadCount(raw: unknown): number | null {
+function parsePushFrame(raw: unknown): MessagePushFrame | null {
   if (typeof raw !== 'string')
     return null
   try {
-    const count = (JSON.parse(raw) as { unreadCount?: unknown })?.unreadCount
-    return typeof count === 'number' && Number.isFinite(count) ? count : null
+    const frame = JSON.parse(raw) as MessagePushFrame
+    return frame && typeof frame === 'object' ? frame : null
   }
   catch {
     return null
@@ -34,12 +56,21 @@ function parseUnreadCount(raw: unknown): number | null {
 /**
  * 小程序站内消息未读数与 WebSocket 接入。
  *
- * 复用现有 `/websocket?token=xxx` 端点；推送帧只承载"有变化"信号与未读数，不带消息体——消息体走
- * HTTP 列表接口，避免客户端处理丢帧后列表缺条、与列表去重、多端已读同步这三类问题。帧里带上
- * unreadCount 可直接更新红点，取不到时回退为主动查询。断线或连接失败时回退定时轮询。
+ * 复用现有 `/websocket?token=xxx` 端点。推送帧带未读数与新消息体：未读数用于直接更新红点，
+ * 消息体用于在任意页面弹窗提示（见 latestMessage）。消息体只服务于这种一次性提示，丢帧最多是
+ * 这次没弹窗，消息列表始终以 HTTP 接口为准，因此不需要处理丢帧补偿与列表去重。
+ * 断线或连接失败时回退定时轮询。
  */
 export const useMessageStore = defineStore('message', () => {
   const unreadCount = ref(0)
+  /**
+   * 最近一条通过 WS 推送到达的新消息，供任意页面弹窗提示。
+   *
+   * 只是"最近一条"的瞬时值，不是消息列表——列表始终以 HTTP 接口为准。因此丢帧最多是这次没弹窗，
+   * 不会造成列表缺条。消费方（如全局弹窗组件）watch 到变化后应调用 consumeLatestMessage() 清空，
+   * 避免页面切换重新挂载时又弹一次旧消息。
+   */
+  const latestMessage = ref<PushedMessage | null>(null)
 
   let socketTask: UniApp.SocketTask | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -134,15 +165,20 @@ export const useMessageStore = defineStore('message', () => {
     })
 
     task.onMessage((res) => {
-      // 推送帧形如 {"event":"MESSAGE_CREATED","unreadCount":3}，带未读数时直接更新红点，
-      // 省掉一次回查请求；群发/全员广播时各人未读数不同，后端不下发该字段，此时回退到主动回查。
-      const pushed = parseUnreadCount(res?.data)
-      if (pushed === null) {
+      const frame = parsePushFrame(res?.data)
+      // 帧解析不出或后端没带未读数（群发时各人不同），回退主动回查
+      if (!frame || typeof frame.unreadCount !== 'number' || !Number.isFinite(frame.unreadCount)) {
         refreshUnreadCount()
-        return
       }
-      unreadCount.value = pushed
-      syncBadge()
+      else {
+        unreadCount.value = frame.unreadCount
+        syncBadge()
+      }
+
+      // 只有带业务类型的新消息才对外抛出：后台公告解析不出 bizType，不该弹给候选人
+      if (frame?.event === 'MESSAGE_CREATED' && frame.message?.bizType) {
+        latestMessage.value = frame.message
+      }
     })
 
     task.onError(() => {
@@ -174,12 +210,18 @@ export const useMessageStore = defineStore('message', () => {
     closeSocket()
   }
 
-  /** 登出时调用：停止连接并清空红点，避免残留上一个用户的未读数。 */
+  /** 登出时调用：停止连接并清空红点与待弹窗消息，避免残留上一个用户的数据。 */
   function reset() {
     stop()
     unreadCount.value = 0
+    latestMessage.value = null
     syncBadge()
   }
 
-  return { unreadCount, refreshUnreadCount, start, stop, reset }
+  /** 弹窗展示后调用，清空待弹窗消息，避免页面切换重新挂载时又弹一次旧消息。 */
+  function consumeLatestMessage() {
+    latestMessage.value = null
+  }
+
+  return { unreadCount, latestMessage, refreshUnreadCount, consumeLatestMessage, start, stop, reset }
 })
