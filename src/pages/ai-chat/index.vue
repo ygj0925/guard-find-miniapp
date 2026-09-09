@@ -1318,7 +1318,7 @@ onUnmounted(() => {
           <view class="start-arrow-icon" />
         </view>
       </view>
-      <text class="ai-disclaimer">内容由 AI 生成</text>
+      <text class="ai-disclaimer" role="note">内容由人工智能生成，仅供参考</text>
     </view>
 
     <template v-else>
@@ -1449,6 +1449,7 @@ onUnmounted(() => {
 
               <text v-if="message.status === 'stopped'" class="message-state">回复已停止</text>
               <text v-else-if="message.status === 'error'" class="message-state error">回复失败，可重新发送问题</text>
+              <text v-if="message.role === 'assistant' && message.status === 'complete'" class="ai-generated-note" role="note">内容由人工智能生成，仅供参考</text>
             </view>
           </view>
         </template>
@@ -1888,6 +1889,15 @@ onUnmounted(() => {
   margin-bottom: 12rpx;
   color: var(--app-muted);
   font-size: 23rpx;
+}
+
+.ai-generated-note {
+  display: block;
+  margin-top: 18rpx;
+  color: var(--app-muted);
+  font-size: 20rpx;
+  line-height: 1.4;
+  text-align: center;
 }
 
 .message-bubble {
