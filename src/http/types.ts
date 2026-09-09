@@ -5,6 +5,8 @@ export type CustomRequestOptions = UniApp.RequestOptions & {
   query?: Record<string, any>
   /** 出错时是否隐藏错误提示 */
   hideErrorToast?: boolean
+  /** 匿名请求：不携带访问令牌，401 不处理全局登录态 */
+  skipAuth?: boolean
 } & IUniUploadFileOptions // 添加uni.uploadFile参数类型
 
 /** 主要提供给 openapi-ts-request 生成的代码使用 */

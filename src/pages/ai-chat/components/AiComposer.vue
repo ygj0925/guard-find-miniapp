@@ -16,18 +16,23 @@ const props = withDefaults(defineProps<{
   chatMode?: boolean
   speechState?: SpeechRecognitionState
   speechStateText?: string
+  voiceMode?: boolean
+  voicePermissionPending?: boolean
 }>(), {
   disabled: false,
   replying: false,
   chatMode: false,
   speechState: 'idle',
   speechStateText: '',
+  voiceMode: false,
+  voicePermissionPending: false,
 })
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   'send': []
   'stop': []
+  'voice-mode-request': [enabled: boolean]
   'record-start': []
   'record-stop': []
   'record-cancel': []
@@ -36,12 +41,11 @@ const emit = defineEmits<{
 const isFocused = ref(false)
 const inputFocused = ref(false)
 const recordingGestureActive = ref(false)
-const voiceMode = ref(false)
 const speechActive = computed(() => props.speechState !== 'idle')
 
 watch(
-  [() => props.speechState, () => props.modelValue],
-  ([state, value], [previousState, previousValue]) => {
+  () => props.speechState,
+  (state, previousState) => {
     if (state !== 'idle') {
       inputFocused.value = false
       isFocused.value = false
@@ -49,12 +53,8 @@ watch(
       return
     }
 
-    if (previousState !== 'idle') {
+    if (previousState !== 'idle')
       recordingGestureActive.value = false
-      if (value !== previousValue) {
-        voiceMode.value = false
-      }
-    }
   },
 )
 
@@ -63,7 +63,7 @@ function updateValue(event: ComposerInputEvent) {
 }
 
 function send() {
-  if (!props.disabled && !voiceMode.value && props.modelValue.trim() && props.speechState === 'idle') {
+  if (!props.disabled && !props.voiceMode && props.modelValue.trim() && props.speechState === 'idle') {
     emit('send')
   }
 }
@@ -73,18 +73,18 @@ function stop() {
 }
 
 function toggleVoiceMode() {
-  if (props.disabled || props.speechState !== 'idle') {
+  if (props.disabled || props.speechState !== 'idle' || props.voicePermissionPending) {
     return
   }
 
-  voiceMode.value = !voiceMode.value
   inputFocused.value = false
   isFocused.value = false
   uni.hideKeyboard()
+  emit('voice-mode-request', !props.voiceMode)
 }
 
 function handleFocus() {
-  if (voiceMode.value || speechActive.value) {
+  if (props.voiceMode || speechActive.value) {
     inputFocused.value = false
     uni.hideKeyboard()
     return
@@ -100,7 +100,7 @@ function handleBlur() {
 }
 
 function beginRecording() {
-  if (!voiceMode.value || props.disabled || props.speechState !== 'idle') {
+  if (!props.voiceMode || props.disabled || props.speechState !== 'idle') {
     return
   }
 
@@ -148,16 +148,23 @@ function showVoiceTip() {
       'recognizing': speechState === 'recognizing',
     }"
   >
+    <!-- #ifdef MP-WEIXIN -->
     <view
       class="icon-button voice-button"
-      :class="{ active: voiceMode }"
+      :class="{ active: voiceMode, pending: voicePermissionPending }"
+      role="button"
+      :aria-label="voiceMode ? '切换为文字输入' : '切换为语音输入'"
+      :aria-disabled="voicePermissionPending"
       @tap.stop="toggleVoiceMode"
     >
+      <view v-if="voicePermissionPending" class="voice-permission-spinner" aria-hidden="true" />
       <view
+        v-else
         class="composer-icon voice-icon"
         :class="voiceMode ? 'i-carbon-keyboard' : 'i-carbon-microphone'"
       />
     </view>
+    <!-- #endif -->
 
     <view class="input-area">
       <view
@@ -341,6 +348,20 @@ function showVoiceTip() {
 .voice-button {
   position: relative;
   background: #eef4ff;
+}
+
+.voice-button.pending {
+  background: #f5f8ff;
+}
+
+.voice-permission-spinner {
+  box-sizing: border-box;
+  width: 30rpx;
+  height: 30rpx;
+  border: 4rpx solid rgba(75, 127, 227, 0.18);
+  border-top-color: #4b7fe3;
+  border-radius: 50%;
+  animation: recognizing-spin 0.8s linear infinite;
 }
 
 .voice-button.active {

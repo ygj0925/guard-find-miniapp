@@ -9,6 +9,23 @@ export interface PhoneLoginForm {
   captcha: string
   /** wx.login() 返回的临时凭证，用于关联微信身份。 */
   wxLoginCode?: string
+  /** 分享岗位的分享id */
+  shareIds: string[]
+}
+
+export type SocialLoginSource = 'WECHAT_OPEN'
+
+export interface SocialAuthorizeResult {
+  authorizeUrl: string
+}
+
+export interface SocialLoginForm {
+  /** 后端 sys_client.client_id，不是微信 AppID。 */
+  clientId: string
+  authType: 'SOCIAL'
+  source: SocialLoginSource
+  code: string
+  state: string
 }
 
 export interface BehaviorCaptcha {
@@ -59,10 +76,21 @@ export interface IUserInfoRes {
   username: string
   nickname: string
   avatar?: string
+  /** 是否已完成内部员工认证。 */
+  isInternalEmployee?: boolean
+  /** 已认证或待认证的企业邮箱。 */
+  email?: string
+  /** 员工所属部门名称。 */
+  deptName?: string
   /** 同时支持单角色和多角色，你自行选择一种就行 */
   role?: UserRole
   roles?: UserRole[]
   [key: string]: any // 允许其他扩展字段
+}
+
+export interface InternalEmployeeVerifyRequest {
+  email: string
+  captcha: string
 }
 
 // 认证存储数据结构

@@ -1,6 +1,10 @@
 import { computed, ref } from 'vue'
 
 export type SpeechRecognitionState = 'idle' | 'recording' | 'recognizing'
+export type MicrophonePermissionResult = 'granted' | 'denied' | 'failed' | 'unsupported'
+export type SpeechStartResult = 'started' | 'cancelled' | 'permission-required' | 'failed'
+
+type MicrophonePermissionState = MicrophonePermissionResult | 'prompt'
 
 interface RecognitionResult {
   result?: string
@@ -9,6 +13,10 @@ interface RecognitionResult {
 interface RecognitionError {
   errMsg?: string
   msg?: string
+}
+
+interface MicrophoneAuthSetting {
+  'scope.record'?: boolean
 }
 
 interface WechatSpeechRecognitionManager {
@@ -27,6 +35,12 @@ interface WechatSpeechPlugin {
 interface SpeechRecognitionOptions {
   onResult: (text: string) => void
   onError: (message: string) => void
+  onPermissionRequired?: () => void
+}
+
+interface NormalizedRecognitionError {
+  message: string
+  permissionRequired: boolean
 }
 
 const MAX_RECORDING_DURATION = 60_000
@@ -38,6 +52,8 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
   let manager: WechatSpeechRecognitionManager | null = null
   let timer: ReturnType<typeof setInterval> | null = null
   let recordingStartedAt = 0
+  let startAttemptSequence = 0
+  let permissionCheckPending = false
   let managerStarted = false
   let managerStartPending = false
   let managerStopPending = false
@@ -67,6 +83,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     durationSeconds.value = 0
     interimText.value = ''
     managerStarted = false
+    permissionCheckPending = false
     managerStartPending = false
     managerStopPending = false
     stopRequested = false
@@ -105,8 +122,12 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
       const shouldNotify = !ignoreNextResult && !disposed
       ignoreNextResult = false
       resetState()
-      if (shouldNotify)
-        options.onError(normalizeError(error))
+      if (!shouldNotify)
+        return
+      const normalizedError = normalizeError(error)
+      if (normalizedError.permissionRequired)
+        options.onPermissionRequired?.()
+      options.onError(normalizedError.message)
     }
   }
 
@@ -132,17 +153,111 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     return manager
   }
 
-  function start() {
-    if (disposed || state.value !== 'idle' || managerStartPending || managerStopPending)
-      return false
+  function getMicrophonePermissionState(): Promise<MicrophonePermissionState> {
+    return new Promise((resolve) => {
+      // #ifdef MP-WEIXIN
+      uni.getSetting({
+        success: ({ authSetting }) => {
+          const recordPermission = (authSetting as MicrophoneAuthSetting)['scope.record']
+          if (recordPermission === true)
+            resolve('granted')
+          else if (recordPermission === false)
+            resolve('denied')
+          else
+            resolve('prompt')
+        },
+        fail: () => resolve('failed'),
+      })
+      // #endif
+
+      // #ifndef MP-WEIXIN
+      resolve('unsupported')
+      // #endif
+    })
+  }
+
+  async function requestPermission(): Promise<MicrophonePermissionResult> {
+    const permissionState = await getMicrophonePermissionState()
+    if (permissionState !== 'prompt')
+      return permissionState
+
+    return new Promise((resolve) => {
+      // #ifdef MP-WEIXIN
+      uni.authorize({
+        scope: 'scope.record',
+        success: () => resolve('granted'),
+        fail: (error) => {
+          const detail = error.errMsg || ''
+          resolve(/deny|denied|auth deny/i.test(detail) ? 'denied' : 'failed')
+        },
+      })
+      // #endif
+
+      // #ifndef MP-WEIXIN
+      resolve('unsupported')
+      // #endif
+    })
+  }
+
+  function openPermissionSettings(): Promise<MicrophonePermissionResult> {
+    return new Promise((resolve) => {
+      // #ifdef MP-WEIXIN
+      uni.openSetting({
+        success: ({ authSetting }) => {
+          const recordPermission = (authSetting as MicrophoneAuthSetting)['scope.record']
+          resolve(recordPermission === true ? 'granted' : 'denied')
+        },
+        fail: () => resolve('failed'),
+      })
+      // #endif
+
+      // #ifndef MP-WEIXIN
+      resolve('unsupported')
+      // #endif
+    })
+  }
+
+  async function start(): Promise<SpeechStartResult> {
+    if (
+      disposed
+      || state.value !== 'idle'
+      || permissionCheckPending
+      || managerStartPending
+      || managerStopPending
+    ) {
+      return 'cancelled'
+    }
+
+    const startAttempt = ++startAttemptSequence
+    permissionCheckPending = true
+    stopRequested = false
+    const permissionState = await getMicrophonePermissionState()
+
+    if (startAttempt !== startAttemptSequence || disposed || stopRequested) {
+      if (startAttempt === startAttemptSequence)
+        permissionCheckPending = false
+      return 'cancelled'
+    }
+
+    permissionCheckPending = false
+    if (permissionState !== 'granted') {
+      if (permissionState === 'failed')
+        options.onError('暂时无法检查麦克风权限，请稍后重试')
+      else if (permissionState === 'unsupported')
+        options.onError('当前环境暂不支持语音识别')
+      return permissionState === 'denied' || permissionState === 'prompt'
+        ? 'permission-required'
+        : 'failed'
+    }
+
     const recognitionManager = getManager()
     if (!recognitionManager)
-      return false
+      return 'failed'
+
     try {
       managerStarted = false
       managerStartPending = true
       managerStopPending = false
-      stopRequested = false
       ignoreNextResult = false
       interimText.value = ''
       state.value = 'recording'
@@ -152,34 +267,54 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
         durationSeconds.value = Math.min(60, Math.floor((Date.now() - recordingStartedAt) / 1000))
       }, 250)
       recognitionManager.start({ duration: MAX_RECORDING_DURATION, lang: 'zh_CN' })
-      return true
+      return 'started'
     }
     catch {
       resetState()
       options.onError('无法启动录音，请重试')
-      return false
+      return 'failed'
     }
   }
 
   function stop() {
+    if (state.value === 'idle' && permissionCheckPending) {
+      startAttemptSequence += 1
+      permissionCheckPending = false
+      stopRequested = true
+      return
+    }
     if (state.value !== 'recording' || !manager)
       return
     stopTimer()
     stopRequested = true
     state.value = 'recognizing'
-    if (managerStarted) {
+    if (managerStarted && !managerStopPending) {
       managerStopPending = true
       manager.stop()
     }
   }
 
   function cancel() {
-    if (state.value === 'idle' && !managerStartPending)
+    if (state.value === 'idle' && permissionCheckPending) {
+      startAttemptSequence += 1
+      permissionCheckPending = false
+      stopRequested = true
+      resetVisibleState()
       return
+    }
+    if (
+      state.value === 'idle'
+      && !managerStartPending
+      && !managerStarted
+      && !managerStopPending
+    ) {
+      return
+    }
+
     ignoreNextResult = true
     stopRequested = true
     resetVisibleState()
-    if (manager && managerStarted) {
+    if (manager && managerStarted && !managerStopPending) {
       managerStopPending = true
       manager.stop()
     }
@@ -187,23 +322,45 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
 
   function dispose() {
     disposed = true
+    startAttemptSequence += 1
+    permissionCheckPending = false
     ignoreNextResult = true
     stopRequested = true
     resetVisibleState()
-    if (manager && managerStarted) {
+    if (manager && managerStarted && !managerStopPending) {
       managerStopPending = true
       manager.stop()
     }
   }
 
-  return { state, stateText, start, stop, cancel, dispose }
+  return {
+    state,
+    stateText,
+    requestPermission,
+    openPermissionSettings,
+    start,
+    stop,
+    cancel,
+    dispose,
+  }
 }
 
-function normalizeError(error: RecognitionError) {
+function normalizeError(error: RecognitionError): NormalizedRecognitionError {
   const detail = error.errMsg || error.msg || ''
-  if (/auth|permission/i.test(detail))
-    return '请允许使用麦克风后再试'
-  if (/network|timeout/i.test(detail))
-    return '网络不稳定，语音识别失败，请重试'
-  return '语音识别失败，请再说一遍'
+  if (/auth|permission|denied|拒绝|权限/i.test(detail)) {
+    return {
+      message: '麦克风权限已关闭，请重新点击语音图标',
+      permissionRequired: true,
+    }
+  }
+  if (/network|timeout/i.test(detail)) {
+    return {
+      message: '网络不稳定，语音识别失败，请重试',
+      permissionRequired: false,
+    }
+  }
+  return {
+    message: '语音识别失败，请再说一遍',
+    permissionRequired: false,
+  }
 }

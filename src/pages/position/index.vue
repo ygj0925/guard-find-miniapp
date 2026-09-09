@@ -734,25 +734,11 @@ onUnload(() => {
         </view>
       </view>
 
-      <view class="mx-4 mt-3 flex flex-none items-center rounded-2xl bg-[#e7f3ff] px-3.5 py-3 text-brand-blue shadow-[inset_0_1rpx_0_rgba(255,255,255,0.7)]">
-        <view class="mr-3 h-56rpx w-56rpx flex flex-none items-center justify-center rounded-xl bg-white/82">
-          <view class="i-carbon-location-filled text-base leading-none" aria-hidden="true" />
-        </view>
-        <view class="min-w-0 flex flex-1 flex-col">
-          <text class="text-sm font-700">优先选择工作地点</text>
-          <text class="mt-0.5 text-2xs text-[#5f7fa6]">支持多选，可展开地区查看下级地点</text>
-        </view>
-      </view>
-
       <scroll-view class="box-border min-h-0 w-full flex-1" scroll-y :show-scrollbar="false">
         <view class="px-4 pb-8 pt-5">
           <view class="mb-8">
-            <view class="mb-3 flex items-end justify-between gap-3">
-              <view class="min-w-0 flex-1">
-                <text class="block text-base text-app-ink font-700">工作地点</text>
-                <text class="mt-1 block text-2xs text-app-muted">不选择具体地点即为全国</text>
-              </view>
-              <text v-if="selectedFilters.locIds.length" class="flex-none text-2xs text-brand-blue font-650">已选 {{ selectedFilters.locIds.length }} 个</text>
+            <view class="mb-3">
+              <text class="block text-base text-app-ink font-700">工作地点</text>
             </view>
 
             <view v-if="filterOptionsLoading" class="flex flex-col gap-2" aria-label="工作地点加载中">
@@ -781,11 +767,6 @@ onUnload(() => {
           </view>
 
           <view>
-            <view class="mb-4">
-              <text class="block text-base text-app-ink font-700">更多条件</text>
-              <text class="mt-1 block text-2xs text-app-muted">可继续选择学历与工作经验</text>
-            </view>
-
             <view
               v-for="section in filterSections"
               :key="section.key"
@@ -835,7 +816,6 @@ onUnload(() => {
             @tap="applyFilters"
           >
             <text>确定</text>
-            <text v-if="draftFilterCount" class="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-3xs">{{ draftFilterCount }}</text>
           </button>
         </view>
       </view>

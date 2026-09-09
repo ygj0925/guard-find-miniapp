@@ -33,16 +33,8 @@ interface PositionDetailView {
   id: string
   jobId: string | number
   title: string
-  company: string
-  companyLogo?: string
-  companyIndustry?: string
-  companyStage?: string
-  companySize?: string
   salary: string
   location: string
-  address?: string
-  latitude?: number
-  longitude?: number
   education: string
   experience: string
   tags: string[]
@@ -56,7 +48,6 @@ const EMPTY_POSITION: PositionDetailView = {
   id: '',
   jobId: '',
   title: '',
-  company: '',
   salary: '',
   location: '',
   education: '',
@@ -99,16 +90,8 @@ function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
     id: source.positionId,
     jobId: source.jobId,
     title: source.positionName,
-    company: source.company || '招聘企业',
-    companyLogo: source.companyLogo,
-    companyIndustry: source.companyIndustry,
-    companyStage: source.companyStage,
-    companySize: source.companySize,
     salary: formatPositionSalary(source),
     location: source.location,
-    address: source.address,
-    latitude: source.latitude,
-    longitude: source.longitude,
     education: source.edu,
     experience: source.experience,
     tags: source.tags || [],
@@ -252,11 +235,15 @@ function drawSharePoster() {
   }
 }
 // #endif
-onShareAppMessage(() => ({
-  title: position.value.title,
-  path: sharePath.value,
-  imageUrl: screenshotPath.value || 'https://static1.3sbio.com/logo/2.png',
-}))
+onShareAppMessage(async () => {
+  await callShareApi()
+  console.log('[分享路径]', sharePath.value)
+  return {
+    title: position.value.title,
+    path: sharePath.value,
+    imageUrl: screenshotPath.value || 'https://static1.3sbio.com/logo/2.png',
+  }
+})
 
 onShareTimeline(() => ({
   title: shareTitle.value,
@@ -499,7 +486,7 @@ function openApplyProgress() {
     <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-4 pt-2.5 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
       <view class="flex items-center gap-3">
         <!-- #ifdef MP-WEIXIN -->
-        <button v-if="isLoggedIn" class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位" @tap="callShareApi">
+        <button v-if="isLoggedIn" class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位">
           <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>

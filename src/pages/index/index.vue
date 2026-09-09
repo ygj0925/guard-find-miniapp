@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 import type { MiniappBanner } from '@/api/banner'
 import { getMiniappBanners } from '@/api/banner'
 import type { PositionListItem } from '@/api/position'
 import { getHotPositions } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { useUserStore } from '@/store'
 import { usePositionStore } from '@/store/position'
+import { useTokenStore } from '@/store/token'
 import { normalizeTrustedBannerUrl } from '@/utils/bannerTarget'
+import { clearInternalReferralIntent, consumeInternalReferralIntent, saveInternalReferralIntent } from '@/utils/internalReferralIntent'
 import { formatPositionSalary } from '@/utils/positionSalary'
+import { navigateToLoginPage } from '@/utils/toLoginPage'
+import InternalReferralModal from './components/InternalReferralModal.vue'
 
 defineOptions({
   name: 'Home',
@@ -42,7 +48,8 @@ interface QuickEntry {
   iconClass: string
   gradient: string
   glow: string
-  pagePath: string
+  pagePath?: string
+  action?: 'internalReferral'
   /** 跳转职位页时携带的招聘分类编码（1=社会招聘，2=校园招聘），用于自动选中并过滤。 */
   category?: string
 }
@@ -83,6 +90,7 @@ const quickEntryPages: QuickEntry[][] = [
   [
     { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
     { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
+    { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #13a77e 0%, #43d0a5 100%)', glow: '0 10rpx 20rpx rgba(19,167,126,0.24)', action: 'internalReferral' },
     { title: '求职工作台', iconClass: 'i-carbon-dashboard', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
     { title: '消息通知', iconClass: 'i-carbon-notification', gradient: 'linear-gradient(140deg, #5f7ce8 0%, #86a4ff 100%)', glow: '0 10rpx 20rpx rgba(95,124,232,0.24)', pagePath: 'pages/notification/index' },
     { title: '简历完善', iconClass: 'i-carbon-user-profile', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
@@ -101,6 +109,17 @@ const hotPositionsFailed = ref(false)
 const headerScrolled = ref(false)
 const bannerIndex = ref(0)
 const entryPageIndex = ref(0)
+const showInternalReferralModal = ref(false)
+const internalReferralOpening = ref(false)
+
+const positionStore = usePositionStore()
+const tokenStore = useTokenStore()
+const userStore = useUserStore()
+const { userInfo } = storeToRefs(userStore)
+const internalReferralEmail = computed(() => {
+  const email = userInfo.value?.email
+  return typeof email === 'string' ? email.trim() : ''
+})
 
 const banners = computed<HomeBanner[]>(() => {
   const normalizedBanners = remoteBanners.value
@@ -118,8 +137,6 @@ const banners = computed<HomeBanner[]>(() => {
 
   return normalizedBanners.length ? normalizedBanners : fallbackBanners
 })
-
-const positionStore = usePositionStore()
 
 function openPage(pagePath: string) {
   const normalizedPath = pagePath.replace(/^\/+/, '')
@@ -157,11 +174,99 @@ function openBanner(banner: HomeBanner) {
   })
 }
 
-function openEntry(entry: QuickEntry) {
-  if (entry.category) {
-    positionStore.setPendingCategory(entry.category)
+function showInternalReferralError(title: string) {
+  uni.showToast({ title, icon: 'none' })
+}
+
+function openPositionList() {
+  positionStore.setPendingCategory('')
+  uni.showLoading({ title: '正在打开职位', mask: true })
+
+  return new Promise<boolean>((resolve) => {
+    uni.switchTab({
+      url: '/pages/position/index',
+      success: () => {
+        uni.hideLoading()
+        resolve(true)
+      },
+      fail: () => {
+        uni.hideLoading()
+        showInternalReferralError('职位页面打开失败，请重试')
+        resolve(false)
+      },
+    })
+  })
+}
+
+async function openAuthenticatedInternalReferral() {
+  try {
+    if (userInfo.value?.isInternalEmployee === true) {
+      if (await openPositionList())
+        clearInternalReferralIntent()
+      return
+    }
+
+    showInternalReferralModal.value = true
+    clearInternalReferralIntent()
   }
-  openPage(entry.pagePath)
+  catch {
+    showInternalReferralError('暂时无法打开内部推荐，请重试')
+  }
+}
+
+async function handleInternalReferralEntry() {
+  if (internalReferralOpening.value)
+    return
+
+  internalReferralOpening.value = true
+  try {
+    if (!tokenStore.updateNowTime().hasLogin) {
+      const intentSaved = saveInternalReferralIntent()
+      const navigation = await navigateToLoginPage({
+        queryString: `?redirect=${encodeURIComponent('/pages/index/index')}`,
+      })
+
+      if (navigation.status === 'failed') {
+        showInternalReferralError('登录页打开失败，请重试')
+        return
+      }
+      if (!intentSaved)
+        showInternalReferralError('登录后请再次点击内部推荐')
+      return
+    }
+
+    await openAuthenticatedInternalReferral()
+  }
+  catch {
+    showInternalReferralError('暂时无法打开内部推荐，请重试')
+  }
+  finally {
+    internalReferralOpening.value = false
+  }
+}
+
+function closeInternalReferralModal() {
+  showInternalReferralModal.value = false
+  clearInternalReferralIntent()
+}
+
+async function continueToPositionList() {
+  if (!await openPositionList())
+    return
+
+  showInternalReferralModal.value = false
+  clearInternalReferralIntent()
+}
+
+function openEntry(entry: QuickEntry) {
+  if (entry.action === 'internalReferral') {
+    void handleInternalReferralEntry()
+    return
+  }
+  if (entry.category)
+    positionStore.setPendingCategory(entry.category)
+  if (entry.pagePath)
+    openPage(entry.pagePath)
 }
 
 function showJobDetail(positionId: string) {
@@ -233,6 +338,15 @@ function handleEntryPageChange(event: SwiperChangeEvent) {
 onLoad(() => {
   loadBanners()
   loadHotPositions()
+})
+
+onShow(() => {
+  if (!tokenStore.updateNowTime().hasLogin) {
+    clearInternalReferralIntent()
+    return
+  }
+  if (consumeInternalReferralIntent())
+    void openAuthenticatedInternalReferral()
 })
 
 onPageScroll(({ scrollTop }) => {
@@ -328,7 +442,7 @@ onPageScroll(({ scrollTop }) => {
 
     <view class="px-3 pt-1">
       <view
-        class="relative cursor-pointer overflow-hidden rounded-32rpx bg-[linear-gradient(118deg,#3f61f2_0%,#6a5bf0_52%,#9a63f2_100%)] px-3.5 py-3 shadow-[0_16rpx_36rpx_rgba(72,78,214,0.24)] active:opacity-88"
+        class="relative cursor-pointer overflow-hidden rounded-32rpx px-3.5 py-3 shadow-[0_16rpx_36rpx_rgba(45,111,230,0.24)] bg-brand-hero active:opacity-88"
         role="button"
         @tap="openPage('pages/ai-chat/index')"
       >
@@ -348,7 +462,7 @@ onPageScroll(({ scrollTop }) => {
             <text class="mt-1.5 block text-2xs text-white/82">说出期望，AI 帮你匹配岗位并一键投递</text>
           </view>
 
-          <view class="ml-2 h-60rpx flex flex-none items-center rounded-full bg-white px-3 text-xs text-[#5347e8] font-700 shadow-[0_8rpx_18rpx_rgba(28,32,110,0.18)]">
+          <view class="ml-2 h-60rpx flex flex-none items-center rounded-full bg-white px-3 text-xs text-brand-blue font-700 shadow-[0_8rpx_18rpx_rgba(45,111,230,0.18)]">
             <text>聊一聊</text>
             <view class="i-carbon-arrow-right ml-0.5 text-xs leading-none" />
           </view>
@@ -368,6 +482,10 @@ onPageScroll(({ scrollTop }) => {
                 :key="entry.title"
                 class="flex flex-col cursor-pointer items-center active:opacity-70"
                 role="button"
+                tabindex="0"
+                :aria-label="entry.title"
+                @keydown.enter.prevent="openEntry(entry)"
+                @keydown.space.prevent="openEntry(entry)"
                 @tap="openEntry(entry)"
               >
                 <view
@@ -461,5 +579,13 @@ onPageScroll(({ scrollTop }) => {
         </view>
       </view>
     </view>
+
+    <InternalReferralModal
+      v-if="showInternalReferralModal"
+      :initial-email="internalReferralEmail"
+      @close="closeInternalReferralModal"
+      @skip="continueToPositionList"
+      @certified="continueToPositionList"
+    />
   </view>
 </template>

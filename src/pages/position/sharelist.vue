@@ -49,8 +49,9 @@ onLoad(async (options) => {
     return
   }
 
-  // 保存 shareId 到本地
-  uni.setStorageSync('shareId', options.shareId)
+  // 保存 shareId 到本地，以逗号拼接方式累积
+  const existing = uni.getStorageSync('shareIds')
+  uni.setStorageSync('shareIds', existing ? `${existing},${options.shareId}` : options.shareId)
 
   // 调用分享列表接口
   await load(options.shareId)
@@ -95,7 +96,7 @@ onLoad(async (options) => {
       <view class="i-carbon-warning mb-4 text-6xl text-[#dce3f0]" />
       <text class="text-base text-[#1a2640] font-700">加载失败</text>
       <button
-        class="plain-button mt-4 h-10 rounded-xl border border-solid border-[#dce2ea] bg-white px-5 text-sm text-[#4b5565] font-600"
+        class="plain-button mt-4 h-10 border border-[#dce2ea] rounded-xl border-solid bg-white px-5 text-sm text-[#4b5565] font-600"
         @tap="() => load('')"
       >
         重新加载
@@ -162,11 +163,17 @@ onLoad(async (options) => {
 }
 
 @keyframes skeleton-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: 0 0; }
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-block { animation: none; }
+  .skeleton-block {
+    animation: none;
+  }
 }
 </style>

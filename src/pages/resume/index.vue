@@ -3,15 +3,68 @@ import { ref } from 'vue'
 import { deleteResume, getFileUrl, getResumes, setDefaultResume, updateResume, uploadResume } from '@/api/resume'
 import type { ResumeItem } from '@/api/resume'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { AUTH_TOKEN_STORAGE_KEY } from '@/store/token'
+// #ifdef H5
+import { downloadH5File } from '@/utils/h5File'
+// #endif
 
 definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '附件简历', backgroundColor: '#f5f7fa' } })
 
 const MAX_RESUMES = 3
+const MAX_RESUME_FILE_SIZE = 10 * 1024 * 1024
+const ALLOWED_RESUME_EXTENSIONS = new Set(['pdf', 'doc', 'docx'])
 const resumes = ref<ResumeItem[]>([])
 const loading = ref(false)
+const selecting = ref(false)
 const editing = ref<ResumeItem>()
 const inputFocus = ref(false)
 const editName = ref('')
+
+function releaseSelecting() {
+  selecting.value = false
+}
+
+function getResumeDownloadName(item: ResumeItem) {
+  if (item.originalFileName?.trim())
+    return item.originalFileName.trim()
+  const extension = typeof item.fileType === 'string'
+    ? item.fileType.replace(/^\./, '').toLowerCase()
+    : ''
+  return `${item.name}${ALLOWED_RESUME_EXTENSIONS.has(extension) ? `.${extension}` : ''}`
+}
+
+async function uploadSelectedResume(filePath: string, originalName: string, fileSize?: number) {
+  if (loading.value || selecting.value) {
+    uni.showToast({ title: '请稍候', icon: 'none' })
+    return
+  }
+  if (resumes.value.length >= MAX_RESUMES) {
+    uni.showToast({ title: `最多上传 ${MAX_RESUMES} 份简历`, icon: 'none' })
+    return
+  }
+  const extension = originalName.split('.').pop()?.toLowerCase() || ''
+  if (originalName && !ALLOWED_RESUME_EXTENSIONS.has(extension)) {
+    uni.showToast({ title: '仅支持 PDF、DOC、DOCX 文件', icon: 'none' })
+    return
+  }
+  if (typeof fileSize === 'number' && fileSize > MAX_RESUME_FILE_SIZE) {
+    uni.showToast({ title: '简历文件不能超过 10MB', icon: 'none' })
+    return
+  }
+  const name = originalName.replace(/\.[^.]+$/, '') || '我的简历'
+  loading.value = true
+  try {
+    await uploadResume(name, filePath)
+    await loadResumes()
+    uni.showToast({ title: '上传成功', icon: 'success' })
+  }
+  catch (error) {
+    uni.showToast({ title: error instanceof Error ? error.message : '上传失败', icon: 'none' })
+  }
+  finally {
+    loading.value = false
+  }
+}
 
 function handleBack() {
   if (getCurrentPages().length > 1) {
@@ -33,29 +86,28 @@ async function loadResumes() {
 }
 
 function chooseResume() {
+  if (loading.value || selecting.value) {
+    uni.showToast({ title: '请稍候', icon: 'none' })
+    return
+  }
   if (resumes.value.length >= MAX_RESUMES) {
     uni.showToast({ title: `最多上传 ${MAX_RESUMES} 份简历`, icon: 'none' })
     return
   }
+  selecting.value = true
   // #ifdef MP-WEIXIN
   uni.chooseMessageFile({
     count: 1,
     type: 'file',
     extension: ['pdf', 'doc', 'docx'],
-    success: async (result) => {
+    success: (result) => {
+      releaseSelecting()
       const file = result.tempFiles[0]
-      if (!file)
-        return
-      const name = file.name.replace(/\.[^.]+$/, '') || '我的简历'
-      loading.value = true
-      try {
-        await uploadResume(name, file.path)
-        await loadResumes()
-        uni.showToast({ title: '上传成功', icon: 'success' })
-      }
-      catch (error) { uni.showToast({ title: error instanceof Error ? error.message : '上传失败', icon: 'none' }) }
-      finally { loading.value = false }
+      if (file)
+        void uploadSelectedResume(file.path, file.name, typeof file.size === 'number' ? file.size : undefined)
     },
+    fail: releaseSelecting,
+    complete: releaseSelecting,
   })
   // #endif
   // #ifndef MP-WEIXIN
@@ -63,20 +115,25 @@ function chooseResume() {
     count: 1,
     type: 'all',
     extension: ['pdf', 'doc', 'docx'],
-    success: async (result) => {
-      const file = result.tempFiles[0]
-      if (!file)
+    success: (result) => {
+      releaseSelecting()
+      const files = Array.isArray(result.tempFiles) ? result.tempFiles : [result.tempFiles]
+      const paths = Array.isArray(result.tempFilePaths) ? result.tempFilePaths : [result.tempFilePaths]
+      const file = files[0]
+      const filePath = paths[0]
+        || (file && typeof file === 'object' && 'path' in file && typeof file.path === 'string' ? file.path : '')
+      const originalName = file && typeof file === 'object' && 'name' in file && typeof file.name === 'string' ? file.name : ''
+      const fileSize = file && typeof file === 'object' && 'size' in file && typeof file.size === 'number'
+        ? file.size
+        : undefined
+      if (!filePath) {
+        uni.showToast({ title: '无法读取所选文件，请重新选择', icon: 'none' })
         return
-      const name = file.name.replace(/\.[^.]+$/, '') || '我的简历'
-      loading.value = true
-      try {
-        await uploadResume(name, file.path)
-        await loadResumes()
-        uni.showToast({ title: '上传成功', icon: 'success' })
       }
-      catch (error) { uni.showToast({ title: error instanceof Error ? error.message : '上传失败', icon: 'none' }) }
-      finally { loading.value = false }
+      void uploadSelectedResume(filePath, originalName, fileSize)
     },
+    fail: releaseSelecting,
+    complete: releaseSelecting,
   })
   // #endif
 }
@@ -91,7 +148,7 @@ function showItemActions(item: ResumeItem) {
     success: (res) => {
       const action = actions[res.tapIndex]
       if (action === '下载简历') {
-        previewResume(item)
+        downloadResume(item)
       }
       else if (action === '在线预览') {
         onlinePreview(item)
@@ -111,28 +168,47 @@ function showItemActions(item: ResumeItem) {
   })
 }
 
-async function previewResume(item: ResumeItem) {
+async function downloadResume(item: ResumeItem) {
   loading.value = true
   try {
     const { attachmentUrl } = await getFileUrl(item.id)
-    if (!attachmentUrl) {
-      uni.showToast({ title: '文件地址不存在', icon: 'none' })
-      return
-    }
-    uni.downloadFile({
-      url: attachmentUrl,
-      header: { Authorization: `Bearer ${uni.getStorageSync('auth-access-token')}` },
-      success: ({ statusCode, tempFilePath }) => {
-        if (statusCode === 200)
-          uni.openDocument({ filePath: tempFilePath, showMenu: true })
-        else
-          uni.showToast({ title: '简历打开失败', icon: 'none' })
-      },
-      fail: () => uni.showToast({ title: '简历打开失败', icon: 'none' }),
+    if (!attachmentUrl)
+      throw new Error('文件地址不存在')
+
+    // #ifdef H5
+    await downloadH5File(attachmentUrl, getResumeDownloadName(item))
+    uni.showToast({ title: '下载已开始', icon: 'none' })
+    // #endif
+
+    // #ifndef H5
+    const token = String(uni.getStorageSync<string>(AUTH_TOKEN_STORAGE_KEY) || '').replace(/^Bearer\s+/i, '').trim()
+    await new Promise<void>((resolve, reject) => {
+      uni.downloadFile({
+        url: attachmentUrl,
+        header: token ? { Authorization: `Bearer ${token}` } : undefined,
+        success: ({ statusCode, tempFilePath }) => {
+          if (statusCode < 200 || statusCode >= 300) {
+            reject(new Error('简历下载失败'))
+            return
+          }
+          uni.openDocument({
+            filePath: tempFilePath,
+            showMenu: true,
+            success: () => resolve(),
+            fail: () => reject(new Error('当前设备无法打开该简历文件')),
+          })
+        },
+        fail: () => reject(new Error('简历下载失败')),
+      })
     })
+    // #endif
   }
-  catch (error) { uni.showToast({ title: error instanceof Error ? error.message : '简历打开失败', icon: 'none' }) }
-  finally { loading.value = false }
+  catch (error) {
+    uni.showToast({ title: error instanceof Error ? error.message : '简历下载失败', icon: 'none' })
+  }
+  finally {
+    loading.value = false
+  }
 }
 
 function onlinePreview(item: ResumeItem) {

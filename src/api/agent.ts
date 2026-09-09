@@ -1,6 +1,6 @@
 import { http } from '@/http/http'
 import { AUTH_TOKEN_STORAGE_KEY, useTokenStore } from '@/store/token'
-import { getEnvBaseUrl } from '@/utils'
+import { getApiUrl } from '@/utils'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { createAgentSseParser } from '@/pages/ai-chat/aiSseParser'
 
@@ -180,9 +180,13 @@ export interface AgentChatStreamListeners {
   onComplete?: () => void
 }
 
+export interface AgentChatStreamController {
+  cancel: () => void
+}
+
 interface ChunkedRequestTask {
   abort: () => void
-  onChunkReceived?: (callback: (result: { data: ArrayBuffer }) => void) => void
+  onChunkReceived?: (callback: (result: { data: ArrayBuffer | Uint8Array }) => void) => void
 }
 
 export function listAgentChatSessions(query: {
@@ -242,8 +246,260 @@ export function resolveAgentToolAsk(
   )
 }
 
-export function streamAgentChat(payload: AgentChatRequest, listeners: AgentChatStreamListeners) {
+export function streamAgentChat(
+  payload: AgentChatRequest,
+  listeners: AgentChatStreamListeners,
+): AgentChatStreamController {
   const token = String(uni.getStorageSync<string>(AUTH_TOKEN_STORAGE_KEY) || '').replace(/^Bearer\s+/i, '').trim()
+  if (!token)
+    return createMissingTokenController(listeners)
+
+  // #ifdef H5
+  const fetchImpl = globalThis.fetch
+  const AbortControllerImpl = globalThis.AbortController
+  if (typeof fetchImpl !== 'function' || typeof AbortControllerImpl !== 'function')
+    return createUnsupportedBrowserStreamController(listeners)
+  return streamAgentChatWithFetch(token, payload, listeners, fetchImpl, AbortControllerImpl)
+  // #endif
+
+  // #ifndef H5
+  return streamAgentChatWithUniRequest(token, payload, listeners)
+  // #endif
+}
+
+function createMissingTokenController(listeners: AgentChatStreamListeners): AgentChatStreamController {
+  let completed = false
+  let cancelled = false
+
+  function finish() {
+    if (completed)
+      return
+    completed = true
+    listeners.onComplete?.()
+  }
+
+  const timer = setTimeout(() => {
+    if (!cancelled)
+      listeners.onError({ code: 'LOGIN_REQUIRED', message: '请先登录后使用 AI 助手' })
+    finish()
+  }, 0)
+
+  return {
+    cancel() {
+      if (completed || cancelled)
+        return
+      cancelled = true
+      clearTimeout(timer)
+      finish()
+    },
+  }
+}
+
+// #ifdef H5
+function createUnsupportedBrowserStreamController(
+  listeners: AgentChatStreamListeners,
+): AgentChatStreamController {
+  let completed = false
+  let cancelled = false
+
+  function finish() {
+    if (completed)
+      return
+    completed = true
+    listeners.onComplete?.()
+  }
+
+  const timer = setTimeout(() => {
+    if (cancelled) {
+      finish()
+      return
+    }
+
+    try {
+      listeners.onError({
+        code: 'STREAM_INTERRUPTED',
+        message: '当前浏览器不支持 AI 流式回复，请升级浏览器后重试',
+      })
+    }
+    finally {
+      finish()
+    }
+  }, 0)
+
+  return {
+    cancel() {
+      if (completed || cancelled)
+        return
+      cancelled = true
+      clearTimeout(timer)
+      finish()
+    },
+  }
+}
+
+function streamAgentChatWithFetch(
+  token: string,
+  payload: AgentChatRequest,
+  listeners: AgentChatStreamListeners,
+  fetchImpl: typeof globalThis.fetch,
+  AbortControllerImpl: typeof globalThis.AbortController,
+): AgentChatStreamController {
+  let controller: AbortController
+  try {
+    controller = new AbortControllerImpl()
+  }
+  catch {
+    return createUnsupportedBrowserStreamController(listeners)
+  }
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+  let completed = false
+  let cancelled = false
+  let terminal = false
+  let timedOut = false
+  let timeout: ReturnType<typeof setTimeout> | undefined
+
+  function finish() {
+    if (completed)
+      return
+    completed = true
+    clearTimeout(timeout)
+    listeners.onComplete?.()
+  }
+
+  function fail(error: AgentChatStreamFailure) {
+    if (terminal || cancelled)
+      return
+    terminal = true
+    listeners.onError(error)
+  }
+
+  const parser = createAgentSseParser(
+    ({ event, value }) => {
+      if (terminal || cancelled)
+        return
+      const normalized = normalizeStreamEvent(event, value)
+      listeners.onEvent(normalized)
+      if (normalized.type === 'done' || normalized.type === 'error')
+        terminal = true
+    },
+    (code) => {
+      fail({
+        code,
+        message: code === 'STREAM_TOO_LARGE' ? 'AI 返回内容过长，请缩短问题后重试' : 'AI 返回数据解析失败，请重试',
+      })
+      controller.abort()
+    },
+  )
+
+  timeout = setTimeout(() => {
+    if (completed || cancelled || terminal)
+      return
+    timedOut = true
+    controller.abort()
+  }, 600000)
+
+  void (async () => {
+    try {
+      const response = await fetchImpl(getApiUrl('/portal/agent/chat'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'text/event-stream',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+        credentials: 'same-origin',
+        signal: controller.signal,
+      })
+
+      if (cancelled)
+        return
+      if (response.status === 401) {
+        fail({ code: 'UNAUTHORIZED', message: '登录已过期，请重新登录' })
+        if (await useTokenStore().clearLoginState(token))
+          toLoginPage()
+        return
+      }
+      if (!response.ok) {
+        fail({
+          code: 'HTTP_ERROR',
+          message: await readFetchResponseMessage(response) || 'AI 服务暂时不可用',
+        })
+        return
+      }
+
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType && !contentType.toLowerCase().includes('text/event-stream')) {
+        fail({
+          code: 'HTTP_ERROR',
+          message: await readFetchResponseMessage(response) || 'AI 服务未返回流式响应',
+        })
+        return
+      }
+      if (!response.body) {
+        fail({ code: 'STREAM_INTERRUPTED', message: '当前浏览器不支持流式响应，请升级后重试' })
+        return
+      }
+
+      reader = response.body.getReader()
+      while (true) {
+        if (cancelled || terminal)
+          break
+        const { value, done } = await reader.read()
+        if (done)
+          break
+        if (value?.byteLength)
+          parser.push(value)
+      }
+
+      if (terminal && reader) {
+        try {
+          await reader.cancel()
+        }
+        catch {
+          // 连接可能已经被服务端关闭，无需再次处理。
+        }
+      }
+      if (!cancelled && !terminal) {
+        parser.finish()
+        if (!terminal)
+          fail({ code: 'STREAM_INTERRUPTED', message: 'AI 回复意外中断，请重试' })
+      }
+    }
+    catch (error) {
+      if (cancelled || terminal)
+        return
+      if (isAbortError(error) && timedOut) {
+        fail({ code: 'NETWORK_ERROR', message: 'AI 响应超时，请稍后重试' })
+        return
+      }
+      fail({ code: 'NETWORK_ERROR', message: '网络连接失败，请检查网络后重试' })
+    }
+    finally {
+      finish()
+    }
+  })()
+
+  return {
+    cancel() {
+      if (completed || cancelled)
+        return
+      cancelled = true
+      controller.abort()
+      void reader?.cancel().catch(() => undefined)
+      finish()
+    },
+  }
+}
+// #endif
+
+// #ifndef H5
+function streamAgentChatWithUniRequest(
+  token: string,
+  payload: AgentChatRequest,
+  listeners: AgentChatStreamListeners,
+): AgentChatStreamController {
   let task: ChunkedRequestTask | undefined
   let completed = false
   let cancelled = false
@@ -264,20 +520,6 @@ export function streamAgentChat(payload: AgentChatRequest, listeners: AgentChatS
     listeners.onError(error)
   }
 
-  if (!token) {
-    const timer = setTimeout(() => {
-      fail({ code: 'LOGIN_REQUIRED', message: '请先登录后使用 AI 助手' })
-      finish()
-    }, 0)
-    return {
-      cancel() {
-        cancelled = true
-        clearTimeout(timer)
-        finish()
-      },
-    }
-  }
-
   const parser = createAgentSseParser(
     ({ event, value }) => {
       if (terminal || cancelled)
@@ -296,9 +538,8 @@ export function streamAgentChat(payload: AgentChatRequest, listeners: AgentChatS
     },
   )
 
-  const baseUrl = String(getEnvBaseUrl() || '').replace(/\/$/, '')
   task = uni.request({
-    url: `${baseUrl}/portal/agent/chat`,
+    url: getApiUrl('/portal/agent/chat'),
     method: 'POST',
     timeout: 600000,
     data: payload,
@@ -309,14 +550,13 @@ export function streamAgentChat(payload: AgentChatRequest, listeners: AgentChatS
     },
     enableChunked: true,
     responseType: 'arraybuffer',
-    success: (response) => {
+    success: async (response) => {
       if (cancelled)
         return
       if (response.statusCode === 401) {
-        // 只允许该请求使用的旧 token 清理自身；迟到的 401 不能撤销刚续期或重新登录的新凭据。
-        if (useTokenStore().clearLoginState(token))
-          toLoginPage()
         fail({ code: 'UNAUTHORIZED', message: '登录已过期，请重新登录' })
+        if (await useTokenStore().clearLoginState(token))
+          toLoginPage()
         return
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -356,6 +596,20 @@ export function streamAgentChat(payload: AgentChatRequest, listeners: AgentChatS
       finish()
     },
   }
+}
+// #endif
+
+async function readFetchResponseMessage(response: Response) {
+  try {
+    return readResponseMessage(await response.text())
+  }
+  catch {
+    return ''
+  }
+}
+
+function isAbortError(error: unknown) {
+  return isRecord(error) && readString(error.name) === 'AbortError'
 }
 
 function normalizeStreamEvent(eventName: string, value: Record<string, unknown>): AgentChatStreamEvent {

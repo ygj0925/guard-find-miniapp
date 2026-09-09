@@ -133,6 +133,7 @@ export interface PositionApplyResult {
 export interface PositionApplyRecord {
   id: string | number
   resumeId: string
+  resumeName?: string
   positionId: string
   importStatus: string
   failedReason?: string
@@ -167,7 +168,7 @@ export interface PositionShares {
 }
 
 export interface PositionShareListData {
-  list: []
+  list: PositionShareItem[]
   total: number
 }
 
@@ -210,7 +211,7 @@ export function getPositionApplyProgress(id: string | number) {
 }
 
 /**
- * 查询职位分享记录
+ * 查询职位分享记录-我的分享
  */
 export interface PositionSharesQuery {
   pageNum: number
@@ -229,7 +230,7 @@ export function createPositionShares(positionIds: string[]) {
 }
 
 /*
-查询分享记录中的职位
+查询分享记录中的职位-用于分享卡片点击后的职位列表展示
 */
 export function getPositionShareList(shareId: string) {
   return http.get<PositionListItem[]>(`/miniapp/position-shares/${shareId}/positions`)

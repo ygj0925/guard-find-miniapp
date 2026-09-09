@@ -6,6 +6,9 @@ import { permission } from '@/router/permission'
 import { useMessageStore } from '@/store/message'
 import { useTokenStore } from '@/store/token'
 import { tabbarStore } from '@/tabbar/store'
+// #ifdef H5
+import { bridgeWechatH5OAuthCallback } from '@/service/auth/wechat-h5-oauth'
+// #endif
 
 const { proxy } = (getCurrentInstance() || {}) as any
 const router = proxy?.$router
@@ -18,11 +21,24 @@ const tokenStore = useTokenStore()
 // App 在前台期间，登录/登出也要即时切换站内消息的连接状态，不必等下一次 onShow
 let stopWatchLogin: (() => void) | null = null
 
+let h5OAuthCallbackRedirecting = false
+
 onLaunch((options) => {
   console.log('App.vue onLaunch', options)
+  // #ifdef H5
+  h5OAuthCallbackRedirecting = bridgeWechatH5OAuthCallback()
+  if (h5OAuthCallbackRedirecting)
+    return
+  // #endif
 })
 onShow((options) => {
   console.log('App.vue onShow', options)
+  // #ifdef H5
+  if (!h5OAuthCallbackRedirecting)
+    h5OAuthCallbackRedirecting = bridgeWechatH5OAuthCallback()
+  // #endif
+  if (h5OAuthCallbackRedirecting)
+    return
   // 处理直接进入页面路由的情况：如h5直接输入路由、微信小程序分享后进入等
   // https://github.com/unibest-tech/unibest/issues/192
   if (options?.path) {
