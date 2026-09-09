@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 import type { MiniappBanner } from '@/api/banner'
 import { getMiniappBanners } from '@/api/banner'
 import type { PositionListItem } from '@/api/position'
 import { getHotPositions } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { useUserStore } from '@/store'
 import { usePositionStore } from '@/store/position'
+import { useTokenStore } from '@/store/token'
 import { normalizeTrustedBannerUrl } from '@/utils/bannerTarget'
+import { clearInternalReferralIntent, consumeInternalReferralIntent, saveInternalReferralIntent } from '@/utils/internalReferralIntent'
 import { formatPositionSalary } from '@/utils/positionSalary'
+import { toLoginPage } from '@/utils/toLoginPage'
+import InternalReferralModal from './components/InternalReferralModal.vue'
 
 defineOptions({
   name: 'Home',
@@ -42,7 +48,8 @@ interface QuickEntry {
   iconClass: string
   gradient: string
   glow: string
-  pagePath: string
+  pagePath?: string
+  action?: 'internalReferral'
   /** 跳转职位页时携带的招聘分类编码（1=社会招聘，2=校园招聘），用于自动选中并过滤。 */
   category?: string
 }
@@ -83,6 +90,7 @@ const quickEntryPages: QuickEntry[][] = [
   [
     { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
     { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
+    { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #13a77e 0%, #43d0a5 100%)', glow: '0 10rpx 20rpx rgba(19,167,126,0.24)', action: 'internalReferral' },
     { title: '求职工作台', iconClass: 'i-carbon-dashboard', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
     { title: '消息通知', iconClass: 'i-carbon-notification', gradient: 'linear-gradient(140deg, #5f7ce8 0%, #86a4ff 100%)', glow: '0 10rpx 20rpx rgba(95,124,232,0.24)', pagePath: 'pages/notification/index' },
     { title: '简历完善', iconClass: 'i-carbon-user-profile', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
@@ -101,6 +109,13 @@ const hotPositionsFailed = ref(false)
 const headerScrolled = ref(false)
 const bannerIndex = ref(0)
 const entryPageIndex = ref(0)
+const showInternalReferralModal = ref(false)
+
+const positionStore = usePositionStore()
+const tokenStore = useTokenStore()
+const userStore = useUserStore()
+const { userInfo } = storeToRefs(userStore)
+const internalReferralEmail = computed(() => userInfo.value.email?.trim() || '')
 
 const banners = computed<HomeBanner[]>(() => {
   const normalizedBanners = remoteBanners.value
@@ -118,8 +133,6 @@ const banners = computed<HomeBanner[]>(() => {
 
   return normalizedBanners.length ? normalizedBanners : fallbackBanners
 })
-
-const positionStore = usePositionStore()
 
 function openPage(pagePath: string) {
   const normalizedPath = pagePath.replace(/^\/+/, '')
@@ -157,11 +170,56 @@ function openBanner(banner: HomeBanner) {
   })
 }
 
-function openEntry(entry: QuickEntry) {
-  if (entry.category) {
-    positionStore.setPendingCategory(entry.category)
+function openPositionList() {
+  positionStore.setPendingCategory('')
+  uni.switchTab({ url: '/pages/position/index' })
+}
+
+function openAuthenticatedInternalReferral() {
+  clearInternalReferralIntent()
+  if (userInfo.value.isInternalEmployee === true) {
+    openPositionList()
+    return
   }
-  openPage(entry.pagePath)
+  showInternalReferralModal.value = true
+}
+
+function handleInternalReferralEntry() {
+  if (!tokenStore.updateNowTime().hasLogin) {
+    if (!saveInternalReferralIntent()) {
+      uni.showToast({
+        title: '登录后请再次点击内部推荐',
+        icon: 'none',
+      })
+    }
+    toLoginPage({
+      queryString: `?redirect=${encodeURIComponent('/pages/index/index')}`,
+    })
+    return
+  }
+  openAuthenticatedInternalReferral()
+}
+
+function closeInternalReferralModal() {
+  showInternalReferralModal.value = false
+  clearInternalReferralIntent()
+}
+
+function continueToPositionList() {
+  showInternalReferralModal.value = false
+  clearInternalReferralIntent()
+  openPositionList()
+}
+
+function openEntry(entry: QuickEntry) {
+  if (entry.action === 'internalReferral') {
+    handleInternalReferralEntry()
+    return
+  }
+  if (entry.category)
+    positionStore.setPendingCategory(entry.category)
+  if (entry.pagePath)
+    openPage(entry.pagePath)
 }
 
 function showJobDetail(positionId: string) {
@@ -233,6 +291,15 @@ function handleEntryPageChange(event: SwiperChangeEvent) {
 onLoad(() => {
   loadBanners()
   loadHotPositions()
+})
+
+onShow(() => {
+  if (!tokenStore.updateNowTime().hasLogin) {
+    clearInternalReferralIntent()
+    return
+  }
+  if (consumeInternalReferralIntent())
+    openAuthenticatedInternalReferral()
 })
 
 onPageScroll(({ scrollTop }) => {
@@ -368,6 +435,10 @@ onPageScroll(({ scrollTop }) => {
                 :key="entry.title"
                 class="flex flex-col cursor-pointer items-center active:opacity-70"
                 role="button"
+                tabindex="0"
+                :aria-label="entry.title"
+                @keydown.enter.prevent="openEntry(entry)"
+                @keydown.space.prevent="openEntry(entry)"
                 @tap="openEntry(entry)"
               >
                 <view
@@ -461,5 +532,13 @@ onPageScroll(({ scrollTop }) => {
         </view>
       </view>
     </view>
+
+    <InternalReferralModal
+      v-if="showInternalReferralModal"
+      :initial-email="internalReferralEmail"
+      @close="closeInternalReferralModal"
+      @skip="continueToPositionList"
+      @certified="continueToPositionList"
+    />
   </view>
 </template>

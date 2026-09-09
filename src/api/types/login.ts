@@ -74,10 +74,21 @@ export interface IUserInfoRes {
   username: string
   nickname: string
   avatar?: string
+  /** 是否已完成内部员工认证。 */
+  isInternalEmployee?: boolean
+  /** 已认证或待认证的企业邮箱。 */
+  email?: string
+  /** 员工所属部门名称。 */
+  deptName?: string
   /** 同时支持单角色和多角色，你自行选择一种就行 */
   role?: UserRole
   roles?: UserRole[]
   [key: string]: any // 允许其他扩展字段
+}
+
+export interface InternalEmployeeVerifyRequest {
+  email: string
+  captcha: string
 }
 
 // 认证存储数据结构

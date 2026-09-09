@@ -1,4 +1,4 @@
-import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm, SocialAuthorizeResult, SocialLoginForm, SocialLoginSource } from './types/login'
+import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, InternalEmployeeVerifyRequest, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm, SocialAuthorizeResult, SocialLoginForm, SocialLoginSource } from './types/login'
 import { http } from '@/http/http'
 
 /**
@@ -77,12 +77,24 @@ export function sendSmsCaptcha(phone: string, captcha?: BehaviorCaptchaRequest) 
 
 // 发送内部员工认证验证码
 export function innerEmployeeSend(email: string) {
-  return http.post<string>('/portal/internal-employee/send', undefined, { email })
+  return http.post<string>(
+    '/portal/internal-employee/send',
+    undefined,
+    { email },
+    undefined,
+    { hideErrorToast: true },
+  )
 }
 
 // 验证内部员工身份
-export function innerEmployeeVerify(data: { email: string, captcha: string }) {
-  return http.post<void>('/portal/internal-employee/verify', data)
+export function innerEmployeeVerify(data: InternalEmployeeVerifyRequest) {
+  return http.post<void>(
+    '/portal/internal-employee/verify',
+    data,
+    undefined,
+    undefined,
+    { hideErrorToast: true },
+  )
 }
 
 // 修改小程序个人信息 (gender： 1-男，2-女)
