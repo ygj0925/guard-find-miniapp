@@ -7,7 +7,7 @@ import { startWechatAuthorization } from '@/service/auth/wechat-auth'
 import { isWechatH5LoginEnabled, startWechatH5OAuth } from '@/service/auth/wechat-h5-oauth'
 // #endif
 import { useTokenStore } from '@/store/token'
-import { navigateAfterAuthenticated } from './navigation'
+import { navigateAfterAuthenticated, resolveAuthRedirect } from './navigation'
 import AuthBehaviorCaptchaModal from './components/AuthBehaviorCaptchaModal.vue'
 import AuthAreaCodePicker from './components/AuthAreaCodePicker.vue'
 import type { AreaCodeItem } from './area-code'
@@ -268,6 +268,13 @@ function onWechatPhoneNumber(event: PhoneNumberEvent) {
 
 function skipLogin() {
   cancelPendingLogin()
+  const pages = getCurrentPages()
+  if (resolveAuthRedirect(redirectUrl.value) === '/pages/ai-chat/index' && pages.length > 1) {
+    uni.navigateBack({
+      fail: () => uni.reLaunch({ url: '/pages/index/index' }),
+    })
+    return
+  }
   uni.reLaunch({ url: '/pages/index/index' })
 }
 </script>

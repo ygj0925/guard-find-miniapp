@@ -11,6 +11,7 @@ import {
 import { aiHeaderMetrics } from './aiLayout'
 
 definePage({
+  excludeLoginPath: true,
   style: {
     navigationStyle: 'custom',
     navigationBarTitleText: '对话记录',

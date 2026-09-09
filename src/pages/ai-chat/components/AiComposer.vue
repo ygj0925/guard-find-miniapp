@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<{
   speechStateText?: string
   voiceMode?: boolean
   voicePermissionPending?: boolean
+  placeholder?: string
 }>(), {
   disabled: false,
   replying: false,
@@ -26,6 +27,7 @@ const props = withDefaults(defineProps<{
   speechStateText: '',
   voiceMode: false,
   voicePermissionPending: false,
+  placeholder: '请输入内容',
 })
 
 const emit = defineEmits<{
@@ -199,7 +201,7 @@ function showVoiceTip() {
         confirm-type="send"
         :cursor-spacing="12"
         :maxlength="500"
-        placeholder="请输入内容"
+        :placeholder="placeholder"
         placeholder-class="composer-placeholder"
         @input="updateValue"
         @confirm="send"

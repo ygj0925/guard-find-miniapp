@@ -14,6 +14,6 @@ export function getMiniappRecommendMessages() {
     '/miniapp/recommend-messages',
     undefined,
     undefined,
-    { hideErrorToast: true },
+    { hideErrorToast: true, skipAuth: true },
   )
 }

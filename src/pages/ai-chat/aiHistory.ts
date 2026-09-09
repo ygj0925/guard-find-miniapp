@@ -45,6 +45,13 @@ export interface AiChatConversation {
 const ACTIVE_CONVERSATION_KEY = 'recruitment-ai-active-conversation'
 const NEW_CONVERSATION_REQUEST_KEY = 'recruitment-ai-new-conversation-request'
 const DELETED_CONVERSATION_IDS_KEY = 'recruitment-ai-deleted-conversations'
+const AI_PENDING_QUESTION_KEY = 'sss-recruitment:ai-chat:pending-question'
+const AI_PENDING_QUESTION_TTL = 15 * 60 * 1000
+
+interface PendingAiQuestion {
+  question: string
+  createdAt: number
+}
 
 export function setActiveHistoryConversation(conversationId: string) {
   clearNewConversationRequest()
@@ -84,6 +91,49 @@ export function consumeDeletedConversationIds() {
   const ids = readStringArray(uni.getStorageSync(DELETED_CONVERSATION_IDS_KEY))
   uni.removeStorageSync(DELETED_CONVERSATION_IDS_KEY)
   return ids
+}
+
+export function savePendingAiQuestion(question: string) {
+  const normalizedQuestion = question.trim()
+  if (!normalizedQuestion)
+    return false
+
+  try {
+    const pendingQuestion: PendingAiQuestion = {
+      question: normalizedQuestion,
+      createdAt: Date.now(),
+    }
+    uni.setStorageSync(AI_PENDING_QUESTION_KEY, pendingQuestion)
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+export function consumePendingAiQuestion() {
+  let storedValue: unknown
+  try {
+    storedValue = uni.getStorageSync(AI_PENDING_QUESTION_KEY)
+    uni.removeStorageSync(AI_PENDING_QUESTION_KEY)
+  }
+  catch {
+    return ''
+  }
+
+  if (typeof storedValue !== 'object' || storedValue === null)
+    return ''
+
+  const pendingQuestion = storedValue as Partial<PendingAiQuestion>
+  if (
+    typeof pendingQuestion.question !== 'string'
+    || typeof pendingQuestion.createdAt !== 'number'
+    || Date.now() - pendingQuestion.createdAt > AI_PENDING_QUESTION_TTL
+  ) {
+    return ''
+  }
+
+  return pendingQuestion.question.trim()
 }
 
 function readStringArray(value: unknown) {

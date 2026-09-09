@@ -27,13 +27,15 @@ import {
 import { getMiniappRecommendMessages } from '@/api/recommend-message'
 import { useTokenStore } from '@/store/token'
 import { useUserStore } from '@/store/user'
-import { toLoginPage } from '@/utils/toLoginPage'
+import { navigateToLoginPage, toLoginPage } from '@/utils/toLoginPage'
 import { safeAreaInsets, systemInfo } from '@/utils/systemInfo'
 import {
   clearNewConversationRequest,
   consumeActiveHistoryConversation,
   consumeDeletedConversationIds,
   consumeNewConversationRequest,
+  consumePendingAiQuestion,
+  savePendingAiQuestion,
 } from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
 import AiBrandHeader from './components/AiBrandHeader.vue'
@@ -47,7 +49,6 @@ defineOptions({
 })
 
 definePage({
-  excludeLoginPath: true,
   style: {
     navigationStyle: 'custom',
     navigationBarTitleText: '生生智家',
@@ -73,11 +74,32 @@ interface ActiveStream {
 
 const AI_PAGE_PATH = '/pages/ai-chat/index'
 const PROCESSING_STATUS_TEXT = '正在处理你的问题…'
+const FALLBACK_RECOMMEND_MESSAGES: MiniappRecommendMessage[] = [
+  {
+    id: 'guest-position-recommendation',
+    topic: '岗位推荐',
+    displayMessage: '帮我看看有哪些适合的岗位',
+    actualMessage: '请根据我的求职意向，推荐目前适合我的岗位。',
+  },
+  {
+    id: 'guest-resume-advice',
+    topic: '简历建议',
+    displayMessage: '如何让我的简历更有竞争力',
+    actualMessage: '请给我一些提升简历竞争力的实用建议。',
+  },
+  {
+    id: 'guest-interview-preparation',
+    topic: '面试准备',
+    displayMessage: '面试前需要重点准备什么',
+    actualMessage: '请告诉我参加面试前需要重点准备哪些内容。',
+  },
+]
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const recommendMessages = ref<MiniappRecommendMessage[]>([])
 const recommendMessagesLoading = ref(false)
 const recommendMessagesFailed = ref(false)
+const isAiAuthenticated = computed(() => tokenStore.hasLogin && Boolean(tokenStore.validToken))
 
 const hasStarted = ref(false)
 const inputValue = ref('')
@@ -87,6 +109,7 @@ const currentConversation = ref<AiChatConversation | null>(null)
 const isReplying = ref(false)
 const isRestoringHistory = ref(false)
 const isOpeningHistory = ref(false)
+const loginPromptPending = ref(false)
 const isFollowingLatest = ref(true)
 const scrollIntoView = ref('')
 const scrollWithAnimation = ref(false)
@@ -230,6 +253,10 @@ function startExperience() {
 }
 
 function openHistory() {
+  if (!reconcileAuthenticatedAiSession()) {
+    uni.showToast({ title: '登录后可查看历史对话', icon: 'none' })
+    return
+  }
   if (isReplying.value) {
     uni.showToast({ title: '请先停止当前回复，再查看历史对话', icon: 'none' })
     return
@@ -270,19 +297,38 @@ function currentUserId() {
   return userId && userId !== '-1' ? userId : null
 }
 
-function leaveAuthenticatedAiSession() {
+function clearAuthenticatedAiSession(preserveDraft = true) {
+  const draft = preserveDraft ? inputValue.value : ''
+  const keepComposerOpen = Boolean(draft.trim())
   speech.cancel()
-  resetConversationState(false)
+  consumeActiveHistoryConversation()
+  consumeDeletedConversationIds()
+  resetConversationState(keepComposerOpen)
+  inputValue.value = draft
   conversationOwnerId = null
-  toLoginPage({
-    queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
-  })
 }
 
 function isAuthenticationError(error: unknown) {
   const details = readRecord(error)
   const code = readString(details.code)
   return details.type === 'auth' || code === 'LOGIN_REQUIRED' || code === 'UNAUTHORIZED'
+}
+
+function reconcileAuthenticatedAiSession() {
+  const currentTokenStore = tokenStore.updateNowTime()
+  if (!currentTokenStore.hasLogin || !currentTokenStore.validToken)
+    return false
+
+  const authenticatedUserId = currentUserId()
+  if (
+    conversationOwnerId !== null
+    && authenticatedUserId !== null
+    && conversationOwnerId !== authenticatedUserId
+  ) {
+    clearAuthenticatedAiSession(false)
+  }
+  conversationOwnerId = authenticatedUserId
+  return true
 }
 
 function handleAsyncAuthLoss(error: unknown) {
@@ -292,33 +338,72 @@ function handleAsyncAuthLoss(error: unknown) {
   const currentTokenStore = tokenStore.updateNowTime()
   if (currentTokenStore.hasLogin && currentTokenStore.validToken) {
     // 迟到的旧请求不得退出新账号，但旧账号会话也不能继续显示或写入。
-    speech.cancel()
-    resetConversationState(false)
+    clearAuthenticatedAiSession()
     conversationOwnerId = currentUserId()
     return true
   }
 
-  leaveAuthenticatedAiSession()
+  clearAuthenticatedAiSession()
+  toLoginPage({
+    queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
+  })
   return true
 }
 
-function ensureAuthenticatedAiSession() {
-  const currentTokenStore = tokenStore.updateNowTime()
-  if (!currentTokenStore.hasLogin || !currentTokenStore.validToken) {
-    leaveAuthenticatedAiSession()
-    return false
-  }
+function confirmQuestionLogin() {
+  return new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '登录提示',
+      content: '使用该功能需要登录，请前往登录。',
+      confirmText: '去登录',
+      cancelText: '稍后再说',
+      confirmColor: '#2d6fe6',
+      success: result => resolve(result.confirm),
+      fail: () => resolve(false),
+    })
+  })
+}
 
-  const authenticatedUserId = currentUserId()
-  if (
-    conversationOwnerId !== null
-    && authenticatedUserId !== null
-    && conversationOwnerId !== authenticatedUserId
-  ) {
-    resetConversationState(false)
+async function requestLoginForQuestion(question: string) {
+  if (loginPromptPending.value)
+    return
+
+  inputValue.value = question
+  loginPromptPending.value = true
+  try {
+    if (!await confirmQuestionLogin())
+      return
+
+    if (reconcileAuthenticatedAiSession()) {
+      sendMessage(question)
+      return
+    }
+
+    savePendingAiQuestion(question)
+    speech.cancel()
+    const navigation = await navigateToLoginPage({
+      queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
+    })
+    if (navigation.status === 'failed') {
+      uni.showToast({
+        title: navigation.message || '暂时无法打开登录页，请稍后重试',
+        icon: 'none',
+      })
+    }
   }
-  conversationOwnerId = authenticatedUserId
-  return true
+  finally {
+    loginPromptPending.value = false
+  }
+}
+
+function restorePendingQuestion() {
+  const pendingQuestion = consumePendingAiQuestion()
+  if (!pendingQuestion)
+    return
+
+  hasStarted.value = true
+  inputValue.value = pendingQuestion
+  uni.showToast({ title: '已登录，请确认问题后发送', icon: 'none' })
 }
 
 function normalizeRecommendMessages(messages: MiniappRecommendMessage[]) {
@@ -353,12 +438,13 @@ async function loadRecommendMessages() {
   recommendMessagesLoading.value = true
   recommendMessagesFailed.value = false
   try {
-    recommendMessages.value = normalizeRecommendMessages(await getMiniappRecommendMessages())
+    const remoteMessages = normalizeRecommendMessages(await getMiniappRecommendMessages())
+    recommendMessages.value = remoteMessages.length ? remoteMessages : [...FALLBACK_RECOMMEND_MESSAGES]
   }
-  catch (error) {
-    recommendMessages.value = []
-    if (!handleAsyncAuthLoss(error))
-      recommendMessagesFailed.value = true
+  catch {
+    // 推荐问题属于游客体验内容；接口不可用时使用本地问题，不能触发登录跳转。
+    recommendMessages.value = [...FALLBACK_RECOMMEND_MESSAGES]
+    recommendMessagesFailed.value = false
   }
   finally {
     recommendMessagesLoading.value = false
@@ -374,8 +460,10 @@ function sendMessage(content = inputValue.value) {
   const question = content.trim()
   if (!question || isReplying.value || isRestoringHistory.value)
     return
-  if (!ensureAuthenticatedAiSession())
+  if (!reconcileAuthenticatedAiSession()) {
+    void requestLoginForQuestion(question)
     return
+  }
 
   if (!currentConversation.value) {
     const createdAt = Date.now()
@@ -1236,17 +1324,22 @@ watch(
     if (currentPath !== AI_PAGE_PATH)
       return
 
-    const currentTokenStore = tokenStore.updateNowTime()
-    if (!currentTokenStore.hasLogin || !currentTokenStore.validToken)
-      leaveAuthenticatedAiSession()
+    if (!reconcileAuthenticatedAiSession() && (conversationOwnerId !== null || currentConversation.value))
+      clearAuthenticatedAiSession()
   },
 )
 
 onShow(() => {
-  if (!ensureAuthenticatedAiSession())
-    return
+  const authenticated = reconcileAuthenticatedAiSession()
+  if (!authenticated && (conversationOwnerId !== null || currentConversation.value))
+    clearAuthenticatedAiSession()
+
+  // 快捷问题是游客可浏览内容，匿名接口不可用时会自动使用本地兜底。
   void loadRecommendMessages()
-  void restoreHistorySelection()
+  if (authenticated) {
+    restorePendingQuestion()
+    void restoreHistorySelection()
+  }
   if (hasStarted.value)
     void measureContentViewport()
 })
@@ -1266,7 +1359,11 @@ onUnmounted(() => {
 <template>
   <view class="ai-page">
     <view class="ai-header-fixed">
-      <AiBrandHeader @history="openHistory" @new-chat="startNewConversation" />
+      <AiBrandHeader
+        :show-history="isAiAuthenticated"
+        @history="openHistory"
+        @new-chat="startNewConversation"
+      />
     </view>
 
     <scroll-view
@@ -1473,6 +1570,7 @@ onUnmounted(() => {
           :disabled="isReplying || isRestoringHistory"
           :replying="isReplying"
           :chat-mode="Boolean(currentConversation)"
+          :placeholder="isAiAuthenticated ? '请输入内容' : '输入问题，发送时需登录'"
           :speech-state="speechState"
           :speech-state-text="speechStateText"
           :voice-mode="voiceMode"
