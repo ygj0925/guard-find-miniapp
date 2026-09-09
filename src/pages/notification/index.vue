@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onHide, onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { getMiniappMessageDetail, getMiniappMessagePage, readAllMiniappMessages } from '@/api/message'
 import type { MiniappMessage } from '@/api/message'
 import AppPageHeader from '@/components/AppPageHeader.vue'
@@ -115,6 +115,21 @@ async function loadMessages(reset = false) {
     catch (e) {
       console.error('[msg-debug] !!! 渲染字段计算抛错，这就是列表不显示的原因', e)
     }
+    // Vue 侧数据已确认正确，这里检查 render 结果有没有真的 setData 到视图层：
+    // j = 加载中分支，k = 列表分支，n = 列表项数组。若 k 不为 true 说明视图层没收到更新。
+    await nextTick()
+    setTimeout(() => {
+      try {
+        const pages = (globalThis as any).getCurrentPages?.() || []
+        const cur: any = pages[pages.length - 1]
+        console.log('[msg-debug] 页面栈深度=', pages.length, '路由=', pages.map((p: any) => p?.route).join(','))
+        console.log('[msg-debug] 视图层数据 j=', cur?.data?.j, 'k=', cur?.data?.k, 'n.length=', cur?.data?.n?.length, 'd=', cur?.data?.d)
+        console.log('[msg-debug] 视图层 keys=', cur?.data ? Object.keys(cur.data).join(',') : '(取不到 data)')
+      }
+      catch (e) {
+        console.error('[msg-debug] 读取视图层数据失败', e)
+      }
+    }, 500)
   }
   catch (err) {
     console.error('[msg-debug] !!! loadMessages 请求失败', err)
