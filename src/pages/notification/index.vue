@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onHide, onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { getMiniappMessageDetail, getMiniappMessagePage, readAllMiniappMessages } from '@/api/message'
 import type { MiniappMessage } from '@/api/message'
 import AppPageHeader from '@/components/AppPageHeader.vue'
@@ -75,6 +75,15 @@ const hasMore = computed(() => notifications.value.length < total.value)
 const unreadCount = computed(() => messageStore.unreadCount)
 const pageVisible = ref(false)
 
+// 三个状态卡用互斥的独立 v-if，而不是 v-if/v-else-if/v-else 条件链：
+// 这条链位于 <template v-if="isLoggedIn"> 内、且前面紧邻另一个兄弟 v-if（提醒卡），
+// 实测视图层已拿到列表分支为 true 的渲染数据，却仍然渲染了 v-else 的空状态卡
+// （selectorQuery 查不到 .message-list-card 节点），导致有消息也显示"暂无历史消息"。
+// 拆成独立条件后不依赖链式求值，条件本身保证三者互斥。
+const showLoadingCard = computed(() => loading.value && !notifications.value.length)
+const showMessageList = computed(() => notifications.value.length > 0)
+const showEmptyCard = computed(() => !loading.value && !notifications.value.length)
+
 async function loadMessages(reset = false) {
   if (!isLoggedIn.value)
     return
@@ -88,62 +97,16 @@ async function loadMessages(reset = false) {
   }
   loading.value = true
   const nextPageNum = reset ? 1 : pageNum.value + 1
-  console.log('[msg-debug] loadMessages 开始 reset=', reset, 'version=', version, 'requestVersion=', requestVersion, 'page=', nextPageNum)
   try {
     const page = await getMiniappMessagePage({ page: nextPageNum, size: PAGE_SIZE })
-    console.log('[msg-debug] 响应到手 raw=', JSON.stringify(page))
-    console.log('[msg-debug] 响应解析 isArray=', Array.isArray((page as any)?.list), 'list.length=', (page as any)?.list?.length, 'total=', (page as any)?.total)
-    if (version !== requestVersion) {
-      console.warn('[msg-debug] !!! 响应被当成过期丢弃 version=', version, 'requestVersion=', requestVersion)
+    if (version !== requestVersion)
       return
-    }
     notifications.value = reset ? page.list : [...notifications.value, ...page.list]
     total.value = page.total
     pageNum.value = nextPageNum
     loadFailed.value = false
-    console.log('[msg-debug] 赋值完成 notifications.length=', notifications.value?.length, 'total=', total.value)
-    // 模板里 toDisplayTime/typeMetaOf 是渲染期调用的，一旦抛错整个 render 会失败、
-    // setData 不生效，界面就会停留在上一次的空状态。这里在 JS 侧预演算一遍定位。
-    try {
-      console.log('[msg-debug] 渲染字段预演算=', JSON.stringify(notifications.value.map(i => ({
-        id: i.id,
-        time: toDisplayTime(i.createTime),
-        label: typeMetaOf(i.type).label,
-        icon: typeMetaOf(i.type).iconClass,
-      }))))
-    }
-    catch (e) {
-      console.error('[msg-debug] !!! 渲染字段计算抛错，这就是列表不显示的原因', e)
-    }
-    // Vue 侧数据已确认正确，这里检查 render 结果有没有真的 setData 到视图层：
-    // j = 加载中分支，k = 列表分支，n = 列表项数组。若 k 不为 true 说明视图层没收到更新。
-    await nextTick()
-    setTimeout(() => {
-      try {
-        const pages = (globalThis as any).getCurrentPages?.() || []
-        const cur: any = pages[pages.length - 1]
-        console.log('[msg-debug] 页面栈深度=', pages.length, '路由=', pages.map((p: any) => p?.route).join(','))
-        console.log('[msg-debug] 视图层数据 j=', cur?.data?.j, 'k=', cur?.data?.k, 'n.length=', cur?.data?.n?.length, 'd=', cur?.data?.d)
-        console.log('[msg-debug] 视图层 keys=', cur?.data ? Object.keys(cur.data).join(',') : '(取不到 data)')
-        // k=true 说明列表分支该渲染，这里查真实节点树：节点在不在、尺寸位置是多少，
-        // 用来区分"节点没渲染出来"和"渲染了但看不见（高度 0 / 被挤出屏幕 / 被遮挡）"。
-        uni.createSelectorQuery().selectAll('.message-list-card').boundingClientRect((r) => {
-          console.log('[msg-debug] 节点 .message-list-card =', JSON.stringify(r))
-        }).exec()
-        uni.createSelectorQuery().selectAll('.message-row').boundingClientRect((r) => {
-          console.log('[msg-debug] 节点 .message-row 数量=', Array.isArray(r) ? r.length : r, JSON.stringify(r))
-        }).exec()
-        uni.createSelectorQuery().selectAll('.empty-card').boundingClientRect((r) => {
-          console.log('[msg-debug] 节点 .empty-card =', JSON.stringify(r))
-        }).exec()
-      }
-      catch (e) {
-        console.error('[msg-debug] 读取视图层数据失败', e)
-      }
-    }, 500)
   }
-  catch (err) {
-    console.error('[msg-debug] !!! loadMessages 请求失败', err)
+  catch {
     if (reset && version === requestVersion)
       loadFailed.value = true
   }
@@ -216,16 +179,10 @@ async function handleMarkAllRead() {
 onShow(() => {
   pageVisible.value = true
   tokenStore.updateNowTime()
-  console.log('[msg-debug] onShow 触发 isLoggedIn=', isLoggedIn.value, 'unreadCount=', unreadCount.value, 'notifications.length=', notifications.value?.length)
   if (isLoggedIn.value) {
     messageStore.refreshUnreadCount()
     loadMessages(true)
   }
-})
-
-// 监控赋值之后 notifications 是否被别的逻辑清空（渲染看到空列表的另一种可能）
-watch(notifications, (val) => {
-  console.log('[msg-debug] notifications 变化 length=', val?.length, 'loading=', loading.value, 'loadFailed=', loadFailed.value)
 })
 
 onHide(() => {
@@ -313,11 +270,11 @@ onReachBottom(() => {
           </view>
         </view>
 
-        <view v-if="loading && !notifications.length" class="empty-card min-h-820rpx flex flex-col items-center justify-center rounded-32rpx bg-white px-5 py-7">
+        <view v-if="showLoadingCard" class="empty-card min-h-820rpx flex flex-col items-center justify-center rounded-32rpx bg-white px-5 py-7">
           <text class="text-sm text-app-muted">加载中...</text>
         </view>
 
-        <view v-else-if="notifications.length > 0" class="message-list-card overflow-hidden rounded-32rpx bg-white px-3.5 pb-0.5 pt-3">
+        <view v-if="showMessageList" class="message-list-card overflow-hidden rounded-32rpx bg-white px-3.5 pb-0.5 pt-3">
           <view class="h-60rpx flex items-center justify-between">
             <text class="text-sm text-app-ink font-700">最近消息</text>
             <view v-if="unreadCount > 0" class="flex items-center gap-1 rounded-full bg-[#FFF1F3] px-2 py-1">
@@ -370,7 +327,7 @@ onReachBottom(() => {
           </view>
         </view>
 
-        <view v-else class="empty-card min-h-820rpx flex flex-col items-center justify-center rounded-32rpx bg-white px-5 py-7">
+        <view v-if="showEmptyCard" class="empty-card min-h-820rpx flex flex-col items-center justify-center rounded-32rpx bg-white px-5 py-7">
           <image
             class="h-300rpx w-360rpx rounded-28rpx"
             src="https://static1.3sbio.com/assets/lingcai/DjcLa.png"
