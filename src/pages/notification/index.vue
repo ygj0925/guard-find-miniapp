@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onShow } from '@dcloudio/uni-app'
-import { computed, ref, watch } from 'vue'
+import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
+import { computed, ref } from 'vue'
+import { getMiniappMessageDetail, getMiniappMessagePage, readAllMiniappMessages } from '@/api/message'
+import type { MiniappMessage } from '@/api/message'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import { useMessageStore } from '@/store/message'
 import { useTokenStore } from '@/store/token'
-import { tabbarStore } from '@/tabbar/store'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 defineOptions({
@@ -15,83 +17,92 @@ definePage({
     navigationStyle: 'custom',
     navigationBarTitleText: '消息',
     backgroundColor: '#EDF6FF',
+    enablePullDownRefresh: true,
   },
 })
 
-type NotificationKind = 'interview' | 'resume' | 'status'
-
-interface NotificationItem {
-  id: string
-  kind: NotificationKind
-  title: string
-  subtitle: string
-  description: string
-  time: string
-  unread: boolean
-}
-
-interface NotificationKindMeta {
+interface TypeMeta {
   iconClass: string
   surfaceClass: string
+  label: string
 }
 
 const NOTIFICATION_PATH = '/pages/notification/index'
 const POSITION_PATH = '/pages/position/index'
+const PAGE_SIZE = 20
 
-const kindMeta: Record<NotificationKind, NotificationKindMeta> = {
-  interview: {
-    iconClass: 'i-carbon-calendar',
-    surfaceClass: 'bg-[#EAF1FF] text-app-info',
-  },
-  resume: {
-    iconClass: 'i-carbon-document',
-    surfaceClass: 'bg-[#EBFAF5] text-app-success',
-  },
-  status: {
-    iconClass: 'i-carbon-task-complete',
-    surfaceClass: 'bg-[#F3EEFF] text-brand-violet',
-  },
+/** 后端 MessageTypeEnum 的业务类型取值，目前只有投递进度；未来新增类型时在此补充映射即可。 */
+const typeMetaMap: Record<number, TypeMeta> = {
+  3: { iconClass: 'i-carbon-task-complete', surfaceClass: 'bg-[#F3EEFF] text-brand-violet', label: '投递进度' },
+}
+const DEFAULT_TYPE_META: TypeMeta = { iconClass: 'i-carbon-notification', surfaceClass: 'bg-[#EAF1FF] text-app-info', label: '通知消息' }
+
+function typeMetaOf(type: number): TypeMeta {
+  return typeMetaMap[type] ?? DEFAULT_TYPE_META
+}
+
+function toDisplayTime(dateStr: string) {
+  if (!dateStr)
+    return ''
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime()))
+    return ''
+  const now = new Date()
+  const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000)
+  if (diffDays === 0)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (diffDays === 1)
+    return '昨天'
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 const tokenStore = useTokenStore()
+const messageStore = useMessageStore()
 const reminderDismissed = ref(false)
 const reminderEnabled = ref(false)
-const notifications = ref<NotificationItem[]>([
-  {
-    id: 'interview-20260830',
-    kind: 'interview',
-    title: '面试邀请',
-    subtitle: '三生制药 · 临床运营专员',
-    description: '邀请你于 8月30日 14:00 参加线上面试',
-    time: '10:26',
-    unread: true,
-  },
-  {
-    id: 'resume-supplement-01',
-    kind: 'resume',
-    title: '请补充简历',
-    subtitle: '招聘经理希望了解你的项目经历和英语能力',
-    description: '完善后将优先进入下一轮筛选',
-    time: '09:48',
-    unread: true,
-  },
-  {
-    id: 'application-status-01',
-    kind: 'status',
-    title: '投递进展通知',
-    subtitle: '研发管培生已进入简历筛选',
-    description: '预计 3 个工作日内反馈结果',
-    time: '昨天',
-    unread: false,
-  },
-])
+
+const notifications = ref<MiniappMessage[]>([])
+const total = ref(0)
+const pageNum = ref(0)
+const loading = ref(false)
+const loadFailed = ref(false)
+let requestVersion = 0
 
 const isLoggedIn = computed(() => tokenStore.hasLogin)
-const unreadCount = computed(() => notifications.value.filter(item => item.unread).length)
+const hasMore = computed(() => notifications.value.length < total.value)
+const unreadCount = computed(() => messageStore.unreadCount)
 
-function syncUnreadBadge() {
-  const badge = isLoggedIn.value ? unreadCount.value : 0
-  tabbarStore.setTabbarItemBadgeByPath(NOTIFICATION_PATH, badge)
+async function loadMessages(reset = false) {
+  if (!isLoggedIn.value)
+    return
+  if (!reset && (loading.value || !hasMore.value))
+    return
+
+  const version = reset ? ++requestVersion : requestVersion
+  if (reset) {
+    pageNum.value = 0
+    loadFailed.value = false
+  }
+  loading.value = true
+  const nextPageNum = reset ? 1 : pageNum.value + 1
+  try {
+    const page = await getMiniappMessagePage({ page: nextPageNum, size: PAGE_SIZE })
+    if (version !== requestVersion)
+      return
+    notifications.value = reset ? page.list : [...notifications.value, ...page.list]
+    total.value = page.total
+    pageNum.value = nextPageNum
+    loadFailed.value = false
+  }
+  catch {
+    if (reset && version === requestVersion)
+      loadFailed.value = true
+  }
+  finally {
+    if (version === requestVersion)
+      loading.value = false
+  }
 }
 
 function handleLogin() {
@@ -116,30 +127,60 @@ function handleDismissReminder() {
   reminderDismissed.value = true
 }
 
-function handleMessageTap(item: NotificationItem) {
-  item.unread = false
-  uni.showToast({
-    title: '已查看消息',
-    icon: 'none',
-  })
+async function handleMessageTap(item: MiniappMessage) {
+  const wasUnread = !item.isRead
+  item.isRead = true
+  try {
+    // 详情接口会在服务端同时标记该消息已读
+    await getMiniappMessageDetail(item.id)
+  }
+  catch {
+    // 标记已读失败不影响跳转，下次刷新会重新拉到真实已读状态
+  }
+  if (wasUnread)
+    messageStore.refreshUnreadCount()
+
+  if (item.path) {
+    uni.navigateTo({ url: item.path })
+  }
+  else {
+    uni.showToast({ title: '已查看消息', icon: 'none' })
+  }
 }
 
-function handleMarkAllRead() {
+async function handleMarkAllRead() {
   if (unreadCount.value === 0)
     return
 
-  notifications.value = notifications.value.map(item => ({ ...item, unread: false }))
-  uni.showToast({
-    title: '已全部标为已读',
-    icon: 'none',
-  })
+  try {
+    await readAllMiniappMessages()
+    notifications.value = notifications.value.map(item => ({ ...item, isRead: true }))
+    uni.showToast({ title: '已全部标为已读', icon: 'none' })
+  }
+  catch {
+    uni.showToast({ title: '操作失败，请重试', icon: 'none' })
+  }
+  finally {
+    messageStore.refreshUnreadCount()
+  }
 }
-
-watch([isLoggedIn, unreadCount], syncUnreadBadge, { immediate: true })
 
 onShow(() => {
   tokenStore.updateNowTime()
-  syncUnreadBadge()
+  if (isLoggedIn.value) {
+    messageStore.refreshUnreadCount()
+    loadMessages(true)
+  }
+})
+
+onPullDownRefresh(async () => {
+  if (isLoggedIn.value)
+    await Promise.all([messageStore.refreshUnreadCount(), loadMessages(true)])
+  uni.stopPullDownRefresh()
+})
+
+onReachBottom(() => {
+  loadMessages()
 })
 </script>
 
@@ -203,7 +244,11 @@ onShow(() => {
           </view>
         </view>
 
-        <view v-if="notifications.length > 0" class="message-list-card overflow-hidden rounded-32rpx bg-white px-3.5 pb-0.5 pt-3">
+        <view v-if="loading && !notifications.length" class="empty-card min-h-820rpx flex flex-col items-center justify-center rounded-32rpx bg-white px-5 py-7">
+          <text class="text-sm text-app-muted">加载中...</text>
+        </view>
+
+        <view v-else-if="notifications.length > 0" class="message-list-card overflow-hidden rounded-32rpx bg-white px-3.5 pb-0.5 pt-3">
           <view class="h-60rpx flex items-center justify-between">
             <text class="text-sm text-app-ink font-700">最近消息</text>
             <view v-if="unreadCount > 0" class="flex items-center gap-1 rounded-full bg-[#FFF1F3] px-2 py-1">
@@ -224,9 +269,9 @@ onShow(() => {
           >
             <view
               class="h-78rpx w-78rpx flex flex-[0_0_78rpx] items-center justify-center rounded-23rpx text-lg leading-none"
-              :class="kindMeta[notification.kind].surfaceClass"
+              :class="typeMetaOf(notification.type).surfaceClass"
             >
-              <view :class="kindMeta[notification.kind].iconClass" />
+              <view :class="typeMetaOf(notification.type).iconClass" />
             </view>
 
             <view class="min-w-0 flex-1">
@@ -235,17 +280,24 @@ onShow(() => {
                   <text class="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-app-ink font-700">
                     {{ notification.title }}
                   </text>
-                  <view v-if="notification.unread" class="h-12rpx w-12rpx flex-[0_0_12rpx] rounded-full bg-app-danger" />
+                  <view v-if="!notification.isRead" class="h-12rpx w-12rpx flex-[0_0_12rpx] rounded-full bg-app-danger" />
                 </view>
-                <text class="flex-none text-2xs text-app-muted">{{ notification.time }}</text>
+                <text class="flex-none text-2xs text-app-muted">{{ toDisplayTime(notification.createTime) }}</text>
               </view>
               <text class="mt-1 block text-xs text-app-ink-soft font-500 leading-[1.45]">
-                {{ notification.subtitle }}
-              </text>
-              <text class="mt-1 block text-2xs text-app-muted leading-[1.45]">
-                {{ notification.description }}
+                {{ typeMetaOf(notification.type).label }}
               </text>
             </view>
+          </view>
+
+          <view v-if="loading" class="py-3.5 text-center text-2xs text-app-muted">
+            加载中...
+          </view>
+          <view v-else-if="loadFailed" class="py-3.5 text-center text-2xs text-app-danger">
+            加载失败，下拉页面重试
+          </view>
+          <view v-else-if="!hasMore" class="py-3.5 text-center text-2xs text-app-muted">
+            没有更多了
           </view>
         </view>
 

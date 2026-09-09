@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { onHide, onLaunch, onShow } from '@dcloudio/uni-app'
-import { getCurrentInstance, onMounted, onUnmounted } from 'vue'
+import { getCurrentInstance, onMounted, onUnmounted, watch } from 'vue'
 import { navigateToInterceptor } from '@/router/interceptor'
 import { permission } from '@/router/permission'
+import { useMessageStore } from '@/store/message'
+import { useTokenStore } from '@/store/token'
 import { tabbarStore } from '@/tabbar/store'
 
 const { proxy } = (getCurrentInstance() || {}) as any
 const router = proxy?.$router
 
 router && permission.install(router)
+
+const messageStore = useMessageStore()
+const tokenStore = useTokenStore()
+
+// App 在前台期间，登录/登出也要即时切换站内消息的连接状态，不必等下一次 onShow
+let stopWatchLogin: (() => void) | null = null
 
 onLaunch((options) => {
   console.log('App.vue onLaunch', options)
@@ -23,9 +31,24 @@ onShow((options) => {
   else {
     navigateToInterceptor.invoke({ url: '/' })
   }
+
+  if (tokenStore.hasLogin) {
+    messageStore.start()
+  }
+  stopWatchLogin = watch(() => tokenStore.hasLogin, (hasLogin) => {
+    if (hasLogin) {
+      messageStore.start()
+    }
+    else {
+      messageStore.reset()
+    }
+  })
 })
 onHide(() => {
   console.log('App Hide')
+  stopWatchLogin?.()
+  stopWatchLogin = null
+  messageStore.stop()
 })
 
 // #ifdef H5
