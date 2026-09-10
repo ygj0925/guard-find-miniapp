@@ -472,11 +472,11 @@ function skipLogin() {
           </view>
         </view>
         <view class="min-w-0 flex flex-1 flex-wrap">
-          <text>我已阅读并同意</text>
           <view class="inline-flex flex-none whitespace-nowrap">
+            <text>我已阅读并同意</text>
             <text class="tap-link text-[#087ff5]" role="link" @tap.stop="goTo(PRIVACY_PAGE)">《隐私政策》</text>
-            <text>，首次登录将自动创建会员账号</text>
           </view>
+          <text>，首次登录将自动创建会员账号</text>
         </view>
       </view>
 
@@ -534,8 +534,11 @@ function skipLogin() {
           <text class="block text-center text-34rpx text-[#18365f] font-700">隐私政策确认</text>
           <view class="mt-24rpx flex flex-wrap text-28rpx text-[#5d6775] leading-46rpx">
             <text>请您认真阅读</text>
-            <text class="tap-link text-[#167cf3]" role="link" @tap="goTo(PRIVACY_PAGE)">《隐私政策》</text>
-            <text>的全部条款，接受后可开始使用我们的服务，首次登录将自动创建会员账号。</text>
+            <view class="inline-flex flex-none whitespace-nowrap">
+              <text class="tap-link text-[#167cf3]" role="link" @tap="goTo(PRIVACY_PAGE)">《隐私政策》</text>
+              <text>的全部条款</text>
+            </view>
+            <text>，接受后可开始使用我们的服务，首次登录将自动创建会员账号。</text>
           </view>
           <view class="mt-40rpx flex gap-22rpx">
             <button class="login-button h-84rpx flex-1 border-2rpx border-[#2d6fe6] rounded-44rpx border-solid bg-white p-0 text-31rpx text-[#2d6fe6] font-600 leading-80rpx" @tap="closeAgreement">
