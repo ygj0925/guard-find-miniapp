@@ -6,6 +6,7 @@ import { permission } from '@/router/permission'
 import { useMessageStore } from '@/store/message'
 import { useTokenStore } from '@/store/token'
 import { tabbarStore } from '@/tabbar/store'
+import GlobalMessageBubble from '@/components/GlobalMessageBubble.vue'
 // #ifdef H5
 import { bridgeWechatH5OAuthCallback } from '@/service/auth/wechat-h5-oauth'
 // #endif
@@ -85,3 +86,7 @@ onUnmounted(() => {
 })
 // #endif
 </script>
+
+<template>
+  <GlobalMessageBubble />
+</template>

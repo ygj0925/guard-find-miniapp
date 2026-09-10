@@ -160,10 +160,6 @@ function handleLogout() {
           <text v-if="!tokenStore.hasLogin" class="mt-1.5 block text-sm text-[#6b7a8d] leading-[1.4]">
             {{ profileSubtitle }}
           </text>
-          <view v-if="!tokenStore.hasLogin" class="mt-2 inline-flex items-center self-start gap-1 rounded-full bg-brand-blue px-3 py-1 text-xs text-white font-500">
-            <text>登录后使用完整求职服务</text>
-            <view class="i-carbon-chevron-right text-xs leading-none" />
-          </view>
         </view>
 
         <!-- 右箭头 -->
