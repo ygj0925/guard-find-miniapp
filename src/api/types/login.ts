@@ -13,6 +13,22 @@ export interface PhoneLoginForm {
   shareIds: string[]
 }
 
+export type WechatMiniPhoneVerificationMode = 'FAST' | 'REALTIME'
+
+export interface WechatMiniPhoneLoginConfig {
+  phoneVerificationMode: WechatMiniPhoneVerificationMode
+}
+
+export interface WechatMiniPhoneLoginForm {
+  /** 后端 sys_client.client_id，不是微信 AppID。 */
+  clientId: string
+  authType: 'WECHAT_MINI_PHONE'
+  /** wx.login() 返回的临时凭证，用于关联微信身份。 */
+  wxLoginCode: string
+  /** 微信手机号组件返回的一次性凭证。 */
+  phoneCode: string
+}
+
 export type SocialLoginSource = 'WECHAT_OPEN'
 
 export interface SocialAuthorizeResult {

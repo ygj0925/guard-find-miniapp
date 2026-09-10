@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
 import { getPositionFilterOptions, getPositions } from '@/api/position'
-import type { PositionFilterOption, PositionFilterOptions, PositionListItem, PositionLocationOption } from '@/api/position'
+import type { PositionFilterOption, PositionFilterOptions, PositionListItem } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { tabbarStore } from '@/tabbar/store'
@@ -77,37 +77,9 @@ function countFilterSelections(filters: FilterSelectionState) {
     + (filters.locIds.length > 0 ? 1 : 0)
 }
 
-function appendLocationLabels(options: PositionLocationOption[], labels: Map<string, string>) {
-  options.forEach((option) => {
-    if (option.value)
-      labels.set(option.value, option.label)
-    if (option.children?.length)
-      appendLocationLabels(option.children, labels)
-  })
-}
-
-function resolveOptionLabels(options: PositionFilterOption[], values: string[]) {
-  return values.map(value => options.find(option => option.value === value)?.label || value)
-}
-
-const locationLabelByValue = computed(() => {
-  const labels = new Map<string, string>()
-  appendLocationLabels(filterOptions.value.locations, labels)
-  return labels
-})
-const selectedFilterCount = computed(() => countFilterSelections(appliedFilters))
+const hasAppliedFilters = computed(() => countFilterSelections(appliedFilters) > 0)
 const draftFilterCount = computed(() => countFilterSelections(selectedFilters))
 const hasLocationOptions = computed(() => filterOptions.value.locations.length > 0)
-const appliedFilterLabels = computed(() => {
-  const labels: string[] = []
-  if (appliedFilters.locIds.length) {
-    const locationLabels = appliedFilters.locIds.map(value => locationLabelByValue.value.get(value) || value)
-    labels.push(locationLabels.length === 1 ? locationLabels[0] : `${locationLabels[0]}等${locationLabels.length}个地点`)
-  }
-  labels.push(...resolveOptionLabels(filterOptions.value.educationInfos, appliedFilters.educationInfos))
-  labels.push(...resolveOptionLabels(filterOptions.value.workExperiences, appliedFilters.workExperiences))
-  return labels
-})
 const hasMore = computed(() => jobs.value.length < total.value)
 const positionStore = usePositionStore()
 const activeCategories = ref<string[]>([])
@@ -571,43 +543,19 @@ onUnload(() => {
             <button
               id="position-filter-trigger"
               tabindex="0"
-              class="m-0 h-72rpx flex flex-none cursor-pointer items-center rounded-xl bg-white/92 px-3.5 py-0 text-sm text-app-ink font-650 leading-none shadow-[0_8rpx_24rpx_rgba(47,111,232,0.1)] transition-[transform,background-color] duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-98 after:border-0 active:bg-[#edf5ff] motion-reduce:transition-none"
-              :aria-label="`打开职位筛选，已选择 ${selectedFilterCount} 项`"
+              class="m-0 h-72rpx flex flex-none cursor-pointer items-center border-2rpx rounded-xl border-solid px-3.5 py-0 text-sm font-650 leading-none transition-[transform,background-color,border-color,color] duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-98 after:border-0 motion-reduce:transition-none"
+              :class="hasAppliedFilters
+                ? 'border-[#9ec5f5] bg-[#eaf3ff] text-brand-blue shadow-[0_8rpx_24rpx_rgba(47,111,232,0.14)] active:bg-[#dfeeff]'
+                : 'border-transparent bg-white/92 text-app-ink shadow-[0_8rpx_24rpx_rgba(47,111,232,0.1)] active:bg-[#edf5ff]'"
+              :aria-label="hasAppliedFilters ? '打开职位筛选，当前已有筛选条件' : '打开职位筛选'"
               @keydown="activateButtonWithKeyboard"
               @tap="openFilter"
             >
-              <view class="i-carbon-filter mr-1.5 text-sm text-brand-blue leading-none" aria-hidden="true" />
+              <view class="i-carbon-filter mr-1.5 text-sm leading-none" aria-hidden="true" />
               <text>筛选</text>
-              <text
-                v-if="selectedFilterCount"
-                class="ml-1.5 min-w-32rpx rounded-full bg-brand-blue px-1.5 py-0.5 text-center text-3xs text-white font-700"
-              >
-                {{ selectedFilterCount }}
-              </text>
-              <view class="i-carbon-chevron-down ml-1 text-xs text-app-muted leading-none" aria-hidden="true" />
+              <view class="i-carbon-chevron-down ml-1 text-xs leading-none opacity-65" aria-hidden="true" />
             </button>
           </view>
-
-          <scroll-view
-            v-if="appliedFilterLabels.length"
-            class="mt-3 w-full whitespace-nowrap"
-            scroll-x
-            :show-scrollbar="false"
-          >
-            <view class="inline-flex items-center gap-2 pr-4">
-              <button
-                v-for="(label, index) in appliedFilterLabels"
-                :key="`${label}-${index}`"
-                tabindex="0"
-                class="m-0 h-60rpx inline-flex cursor-pointer items-center rounded-lg bg-white/78 px-3 py-0 text-2xs text-brand-blue font-600 leading-none shadow-[inset_0_0_0_1rpx_rgba(118,166,226,0.2)] after:border-0 active:opacity-72"
-                :aria-label="`${label}，点击调整筛选`"
-                @keydown="activateButtonWithKeyboard"
-                @tap="openFilter"
-              >
-                {{ label }}
-              </button>
-            </view>
-          </scroll-view>
         </view>
       </view>
     </view>

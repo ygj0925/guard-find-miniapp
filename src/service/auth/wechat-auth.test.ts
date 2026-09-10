@@ -13,7 +13,7 @@ describe('startWechatAuthorization', () => {
     })
   })
 
-  it('uses a code and routes to phone binding without mutating auth state', async () => {
+  it('returns a fresh WeChat login code without mutating auth state', async () => {
     const getCode = vi.fn(async () => 'mock-wechat-code')
     const result = await startWechatAuthorization({
       isWechatMiniProgram: () => true,

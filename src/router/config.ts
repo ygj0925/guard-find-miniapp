@@ -11,20 +11,16 @@ export const isNeedLoginMode = LOGIN_STRATEGY === LOGIN_STRATEGY_MAP.DEFAULT_NEE
 export const LOGIN_PAGE = '/pages/auth/login'
 export const WECHAT_OAUTH_CALLBACK_PAGE = '/pages/auth/wechat-callback'
 export const REGISTER_PAGE = '/pages/auth/register'
-export const BIND_PHONE_PAGE = '/pages/auth/bind-phone'
 export const RESET_PASSWORD_PAGE = '/pages/auth/reset-password'
 export const SET_PASSWORD_PAGE = '/pages/auth/set-password'
-export const AGREEMENT_PAGE = '/pages/auth/agreement'
 export const PRIVACY_PAGE = '/pages/auth/privacy'
 
 export const LOGIN_PAGE_LIST = [
   LOGIN_PAGE,
   WECHAT_OAUTH_CALLBACK_PAGE,
   REGISTER_PAGE,
-  BIND_PHONE_PAGE,
   RESET_PASSWORD_PAGE,
   SET_PASSWORD_PAGE,
-  AGREEMENT_PAGE,
   PRIVACY_PAGE,
 ]
 

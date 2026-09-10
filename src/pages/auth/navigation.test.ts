@@ -17,8 +17,8 @@ describe('resolveAuthRedirect', () => {
     navigateAfterAuthenticated('/pages/index/index')
     expect(uni.switchTab).toHaveBeenCalledWith({ url: '/pages/index/index' })
 
-    navigateAfterAuthenticated('/pages/auth/agreement')
-    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/auth/agreement' })
+    navigateAfterAuthenticated('/pages/auth/privacy')
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/auth/privacy' })
   })
 
   it('returns to the source page when the login page was opened from it', () => {

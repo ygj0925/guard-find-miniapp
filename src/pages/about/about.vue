@@ -15,7 +15,6 @@ definePage({
     </view>
     <wd-cell-group custom-class="mt-3 overflow-hidden rounded-24rpx">
       <wd-cell title="服务版本" value="1.0.0" />
-      <wd-cell title="服务使用协议" is-link to="/pages/auth/agreement" />
       <wd-cell title="隐私政策" is-link to="/pages/auth/privacy" />
     </wd-cell-group>
   </view>

@@ -74,26 +74,6 @@ interface ActiveStream {
 
 const AI_PAGE_PATH = '/pages/ai-chat/index'
 const PROCESSING_STATUS_TEXT = '正在处理你的问题…'
-const FALLBACK_RECOMMEND_MESSAGES: MiniappRecommendMessage[] = [
-  {
-    id: 'guest-position-recommendation',
-    topic: '岗位推荐',
-    displayMessage: '帮我看看有哪些适合的岗位',
-    actualMessage: '请根据我的求职意向，推荐目前适合我的岗位。',
-  },
-  {
-    id: 'guest-resume-advice',
-    topic: '简历建议',
-    displayMessage: '如何让我的简历更有竞争力',
-    actualMessage: '请给我一些提升简历竞争力的实用建议。',
-  },
-  {
-    id: 'guest-interview-preparation',
-    topic: '面试准备',
-    displayMessage: '面试前需要重点准备什么',
-    actualMessage: '请告诉我参加面试前需要重点准备哪些内容。',
-  },
-]
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const recommendMessages = ref<MiniappRecommendMessage[]>([])
@@ -438,13 +418,11 @@ async function loadRecommendMessages() {
   recommendMessagesLoading.value = true
   recommendMessagesFailed.value = false
   try {
-    const remoteMessages = normalizeRecommendMessages(await getMiniappRecommendMessages())
-    recommendMessages.value = remoteMessages.length ? remoteMessages : [...FALLBACK_RECOMMEND_MESSAGES]
+    recommendMessages.value = normalizeRecommendMessages(await getMiniappRecommendMessages())
   }
   catch {
-    // 推荐问题属于游客体验内容；接口不可用时使用本地问题，不能触发登录跳转。
-    recommendMessages.value = [...FALLBACK_RECOMMEND_MESSAGES]
-    recommendMessagesFailed.value = false
+    recommendMessages.value = []
+    recommendMessagesFailed.value = true
   }
   finally {
     recommendMessagesLoading.value = false
@@ -1334,7 +1312,7 @@ onShow(() => {
   if (!authenticated && (conversationOwnerId !== null || currentConversation.value))
     clearAuthenticatedAiSession()
 
-  // 快捷问题是游客可浏览内容，匿名接口不可用时会自动使用本地兜底。
+  // 游客直接加载后端匿名快捷问题配置。
   void loadRecommendMessages()
   if (authenticated) {
     restorePendingQuestion()

@@ -5,7 +5,6 @@ defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  'agreement': []
   'privacy': []
 }>()
 </script>
@@ -21,8 +20,6 @@ const emit = defineEmits<{
     >
       <text>我已阅读并同意</text>
     </wd-checkbox>
-    <text class="cursor-pointer text-brand-blue" role="link" @tap="emit('agreement')">《用户协议》</text>
-    <text class="mx-0.5">和</text>
     <text class="cursor-pointer text-brand-blue" role="link" @tap="emit('privacy')">《隐私政策》</text>
   </view>
 </template>

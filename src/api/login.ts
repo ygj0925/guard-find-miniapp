@@ -1,4 +1,4 @@
-import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, InternalEmployeeVerifyRequest, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm, SocialAuthorizeResult, SocialLoginForm, SocialLoginSource } from './types/login'
+import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, InternalEmployeeVerifyRequest, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm, SocialAuthorizeResult, SocialLoginForm, SocialLoginSource, WechatMiniPhoneLoginConfig, WechatMiniPhoneLoginForm } from './types/login'
 import { http } from '@/http/http'
 
 /**
@@ -42,6 +42,27 @@ export function login(loginForm: ILoginForm) {
  */
 export function phoneLogin(loginForm: PhoneLoginForm) {
   return http.post<IAuthLoginRes>('/auth/login', loginForm)
+}
+
+/** 微信小程序手机号授权直接登录。 */
+export function wechatMiniPhoneLogin(loginForm: WechatMiniPhoneLoginForm) {
+  return http.post<IAuthLoginRes>(
+    '/auth/login',
+    loginForm,
+    undefined,
+    undefined,
+    { hideErrorToast: true, skipAuth: true },
+  )
+}
+
+/** 获取微信手机号授权组件模式，接口失败时由页面回退到 FAST。 */
+export function getWechatMiniPhoneLoginConfig() {
+  return http.get<WechatMiniPhoneLoginConfig>(
+    '/auth/wechat-mini/phone-login-config',
+    undefined,
+    undefined,
+    { hideErrorToast: true, skipAuth: true },
+  )
 }
 
 export function getSocialAuthorizeUrl(source: SocialLoginSource) {
