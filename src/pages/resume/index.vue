@@ -34,7 +34,7 @@ function getResumeDownloadName(item: ResumeItem) {
 }
 
 async function uploadSelectedResume(filePath: string, originalName: string, fileSize?: number) {
-  if (loading.value || selecting.value) {
+  if (selecting.value) {
     uni.showToast({ title: '请稍候', icon: 'none' })
     return
   }
@@ -140,14 +140,14 @@ function chooseResume() {
 
 function showItemActions(item: ResumeItem) {
   const actions = item.isDefault
-    ? ['下载简历', '在线预览', '重命名', '删除']
-    : ['下载简历', '在线预览', '重命名', '设为默认', '删除']
+    ? ['打开简历', '在线预览', '重命名', '删除']
+    : ['打开简历', '在线预览', '重命名', '设为默认', '删除']
 
   uni.showActionSheet({
     itemList: actions,
     success: (res) => {
       const action = actions[res.tapIndex]
-      if (action === '下载简历') {
+      if (action === '打开简历') {
         downloadResume(item)
       }
       else if (action === '在线预览') {
@@ -194,7 +194,10 @@ async function downloadResume(item: ResumeItem) {
           uni.openDocument({
             filePath: tempFilePath,
             showMenu: true,
-            success: () => resolve(),
+            success: () => {
+              uni.showToast({ title: '可在右上角菜单保存文件', icon: 'none', duration: 2500 })
+              resolve()
+            },
             fail: () => reject(new Error('当前设备无法打开该简历文件')),
           })
         },
