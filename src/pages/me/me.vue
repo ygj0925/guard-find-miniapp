@@ -154,9 +154,12 @@ function handleLogout() {
           <text class="overflow-hidden text-ellipsis whitespace-nowrap text-xl text-[#1a2640] font-700 leading-[1.3]">
             {{ tokenStore.hasLogin ? profileName : '点击登录 / 注册' }}
           </text>
-          <text v-if="tokenStore.hasLogin && userInfo.deptName" class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-brand-blue leading-[1.4]">
-            {{ userInfo.deptName }}
-          </text>
+          <view v-if="tokenStore.hasLogin && userInfo.deptName" class="mt-1 flex items-center gap-1">
+            <text class="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-brand-blue leading-[1.4]">{{ userInfo.deptName }}</text>
+            <view v-if="userInfo.isInternalEmployee" class="h-28rpx w-28rpx flex flex-shrink-0 items-center justify-center rounded-full bg-[#07c160]">
+              <view class="i-carbon-checkmark text-[13px] text-white leading-none" />
+            </view>
+          </view>
           <text v-if="!tokenStore.hasLogin" class="mt-1.5 block text-sm text-[#6b7a8d] leading-[1.4]">
             {{ profileSubtitle }}
           </text>
@@ -222,7 +225,6 @@ function handleLogout() {
           <view class="i-carbon-locked mr-3 w-44rpx flex flex-[0_0_44rpx] items-center justify-center text-xl text-brand-blue leading-none" />
           <view class="min-w-0 flex flex-1 flex-col">
             <text class="text-sm text-[#263249] font-600">隐私政策</text>
-            <text class="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9aa5b5]">了解个人信息处理方式</text>
           </view>
           <view class="i-carbon-chevron-right ml-2 text-base text-[#bec7d4] leading-none" />
         </view>

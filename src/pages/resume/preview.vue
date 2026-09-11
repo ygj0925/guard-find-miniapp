@@ -8,7 +8,7 @@ import { downloadH5File, resolveH5ResourceUrl } from '@/utils/h5File'
 
 defineOptions({ name: 'ResumePreview' })
 
-definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '在线预览' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '简历预览' } })
 
 const previewUrl = ref('')
 const attachmentUrl = ref('')
@@ -111,7 +111,7 @@ function handleBack() {
 
 <template>
   <view class="min-h-[var(--app-viewport-height)] bg-[#f5f7fa]">
-    <AppPageHeader title="在线预览" background="#ffffff" scrolled-background="#ffffff">
+    <AppPageHeader title="简历预览" background="#ffffff" scrolled-background="#ffffff">
       <template #left>
         <button
           class="plain-button h-12 w-12 flex cursor-pointer items-center justify-center border-0 rounded-full bg-transparent p-0 text-xl text-[#17233d] leading-none active:bg-[#eef4ff]"
