@@ -441,10 +441,10 @@ function openApplyProgress() {
     <template v-else>
       <view class="bg-white px-4 pb-5 pt-4">
         <view class="flex items-start justify-between gap-3">
-          <text class="min-w-0 flex-1 text-2xl text-app-ink font-700 leading-[1.3]">{{ position.title }}</text>
-          <text class="flex-none pt-1 text-xl text-brand-blue font-700 leading-none">{{ position.salary }}</text>
+          <text class="min-w-0 flex-1 text-xl text-app-ink font-700 leading-[1.3]">{{ position.title }}</text>
+          <text class="flex-none pt-1 text-lg text-brand-blue font-700 leading-none">{{ position.salary }}</text>
         </view>
-        <view v-if="position.location || position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-app-ink-soft">
+        <view v-if="position.location || position.experience || position.education" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-app-ink-soft">
           <view v-if="position.location" class="flex items-center gap-1.5">
             <view class="i-carbon-location text-base text-app-muted leading-none" />
             <text>{{ position.location }}</text>
@@ -461,19 +461,19 @@ function openApplyProgress() {
       </view>
 
       <view class="mt-2 bg-white px-4 py-5">
-        <text class="block text-xl text-app-ink font-700">职位详情</text>
+        <text class="block text-lg text-app-ink font-700">职位详情</text>
         <view v-if="position.tags.some(Boolean)" class="mt-3 flex flex-wrap gap-2">
-          <text v-for="tag in position.tags.filter(Boolean)" :key="tag" class="rounded-lg bg-[#f2f6fb] px-2.5 py-1.5 text-xs text-app-ink-soft">{{ tag }}</text>
+          <text v-for="tag in position.tags.filter(Boolean)" :key="tag" class="rounded-lg bg-[#f2f6fb] px-2.5 py-1.5 text-2xs text-app-ink-soft">{{ tag }}</text>
         </view>
 
-        <view class="mt-4 flex flex-col gap-2.5 text-base text-app-ink-soft leading-[1.8]">
+        <view class="mt-4 flex flex-col gap-2.5 text-sm text-app-ink-soft leading-[1.8]">
           <text v-for="(item, index) in position.responsibilities" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
         </view>
 
-        <text class="mt-5 block text-lg text-app-ink font-700">任职要求</text>
-        <view class="mt-3 flex flex-col gap-2.5 text-base text-app-ink-soft leading-[1.8]">
+        <text class="mt-5 block text-base text-app-ink font-700">任职要求</text>
+        <view class="mt-3 flex flex-col gap-2.5 text-sm text-app-ink-soft leading-[1.8]">
           <text v-for="(item, index) in position.requirements" :key="item" class="block">
             {{ index + 1 }}. {{ item }}
           </text>
@@ -486,24 +486,24 @@ function openApplyProgress() {
     <view class="fixed inset-x-0 bottom-0 z-100 border-t border-[#e9edf3] bg-white/98 px-4 pt-2.5 shadow-[0_-8rpx_28rpx_rgba(31,52,89,0.08)] pb-safe">
       <view class="flex items-center gap-3">
         <!-- #ifdef MP-WEIXIN -->
-        <button v-if="isLoggedIn" class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位">
+        <button v-if="isLoggedIn" class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-2xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" open-type="share" aria-label="分享职位">
           <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
-        <button v-else class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" aria-label="分享职位" @tap="handleShareLogin">
+        <button v-else class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-2xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" aria-label="分享职位" @tap="handleShareLogin">
           <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
         <!-- #endif -->
         <!-- #ifndef MP-WEIXIN -->
-        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" aria-label="分享职位" @tap="handleShare">
+        <button class="plain-button h-12 w-12 flex flex-none flex-col items-center justify-center border-0 rounded-xl bg-[#f5f7fa] p-0 text-2xs text-app-ink-soft leading-none transition-colors duration-180 active:bg-[#e9edf3] motion-reduce:transition-none" aria-label="分享职位" @tap="handleShare">
           <view class="i-carbon-share mb-1 text-lg text-app-ink leading-none" />
           <text>分享</text>
         </button>
         <!-- #endif -->
 
         <button
-          class="plain-button h-12 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_8rpx_20rpx_rgba(45,111,230,0.2)] transition-[transform,opacity,background-color] duration-180 ease-out active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[#9bb8e8] disabled:shadow-none motion-reduce:transition-none"
+          class="plain-button h-12 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-sm text-white font-700 shadow-[0_8rpx_20rpx_rgba(45,111,230,0.2)] transition-[transform,opacity,background-color] duration-180 ease-out active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[#9bb8e8] disabled:shadow-none motion-reduce:transition-none"
           :disabled="isApplying"
           :aria-label="isApplied ? '查看投递进度' : '投递简历'"
           @tap="isApplied ? openApplyProgress() : handleApply()"
@@ -524,8 +524,8 @@ function openApplyProgress() {
 
         <view class="flex items-start justify-between px-5 pb-3 pt-2.5">
           <view class="min-w-0 flex-1 pr-4">
-            <text class="block text-lg text-app-ink font-700 leading-tight">选择投递简历</text>
-            <text class="mt-1 block text-sm text-app-muted leading-relaxed">请选择一份附件简历完成投递</text>
+            <text class="block text-base text-app-ink font-700 leading-tight">选择投递简历</text>
+            <text class="mt-1 block text-xs text-app-muted leading-relaxed">请选择一份附件简历完成投递</text>
           </view>
           <button class="plain-button h-10 w-10 flex flex-none items-center justify-center border-0 rounded-full bg-[#f3f5f8] p-0 text-lg text-app-ink-soft transition-colors duration-180 active:bg-[#e5eaf1] disabled:opacity-45 motion-reduce:transition-none" aria-label="关闭简历选择" :disabled="isApplying" @tap="closeResumePicker">
             <view class="i-carbon-close leading-none" />
@@ -542,7 +542,7 @@ function openApplyProgress() {
             <view class="skeleton-block ml-3 h-5.5 w-5.5 flex-none rounded-full" />
           </view>
 
-          <scroll-view v-else-if="resumes.length" scroll-y class="max-h-[40vh] px-4" role="radiogroup" aria-label="可投递简历">
+          <scroll-view v-else-if="resumes.length" scroll-y class="box-border max-h-[40vh] w-full px-4" role="radiogroup" aria-label="可投递简历">
             <view
               v-for="resume in resumes"
               :key="resume.id"
@@ -566,10 +566,10 @@ function openApplyProgress() {
 
               <view class="ml-3 min-w-0 flex-1">
                 <view class="flex items-center gap-2">
-                  <text class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-base text-app-ink font-650">{{ resume.name }}</text>
-                  <text v-if="resume.isDefault" class="flex-none rounded-md bg-[#e8f1ff] px-2 py-0.5 text-2xs text-brand-blue font-600">默认</text>
+                  <text class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-app-ink font-650">{{ resume.name }}</text>
+                  <text v-if="resume.isDefault" class="flex-none rounded-md bg-[#e8f1ff] px-2 py-0.5 text-3xs text-brand-blue font-600">默认</text>
                 </view>
-                <view class="mt-1 flex items-center text-xs text-app-muted">
+                <view class="mt-1 flex items-center text-2xs text-app-muted">
                   <view class="i-carbon-time mr-1 flex-none text-sm leading-none" />
                   <text class="overflow-hidden text-ellipsis whitespace-nowrap">上传于 {{ resume.uploadedAt }}</text>
                 </view>
@@ -590,9 +590,9 @@ function openApplyProgress() {
             <view class="h-12 w-12 flex items-center justify-center rounded-xl bg-[#edf4ff] text-2xl text-brand-blue">
               <view class="i-carbon-document-add leading-none" />
             </view>
-            <text class="mt-3 block text-base text-app-ink font-650">还没有附件简历</text>
-            <text class="mt-1 block text-sm text-app-muted leading-relaxed">先上传简历，再回来投递当前职位</text>
-            <button class="plain-button mt-4 h-11 flex items-center justify-center border border-[rgba(45,111,230,0.2)] rounded-xl border-solid bg-[#edf4ff] px-5 text-sm text-brand-blue font-650 transition-colors duration-180 active:bg-[#dce9ff] motion-reduce:transition-none" @tap="goToResumePage">
+            <text class="mt-3 block text-sm text-app-ink font-650">还没有附件简历</text>
+            <text class="mt-1 block text-xs text-app-muted leading-relaxed">先上传简历，再回来投递当前职位</text>
+            <button class="plain-button mt-4 h-11 flex items-center justify-center border border-[rgba(45,111,230,0.2)] rounded-xl border-solid bg-[#edf4ff] px-5 text-xs text-brand-blue font-650 transition-colors duration-180 active:bg-[#dce9ff] motion-reduce:transition-none" @tap="goToResumePage">
               <view class="i-carbon-upload mr-2 text-base leading-none" />
               <text>上传简历</text>
             </button>
@@ -600,10 +600,10 @@ function openApplyProgress() {
         </view>
 
         <view v-if="!isResumesLoading && resumes.length" class="flex items-center gap-3 border-t border-[#e7ebf1] bg-white px-4 py-3">
-          <button class="plain-button h-12 w-24 flex flex-none items-center justify-center border border-[#dce2ea] rounded-xl border-solid bg-white text-base text-app-ink-soft font-600 transition-colors duration-180 active:bg-[#f1f4f8] disabled:opacity-45 motion-reduce:transition-none" :disabled="isApplying" @tap="closeResumePicker">
+          <button class="plain-button h-12 w-24 flex flex-none items-center justify-center border border-[#dce2ea] rounded-xl border-solid bg-white text-sm text-app-ink-soft font-600 transition-colors duration-180 active:bg-[#f1f4f8] disabled:opacity-45 motion-reduce:transition-none" :disabled="isApplying" @tap="closeResumePicker">
             取消
           </button>
-          <button class="plain-button h-12 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-base text-white font-700 shadow-[0_8rpx_20rpx_rgba(45,111,230,0.2)] transition-[transform,opacity,background-color] duration-180 active:scale-[0.99] disabled:bg-[#9bb8e8] disabled:shadow-none motion-reduce:transition-none" :disabled="!selectedResumeId || isApplying" @tap="confirmApply">
+          <button class="plain-button h-12 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-sm text-white font-700 shadow-[0_8rpx_20rpx_rgba(45,111,230,0.2)] transition-[transform,opacity,background-color] duration-180 active:scale-[0.99] disabled:bg-[#9bb8e8] disabled:shadow-none motion-reduce:transition-none" :disabled="!selectedResumeId || isApplying" @tap="confirmApply">
             <view v-if="isApplying" class="apply-spinner mr-2 h-4 w-4 border-2 border-white/35 border-t-white rounded-full" />
             <view v-else class="i-carbon-send-alt mr-2 text-lg leading-none" />
             <text>{{ isApplying ? '正在投递' : '确认投递' }}</text>
