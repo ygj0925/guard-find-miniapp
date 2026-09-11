@@ -1,6 +1,6 @@
 export type AiChatMessageRole = 'assistant' | 'user'
 export type AiChatMessageStatus = 'complete' | 'streaming' | 'stopped' | 'error'
-export type AiMessageExtensionType = 'attachment' | 'tool_call' | 'tool_result' | 'ask' | 'custom'
+export type AiMessageExtensionType = 'attachment' | 'tool_call' | 'tool_result' | 'ask' | 'form' | 'custom'
 export type AiMessageActivityState
   = | 'running'
     | 'waiting_user'

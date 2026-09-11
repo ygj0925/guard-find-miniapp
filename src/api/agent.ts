@@ -13,8 +13,18 @@ export type AgentChatStreamEventType
     | 'tool_call'
     | 'tool_result'
     | 'ask'
+    | 'form'
     | 'done'
     | 'error'
+
+/** 统一 SSE 接口的输入语义；缺省按 message 兼容旧调用。 */
+export type AgentChatMode = 'message' | 'form_submission'
+
+/** 表单提交模式下的用户答案，formId 对应最近一次 form 事件下发的卡片。 */
+export interface AgentFormSubmissionReq {
+  formId: string
+  values: Record<string, unknown>
+}
 
 export interface AgentChatRequest {
   message: string
@@ -24,6 +34,10 @@ export interface AgentChatRequest {
   fileIds?: number[]
   thinking?: boolean
   thinkingLevel?: 'high' | 'max'
+  /** 本轮输入语义；message（默认）或 form_submission。 */
+  mode?: AgentChatMode
+  /** mode=form_submission 时携带的表单答案，不与 message 混传。 */
+  formSubmission?: AgentFormSubmissionReq
 }
 
 export interface AgentChatStreamEvent {
@@ -43,6 +57,40 @@ export interface AgentChatStreamEvent {
 
 export type AgentChatCursor = string | number
 export type AgentChatAttachmentStatus = 'PARSING' | 'SUCCESS' | 'FAILED'
+
+// ─────────────────────────────────────────────
+// 可填写表单卡片（form 事件），见设计方案 17
+// ─────────────────────────────────────────────
+
+/** 第一期固定的字段类型，服务端拒绝下发任何组件名/HTML/脚本/正则/JSON Schema。 */
+export type AgentFormFieldType = 'input' | 'textarea' | 'number' | 'radio' | 'select' | 'date'
+
+export interface AgentFormField {
+  key: string
+  type: AgentFormFieldType
+  label: string
+  required: boolean
+  minLength?: number
+  maxLength?: number
+  options?: string[]
+  min?: number
+  max?: number
+  dateFormat?: string
+}
+
+/** 表单卡片状态机：ready → submitting → submitted；失败/过期分别落到 failed/unknown。 */
+export type AgentFormStatus = 'ready' | 'submitting' | 'submitted' | 'failed' | 'unknown'
+
+/** form 事件 data 字段的形状，对应后端 AgentFormCard.toData()。 */
+export interface AgentFormCardData {
+  formId: string
+  version?: number
+  type: string
+  title: string
+  description?: string
+  fields: AgentFormField[]
+  status: AgentFormStatus
+}
 
 export interface AgentChatAttachment {
   fileId?: number

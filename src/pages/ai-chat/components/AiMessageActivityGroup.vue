@@ -31,7 +31,8 @@ const typeOrder: Record<AiMessageExtension['type'], number> = {
   tool_call: 1,
   tool_result: 2,
   ask: 3,
-  custom: 4,
+  form: 4,
+  custom: 5,
 }
 
 const groups = computed<ActivityGroup[]>(() => {
