@@ -2,6 +2,7 @@ import type { IResponse } from '@/http/types'
 import { http } from '@/http/http'
 import { getResponseMessage, HttpErrorType, isSuccessResultCode, ResultEnum } from '@/http/tools/enum'
 import { AUTH_TOKEN_STORAGE_KEY, useTokenStore } from '@/store/token'
+import { getApiUrl } from '@/utils'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 export interface ResumeItem {
@@ -97,7 +98,7 @@ export function uploadResume(name: string, filePath: string) {
       .trim()
 
     uni.uploadFile({
-      url: '/miniapp/resumes',
+      url: getApiUrl('/miniapp/resumes'),
       filePath,
       name: 'file',
       formData: { name },

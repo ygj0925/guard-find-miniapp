@@ -40,6 +40,7 @@ import {
 import { aiHeaderMetrics } from './aiLayout'
 import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
+import AiFormCard from './components/AiFormCard.vue'
 import AiMessageActivityGroup from './components/AiMessageActivityGroup.vue'
 import AiRichText from './components/AiRichText.vue'
 import { useSpeechRecognition } from './useSpeechRecognition'
@@ -176,11 +177,13 @@ const scrollLatestStyle = computed(() => ({
 const visibleMessages = computed(() => (currentConversation.value?.messages || [])
   .map((message) => {
     const visibleExtensions = message.extensions.filter(isVisibleExtension)
-    return { message, visibleExtensions }
+    const formExtension = message.extensions.find(extension => extension.type === 'form')
+    return { message, visibleExtensions, formExtension }
   })
-  .filter(({ message, visibleExtensions }) => Boolean(
+  .filter(({ message, visibleExtensions, formExtension }) => Boolean(
     message.content
     || visibleExtensions.length
+    || formExtension
     || message.reasoningContent
     || message.status === 'streaming',
   )))
@@ -543,6 +546,11 @@ function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChat
       streamStatusText.value = '需要你的进一步确认'
       scheduleAutoScroll()
       break
+    case 'form':
+      addOrUpdateExtension(assistantMessage, event, 'form')
+      streamStatusText.value = '需要你填写表单'
+      scheduleAutoScroll()
+      break
     case 'done':
       // 空的最终 reply 不能覆盖前面已经累计的 delta 正文。
       if (event.reply?.trim())
@@ -611,6 +619,10 @@ function extensionGroupIdentifier(event: AgentChatStreamEvent, type: AiMessageEx
     return `tool-${event.toolCallId}`
   if (event.askTicketId)
     return `ask-${event.askTicketId}`
+  if (type === 'form') {
+    const formId = readString(event.data.formId)
+    return formId ? `form-${formId}` : ''
+  }
   if (type !== 'attachment')
     return ''
   const attachment = readRecord(event.data.attachment)
@@ -629,9 +641,25 @@ function extensionState(type: AiMessageExtensionType, data: Record<string, unkno
     return 'running'
   if (type === 'ask')
     return statusState(data.status, 'waiting_user')
+  if (type === 'form')
+    return formStatusState(data.status)
   if (type === 'attachment')
     return statusState(readRecord(data.attachment).status, 'running')
   return statusState(data.status, 'success')
+}
+
+/** 表单卡片自己的状态机（ready/submitting/submitted/failed/unknown）映射为通用活动态，仅用于兜底展示。 */
+function formStatusState(value: unknown): AiMessageActivityState {
+  const status = readString(value)
+  if (status === 'submitted')
+    return 'success'
+  if (status === 'failed')
+    return 'failed'
+  if (status === 'unknown')
+    return 'interrupted'
+  if (status === 'submitting')
+    return 'running'
+  return 'waiting_user'
 }
 
 function statusState(value: unknown, fallback: AiMessageActivityState): AiMessageActivityState {
@@ -726,6 +754,74 @@ async function handleAskResolution(
     if (currentConversation.value)
       scheduleAutoScroll()
   }
+}
+
+/**
+ * 提交表单卡片：通过同一个 SSE 接口发起 mode=form_submission 请求，不插入用户气泡。
+ * 提交中立即禁用卡片控件（extension.data.status='submitting'）；服务端续接的回复追加为新的助手消息。
+ */
+function handleFormSubmit(
+  message: AiChatMessage,
+  extension: AiMessageExtension,
+  values: Record<string, unknown>,
+) {
+  if (extension.type !== 'form' || isReplying.value || isRestoringHistory.value)
+    return
+  const formId = readString(extension.data.formId)
+  if (!formId || readString(extension.data.status) !== 'ready')
+    return
+  if (!ensureAuthenticatedAiSession())
+    return
+  if (!currentConversation.value)
+    return
+
+  extension.data = { ...extension.data, status: 'submitting' }
+
+  currentConversation.value.messages.push(createMessage('assistant', '', 'streaming'))
+  const assistantMessage = currentConversation.value.messages[currentConversation.value.messages.length - 1]
+  currentConversation.value.updatedAt = Date.now()
+  isReplying.value = true
+  isFollowingLatest.value = true
+  streamStatusText.value = '正在提交…'
+  void scrollToBottom(true, true)
+
+  activeStream = streamAgentChat(
+    {
+      message: '',
+      stream: true,
+      sessionId: currentConversation.value.id || undefined,
+      mode: 'form_submission',
+      formSubmission: { formId, values },
+    },
+    {
+      onEvent: (event) => {
+        if (event.type === 'start')
+          extension.data = { ...extension.data, status: 'submitted' }
+        else if (event.type === 'error')
+          extension.data = { ...extension.data, status: 'failed', error: readEventMessage(event) }
+        handleStreamEvent(event, assistantMessage)
+      },
+      onError: (error) => {
+        if (handleAsyncAuthLoss(error))
+          return
+        extension.data = { ...extension.data, status: 'failed', error: error.message }
+        if (assistantMessage.status !== 'streaming')
+          return
+        if (!assistantMessage.content)
+          assistantMessage.content = error.message
+        assistantMessage.status = 'error'
+        finishReply()
+      },
+      onComplete: () => {
+        if (assistantMessage.status === 'streaming') {
+          if (!assistantMessage.content)
+            assistantMessage.content = 'AI 回复意外中断，请重试'
+          assistantMessage.status = 'error'
+          finishReply()
+        }
+      },
+    },
+  )
 }
 
 function addAskToolResult(
@@ -1010,6 +1106,25 @@ function mapHistoryMessages(records: AgentChatMessageRecord[], asks: AgentChatAs
       messages.push(message)
       if (record.runId !== undefined)
         assistantByRunId.set(record.runId, message)
+    }
+
+    const formId = readString(record.data?.formId)
+    if (formId && Array.isArray(record.data?.fields)) {
+      const groupId = `form-${formId}`
+      const extension: AiMessageExtension = {
+        id: `${groupId}:form`,
+        type: 'form',
+        groupId,
+        order: nextExtensionOrder(),
+        state: formStatusState(record.data?.status),
+        data: record.data || {},
+      }
+      const existingIndex = message.extensions.findIndex(item => item.id === extension.id)
+      if (existingIndex >= 0)
+        message.extensions.splice(existingIndex, 1, extension)
+      else
+        message.extensions.push(extension)
+      return
     }
 
     if (toolRecord) {
@@ -1466,7 +1581,7 @@ onUnmounted(() => {
 
         <template v-if="currentConversation">
           <view
-            v-for="({ message, visibleExtensions }, messageIndex) in visibleMessages"
+            v-for="({ message, visibleExtensions, formExtension }, messageIndex) in visibleMessages"
             :id="message.id"
             :key="message.id"
             class="message-row"
@@ -1484,6 +1599,12 @@ onUnmounted(() => {
                 v-if="visibleExtensions.length"
                 :extensions="visibleExtensions"
                 @resolve="handleAskResolution(message, $event.extension, $event.action)"
+              />
+
+              <AiFormCard
+                v-if="formExtension"
+                :extension="formExtension"
+                @submit="handleFormSubmit(message, formExtension, $event)"
               />
 
               <view v-if="message.role === 'assistant' && message.reasoningContent" class="reasoning-section">
