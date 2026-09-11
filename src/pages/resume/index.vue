@@ -24,6 +24,15 @@ function releaseSelecting() {
   selecting.value = false
 }
 
+function getFileIconMeta(fileType: string) {
+  const ext = fileType.replace(/^\./, '').toLowerCase()
+  if (ext === 'pdf')
+    return { icon: 'i-carbon-document-pdf', bg: 'bg-[#e84040]' }
+  if (ext === 'doc' || ext === 'docx')
+    return { icon: 'i-carbon-document', bg: 'bg-[#2b5fd9]' }
+  return { icon: 'i-carbon-document', bg: 'bg-[#6b7a8d]' }
+}
+
 function getResumeDownloadName(item: ResumeItem) {
   if (item.originalFileName?.trim())
     return item.originalFileName.trim()
@@ -309,9 +318,12 @@ onShow(loadResumes)
             :key="item.id"
             class="flex items-center rounded-xl bg-white px-4 py-5 shadow-[0_4rpx_16rpx_rgba(38,64,105,0.06)]"
           >
-            <!-- PDF 图标 -->
-            <view class="mr-3 h-88rpx w-72rpx flex flex-shrink-0 flex-col items-center justify-center rounded-10rpx bg-[#e84040]">
-              <view class="i-carbon-document-pdf text-2xl text-white leading-none" />
+            <!-- 文件类型图标 -->
+            <view
+              class="mr-3 h-88rpx w-72rpx flex flex-shrink-0 flex-col items-center justify-center rounded-10rpx"
+              :class="getFileIconMeta(item.fileType).bg"
+            >
+              <view class="text-2xl text-white leading-none" :class="getFileIconMeta(item.fileType).icon" />
             </view>
 
             <!-- 文件信息 -->
