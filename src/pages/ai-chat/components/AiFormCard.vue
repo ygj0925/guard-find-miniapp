@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { AgentFormField, AgentFormFieldType, AgentFormStatus } from '@/api/agent'
+import type { ResumeItem } from '@/api/resume'
 import type { AiMessageExtension } from '../aiHistory'
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { getResumes, uploadResume } from '@/api/resume'
 
 const props = defineProps<{
   extension: AiMessageExtension
@@ -11,7 +13,9 @@ const emit = defineEmits<{
   submit: [values: Record<string, unknown>]
 }>()
 
-const KNOWN_FIELD_TYPES: AgentFormFieldType[] = ['input', 'textarea', 'number', 'radio', 'select', 'date']
+const KNOWN_FIELD_TYPES: AgentFormFieldType[] = ['input', 'textarea', 'number', 'radio', 'select', 'date', 'resume_upload']
+const DEFAULT_RESUME_EXTENSIONS = ['pdf', 'doc', 'docx']
+const DEFAULT_MAX_RESUME_SIZE_MB = 10
 
 const title = computed(() => readString(props.extension.data.title) || '请填写')
 const description = computed(() => readString(props.extension.data.description))
@@ -39,6 +43,39 @@ const isLastStep = computed(() => currentIndex.value === total.value - 1)
 const disabled = computed(() => status.value !== 'ready')
 const progressPercent = computed(() => total.value > 0 ? Math.round(((currentIndex.value + 1) / total.value) * 100) : 0)
 
+// 简历上传/选择字段的本地状态；resumeId 表单只有一个字段，用不到按 key 隔离。
+const resumeOptions = ref<ResumeItem[]>([])
+const resumeOptionsLoaded = ref(false)
+const resumeListLoading = ref(false)
+const resumeUploading = ref(false)
+const resumeSelecting = ref(false)
+
+watch(currentField, (field) => {
+  if (field?.type === 'resume_upload')
+    void loadResumeOptions()
+}, { immediate: true })
+
+onMounted(() => {
+  if (currentField.value?.type === 'resume_upload')
+    void loadResumeOptions()
+})
+
+async function loadResumeOptions() {
+  if (resumeOptionsLoaded.value || resumeListLoading.value)
+    return
+  resumeListLoading.value = true
+  try {
+    resumeOptions.value = await getResumes()
+    resumeOptionsLoaded.value = true
+  }
+  catch {
+    resumeOptions.value = []
+  }
+  finally {
+    resumeListLoading.value = false
+  }
+}
+
 function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -53,7 +90,7 @@ function validate(field: AgentFormField, rawValue: unknown): string {
   const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue
   const empty = value === undefined || value === null || value === ''
   if (field.required && empty)
-    return '此项为必填'
+    return field.type === 'resume_upload' ? '请选择或上传一份简历' : '此项为必填'
   if (empty)
     return ''
   if (field.type === 'number' && Number.isNaN(Number(value)))
@@ -108,8 +145,95 @@ function selectOption(field: AgentFormField, option: string) {
   setAnswer(field.key, option)
 }
 
+function selectResumeOption(field: AgentFormField, resume: ResumeItem) {
+  if (disabled.value || resumeUploading.value)
+    return
+  setAnswer(field.key, resume.id)
+}
+
 function onDateChange(field: AgentFormField, event: { detail: { value: string } }) {
   setAnswer(field.key, event.detail.value)
+}
+
+/** 复用 src/pages/resume/index.vue 的选择方式，只是选完后直接把结果作为表单答案，不跳转页面。 */
+function chooseResumeFile(field: AgentFormField) {
+  if (disabled.value || resumeUploading.value || resumeSelecting.value)
+    return
+  const extensions = field.accept?.length ? field.accept : DEFAULT_RESUME_EXTENSIONS
+  resumeSelecting.value = true
+  const releaseSelecting = () => {
+    resumeSelecting.value = false
+  }
+  // #ifdef MP-WEIXIN
+  uni.chooseMessageFile({
+    count: 1,
+    type: 'file',
+    extension: extensions,
+    success: (result) => {
+      releaseSelecting()
+      const file = result.tempFiles[0]
+      if (file)
+        void uploadChosenResume(field, file.path, file.name, typeof file.size === 'number' ? file.size : undefined)
+    },
+    fail: releaseSelecting,
+    complete: releaseSelecting,
+  })
+  // #endif
+  // #ifndef MP-WEIXIN
+  uni.chooseFile({
+    count: 1,
+    type: 'all',
+    extension: extensions,
+    success: (result) => {
+      releaseSelecting()
+      const files = Array.isArray(result.tempFiles) ? result.tempFiles : [result.tempFiles]
+      const paths = Array.isArray(result.tempFilePaths) ? result.tempFilePaths : [result.tempFilePaths]
+      const file = files[0]
+      const filePath = paths[0]
+        || (file && typeof file === 'object' && 'path' in file && typeof file.path === 'string' ? file.path : '')
+      const originalName = file && typeof file === 'object' && 'name' in file && typeof file.name === 'string' ? file.name : ''
+      const fileSize = file && typeof file === 'object' && 'size' in file && typeof file.size === 'number'
+        ? file.size
+        : undefined
+      if (!filePath) {
+        uni.showToast({ title: '无法读取所选文件，请重新选择', icon: 'none' })
+        return
+      }
+      void uploadChosenResume(field, filePath, originalName, fileSize)
+    },
+    fail: releaseSelecting,
+    complete: releaseSelecting,
+  })
+  // #endif
+}
+
+async function uploadChosenResume(field: AgentFormField, filePath: string, originalName: string, fileSize?: number) {
+  const allowedExtensions = (field.accept?.length ? field.accept : DEFAULT_RESUME_EXTENSIONS).map(item => item.toLowerCase())
+  const extensions = new Set(allowedExtensions)
+  const maxSizeBytes = (field.maxSizeMb ?? DEFAULT_MAX_RESUME_SIZE_MB) * 1024 * 1024
+  const extension = originalName.split('.').pop()?.toLowerCase() || ''
+  if (originalName && !extensions.has(extension)) {
+    uni.showToast({ title: `仅支持 ${allowedExtensions.join('、')} 文件`, icon: 'none' })
+    return
+  }
+  if (typeof fileSize === 'number' && fileSize > maxSizeBytes) {
+    uni.showToast({ title: `简历文件不能超过 ${field.maxSizeMb ?? DEFAULT_MAX_RESUME_SIZE_MB}MB`, icon: 'none' })
+    return
+  }
+  const name = originalName.replace(/\.[^.]+$/, '') || '我的简历'
+  resumeUploading.value = true
+  try {
+    const uploaded = await uploadResume(name, filePath)
+    resumeOptions.value = [uploaded, ...resumeOptions.value.filter(item => item.id !== uploaded.id)]
+    setAnswer(field.key, uploaded.id)
+    uni.showToast({ title: '上传成功', icon: 'success' })
+  }
+  catch (error) {
+    uni.showToast({ title: error instanceof Error ? error.message : '上传失败', icon: 'none' })
+  }
+  finally {
+    resumeUploading.value = false
+  }
 }
 </script>
 
@@ -171,6 +295,31 @@ function onDateChange(field: AgentFormField, event: { detail: { value: string } 
             {{ answers[currentField.key] || '请选择日期' }}
           </view>
         </picker>
+
+        <view v-else-if="currentField.type === 'resume_upload'" class="form-resume-picker">
+          <view v-if="resumeListLoading" class="form-resume-loading">
+            <text class="form-hint">正在加载已保存的简历…</text>
+          </view>
+          <view v-else-if="resumeOptions.length" class="form-resume-list">
+            <view
+              v-for="resume in resumeOptions"
+              :key="resume.id"
+              class="form-resume-item"
+              :class="{ 'form-resume-item-active': answers[currentField.key] === resume.id }"
+              @tap="selectResumeOption(currentField, resume)"
+            >
+              <text class="form-resume-name">{{ resume.name }}</text>
+              <text v-if="resume.isDefault" class="form-resume-tag">默认</text>
+            </view>
+          </view>
+          <button
+            class="form-button form-button-ghost form-resume-upload-button"
+            :disabled="disabled || resumeUploading || resumeSelecting"
+            @tap="chooseResumeFile(currentField)"
+          >
+            {{ resumeUploading ? '上传中…' : '上传新简历' }}
+          </button>
+        </view>
 
         <input
           v-else
@@ -415,5 +564,55 @@ function onDateChange(field: AgentFormField, event: { detail: { value: string } 
 .form-status-submitted,
 .form-status-unknown {
   opacity: 0.85;
+}
+
+.form-resume-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.form-resume-loading {
+  padding: 8rpx 0;
+}
+
+.form-resume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.form-resume-item {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid #c9d5ec;
+  border-radius: 14rpx;
+  background: #fff;
+}
+
+.form-resume-item-active {
+  border-color: #4674d3;
+  background: rgba(70, 116, 211, 0.08);
+}
+
+.form-resume-name {
+  color: #34435f;
+  font-size: 25rpx;
+}
+
+.form-resume-tag {
+  padding: 2rpx 12rpx;
+  border-radius: 20rpx;
+  background: #e2e9f7;
+  color: #4674d3;
+  font-size: 20rpx;
+}
+
+.form-resume-upload-button {
+  flex: none;
 }
 </style>

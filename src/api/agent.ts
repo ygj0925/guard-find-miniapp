@@ -62,8 +62,12 @@ export type AgentChatAttachmentStatus = 'PARSING' | 'SUCCESS' | 'FAILED'
 // 可填写表单卡片（form 事件），见设计方案 17
 // ─────────────────────────────────────────────
 
-/** 第一期固定的字段类型，服务端拒绝下发任何组件名/HTML/脚本/正则/JSON Schema。 */
-export type AgentFormFieldType = 'input' | 'textarea' | 'number' | 'radio' | 'select' | 'date'
+/**
+ * 第一期固定的字段类型，服务端拒绝下发任何组件名/HTML/脚本/正则/JSON Schema。
+ * resume_upload 是设计方案 17 通用字段类型之外、独立落地的专用字段，
+ * 前端不走通用编辑器渲染，而是复用小程序已有的简历上传/选择能力。
+ */
+export type AgentFormFieldType = 'input' | 'textarea' | 'number' | 'radio' | 'select' | 'date' | 'resume_upload'
 
 export interface AgentFormField {
   key: string
@@ -76,6 +80,10 @@ export interface AgentFormField {
   min?: number
   max?: number
   dateFormat?: string
+  /** resume_upload 专用：允许的文件扩展名。 */
+  accept?: string[]
+  /** resume_upload 专用：单份简历大小上限（MB）。 */
+  maxSizeMb?: number
 }
 
 /** 表单卡片状态机：ready → submitting → submitted；失败/过期分别落到 failed/unknown。 */
