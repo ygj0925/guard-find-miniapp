@@ -181,11 +181,9 @@ onReachBottom(() => load())
 
             <!-- 底部：招聘信息 + 日期 -->
             <view class="mt-3 flex items-center justify-between border-t-1rpx border-t-[#f1f3f6] border-t-solid pt-3">
-              <view class="flex items-center">
-                <view class="h-42rpx w-42rpx flex items-center justify-center rounded-full bg-[#e9f3ff] text-sm text-brand-blue leading-none">
-                  <view class="i-carbon-user-avatar" />
-                </view>
-                <text class="ml-2 text-xs text-app-ink-soft">招聘团队 · 简历直投</text>
+              <view class="flex items-center text-2xs text-app-muted">
+                <view class="i-carbon-building mr-1 text-sm leading-none" />
+                <text>三生制药 · 官方直招</text>
               </view>
               <text class="ml-3 text-xs text-app-muted">{{ formatDate(share.createTime) }}</text>
             </view>
