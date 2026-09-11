@@ -249,7 +249,7 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
     </view>
 
     <template v-else-if="status === 'ready' && currentField">
-      <view class="form-progress">
+      <view v-if="total > 1" class="form-progress">
         <text class="form-step-label">第 {{ currentIndex + 1 }} / {{ total }} 题</text>
         <view class="form-progress-track">
           <view class="form-progress-bar" :style="{ width: `${progressPercent}%` }" />
@@ -337,6 +337,7 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
 
       <view class="form-actions">
         <button
+          v-if="total > 1"
           class="form-button form-button-ghost"
           :disabled="disabled || currentIndex === 0"
           @tap="goPrev"
