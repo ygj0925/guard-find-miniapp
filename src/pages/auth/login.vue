@@ -38,6 +38,7 @@ const redirectUrl = ref('')
 const feedback = ref('')
 const wechatPhoneVerificationMode = ref<WechatMiniPhoneVerificationMode>('FAST')
 const wechatPhoneConfigLoading = ref(true)
+const ENABLE_LOGIN_AREA_CODE_PICKER = false
 const showCaptcha = ref(false)
 const showAreaPicker = ref(false)
 const area = ref<AreaCodeItem>(getAreaByIso(DEFAULT_AREA_ISO))
@@ -381,6 +382,7 @@ function skipLogin() {
       <view>
         <view class="h-94rpx flex items-center border-b-1rpx border-b-[#ececec] border-b-solid text-31rpx">
           <view
+            v-if="ENABLE_LOGIN_AREA_CODE_PICKER"
             class="tap-target h-full min-w-104rpx flex flex-none items-center whitespace-nowrap pr-8rpx"
             role="button"
             :aria-expanded="showAreaPicker"
@@ -391,7 +393,8 @@ function skipLogin() {
             <view class="i-carbon-chevron-down ml-5rpx h-24rpx w-24rpx flex-none text-[#727b84] leading-none" />
           </view>
           <input
-            class="h-full min-w-0 flex-1 pl-8rpx text-[#333]"
+            class="h-full min-w-0 flex-1 text-[#333]"
+            :class="ENABLE_LOGIN_AREA_CODE_PICKER ? 'pl-8rpx' : 'pl-0'"
             :value="form.phone"
             type="number"
             :maxlength="phoneMaxLength"
@@ -521,7 +524,7 @@ function skipLogin() {
     </view>
 
     <AuthBehaviorCaptchaModal v-if="showCaptcha" @cancel="showCaptcha = false" @success="sendCodeAfterCaptcha" />
-    <AuthAreaCodePicker v-if="showAreaPicker" :selected-iso="area.iso" @cancel="showAreaPicker = false" @select="selectArea" />
+    <AuthAreaCodePicker v-if="ENABLE_LOGIN_AREA_CODE_PICKER && showAreaPicker" :selected-iso="area.iso" @cancel="showAreaPicker = false" @select="selectArea" />
 
     <view
       v-if="showAgreement"
