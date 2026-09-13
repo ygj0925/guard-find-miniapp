@@ -26,7 +26,7 @@ export interface CustomTabBarItem {
    * - image: 图片的路径
    */
   icon: string
-  /** 只有在 image 模式下才需要，传递的是高亮的图片 */
+  /** 选中态图标；未配置时继续使用 icon。image 传图片路径，unocss/iconfont 传图标类名。 */
   iconActive?: string
   /** badge 显示一个数字或 小红点 */
   badge?: CustomTabBarItemBadge

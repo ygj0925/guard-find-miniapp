@@ -3,12 +3,14 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TabbarItem from './TabbarItem.vue'
 
-const storeState = vi.hoisted(() => ({ backToTopPath: '' }))
+const storeState = vi.hoisted(() => ({ backToTopPath: '', curIdx: 0 }))
 
 // mock tabbar store，避免 uni.getStorageSync 在模块加载时执行
 vi.mock('./store', () => ({
   tabbarStore: {
-    curIdx: 0,
+    get curIdx() {
+      return storeState.curIdx
+    },
     isBackToTopPath: (path: string) => storeState.backToTopPath === path,
   },
 }))
@@ -17,7 +19,7 @@ const baseItem: CustomTabBarItem = {
   text: '首页',
   pagePath: 'pages/index/index',
   iconType: 'unocss',
-  icon: 'i-carbon-home',
+  icon: 'i-my-icons-home',
 }
 
 describe('tabbarItem', () => {
@@ -25,6 +27,7 @@ describe('tabbarItem', () => {
 
   beforeEach(() => {
     storeState.backToTopPath = ''
+    storeState.curIdx = 0
   })
 
   afterEach(() => {
@@ -49,7 +52,35 @@ describe('tabbarItem', () => {
     wrapper = mount(TabbarItem, {
       props: { item: baseItem, index: 0 },
     })
-    expect(wrapper.html()).toContain('i-carbon-home')
+    expect(wrapper.html()).toContain('i-my-icons-home')
+  })
+
+  it('选中时渲染实心图标', () => {
+    const item: CustomTabBarItem = {
+      ...baseItem,
+      iconActive: 'i-my-icons-home-filled',
+    }
+
+    wrapper = mount(TabbarItem, {
+      props: { item, index: 0 },
+    })
+
+    expect(wrapper.find('.i-my-icons-home-filled').exists()).toBe(true)
+  })
+
+  it('未选中时保留轮廓图标', () => {
+    const item: CustomTabBarItem = {
+      ...baseItem,
+      iconActive: 'i-my-icons-home-filled',
+    }
+    storeState.curIdx = 1
+
+    wrapper = mount(TabbarItem, {
+      props: { item, index: 0 },
+    })
+
+    expect(wrapper.find('.i-my-icons-home').exists()).toBe(true)
+    expect(wrapper.find('.i-my-icons-home-filled').exists()).toBe(false)
   })
 
   it('回顶部状态覆盖职位图标和文本', () => {

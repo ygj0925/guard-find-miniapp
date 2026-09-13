@@ -13,7 +13,7 @@ const props = defineProps<{
 const showBackToTop = computed(() => !props.isBulge && tabbarStore.isBackToTopPath(props.item.pagePath))
 const displayText = computed(() => showBackToTop.value ? '回顶部' : getI18nText(props.item.text))
 
-function getImageByIndex(index: number, item: CustomTabBarItem) {
+function getIconByIndex(index: number, item: CustomTabBarItem) {
   if (!item.iconActive) {
     return item.icon
   }
@@ -26,11 +26,11 @@ function getImageByIndex(index: number, item: CustomTabBarItem) {
     <template v-if="item.iconType === 'uiLib'" />
 
     <template v-if="item.iconType === 'unocss' || item.iconType === 'iconfont'">
-      <view class="leading-none" :class="[showBackToTop ? 'i-carbon-up-to-top' : item.icon, isBulge ? 'text-7xl' : 'text-xl']" />
+      <view class="leading-none" :class="[showBackToTop ? 'i-carbon-up-to-top' : getIconByIndex(index, item), isBulge ? 'text-7xl' : 'text-xl']" />
     </template>
 
     <template v-if="item.iconType === 'image'">
-      <image :src="getImageByIndex(index, item)" mode="scaleToFill" :class="isBulge ? 'h-116px w-116px' : 'h-24px w-24px'" />
+      <image :src="getIconByIndex(index, item)" mode="scaleToFill" :class="isBulge ? 'h-116px w-116px' : 'h-24px w-24px'" />
     </template>
 
     <view v-if="!isBulge" class="mt-0.5 text-xs">

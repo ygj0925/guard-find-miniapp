@@ -29,13 +29,15 @@ export const customTabbarList: CustomTabBarItem[] = [
     text: '首页',
     pagePath: 'pages/index/index',
     iconType: 'unocss',
-    icon: 'i-carbon-home',
+    icon: 'i-my-icons-home',
+    iconActive: 'i-my-icons-home-filled',
   },
   {
     text: '职位',
     pagePath: 'pages/position/index',
     iconType: 'unocss',
-    icon: 'i-carbon-task',
+    icon: 'i-my-icons-briefcase',
+    iconActive: 'i-my-icons-briefcase-filled',
   },
   {
     text: '',
@@ -50,12 +52,14 @@ export const customTabbarList: CustomTabBarItem[] = [
     pagePath: 'pages/notification/index',
     iconType: 'unocss',
     icon: 'i-carbon-notification',
+    iconActive: 'i-carbon-notification-filled',
   },
   {
     text: '我的',
     pagePath: 'pages/me/me',
     iconType: 'unocss',
     icon: 'i-carbon-user',
+    iconActive: 'i-carbon-user-filled',
   },
 ]
 

@@ -46,6 +46,7 @@ interface HomeBanner {
 interface QuickEntry {
   title: string
   iconClass: string
+  iconUrl?: string
   gradient: string
   glow: string
   pagePath?: string
@@ -88,15 +89,17 @@ const fallbackBanners: HomeBanner[] = [
 
 const quickEntryPages: QuickEntry[][] = [
   [
-    { title: '社会招聘', iconClass: 'i-carbon-portfolio', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
-    { title: '校园招聘', iconClass: 'i-carbon-education', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
+    { title: '社会招聘', iconClass: 'i-carbon-portfolio', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E7%A4%BE%E4%BC%9A%E6%8B%9B%E8%81%98.png', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
+    { title: '校园招聘', iconClass: 'i-carbon-education', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E6%A0%A1%E5%9B%AD%E6%8B%9B%E8%81%98.png', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
+    { title: '求职工作台', iconClass: 'i-carbon-dashboard', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E6%B1%82%E8%81%8C%E5%B7%A5%E4%BD%9C%E5%8F%B0.png', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
+    { title: '消息通知', iconClass: 'i-carbon-notification', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E6%B6%88%E6%81%AF%E9%80%9A%E7%9F%A5.png', gradient: 'linear-gradient(140deg, #5f7ce8 0%, #86a4ff 100%)', glow: '0 10rpx 20rpx rgba(95,124,232,0.24)', pagePath: 'pages/notification/index' },
+    { title: '简历完善', iconClass: 'i-carbon-user-profile', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E7%AE%80%E5%8E%86%E5%AE%8C%E5%96%84.png', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
+    { title: '生生AI', iconClass: 'i-carbon-ai-status', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E7%94%9F%E7%94%9FAI.png', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
     { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #13a77e 0%, #43d0a5 100%)', glow: '0 10rpx 20rpx rgba(19,167,126,0.24)', action: 'internalReferral' },
-    { title: '求职工作台', iconClass: 'i-carbon-dashboard', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
-    { title: '消息通知', iconClass: 'i-carbon-notification', gradient: 'linear-gradient(140deg, #5f7ce8 0%, #86a4ff 100%)', glow: '0 10rpx 20rpx rgba(95,124,232,0.24)', pagePath: 'pages/notification/index' },
-    { title: '简历完善', iconClass: 'i-carbon-user-profile', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
-    { title: '生生AI', iconClass: 'i-carbon-ai-status', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
   ],
 ]
+
+const visibleQuickEntryPages = computed(() => quickEntryPages)
 
 const HOT_POSITION_LIMIT = 10
 const remoteBanners = ref<MiniappBanner[]>([])
@@ -442,29 +445,30 @@ onPageScroll(({ scrollTop }) => {
 
     <view class="px-3 pt-1">
       <view
-        class="relative cursor-pointer overflow-hidden rounded-32rpx px-3.5 py-3 shadow-[0_16rpx_36rpx_rgba(45,111,230,0.24)] bg-brand-hero active:opacity-88"
+        class="relative cursor-pointer overflow-hidden rounded-32rpx bg-[linear-gradient(102deg,#8dcdf3_0%,#91d9ec_52%,#86dedc_100%)] px-3.5 py-3 shadow-[0_14rpx_30rpx_rgba(62,157,201,0.2)] active:opacity-88"
         role="button"
+        aria-label="打开生生智家 AI 助手"
         @tap="openPage('pages/ai-chat/index')"
       >
-        <view class="pointer-events-none absolute h-200rpx w-200rpx rounded-full bg-white/16 -right-56rpx -top-72rpx" />
-        <view class="pointer-events-none absolute left-160rpx h-140rpx w-140rpx rounded-full bg-white/10 -bottom-72rpx" />
+        <view class="pointer-events-none absolute h-200rpx w-200rpx rounded-full bg-white/18 -right-56rpx -top-72rpx" />
+        <view class="pointer-events-none absolute left-160rpx h-140rpx w-140rpx rounded-full bg-white/12 -bottom-72rpx" />
 
         <view class="relative z-1 flex items-center">
-          <view class="h-92rpx w-92rpx center flex-none border-1rpx border-white/30 rounded-26rpx border-solid bg-white/18">
-            <view class="i-carbon-ai-status text-2xl text-white leading-none" />
-          </view>
+          <image
+            class="h-92rpx w-92rpx flex-none"
+            src="https://static1.3sbio.com/assets/lingcai/icon_%E7%94%9F%E7%94%9F%E6%99%BA%E5%AE%B6.png"
+            mode="aspectFit"
+            aria-hidden="true"
+          />
 
           <view class="ml-3 min-w-0 flex flex-1 flex-col">
-            <view class="flex items-center">
-              <text class="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-white font-700">生生智家 · AI 助手</text>
-              <text class="ml-1.5 flex-none rounded-full bg-white/24 px-1.5 py-0.5 text-3xs text-white font-600">NEW</text>
-            </view>
-            <text class="mt-1.5 block text-2xs text-white/82">说出期望，AI 帮你匹配岗位并一键投递</text>
+            <text class="overflow-hidden text-ellipsis whitespace-nowrap text-36rpx text-[#113d78] font-700 leading-none">生生智家 · AI 助手</text>
+            <text class="mt-2 block text-2xs text-[#315d88] font-500">说出期望，AI 帮你匹配岗位并一键投递</text>
           </view>
 
-          <view class="ml-2 h-60rpx flex flex-none items-center rounded-full bg-white px-3 text-xs text-brand-blue font-700 shadow-[0_8rpx_18rpx_rgba(45,111,230,0.18)]">
+          <view class="ml-2 h-64rpx flex flex-none items-center rounded-full bg-white px-4 text-30rpx text-[#165caa] font-700 shadow-[0_8rpx_18rpx_rgba(44,122,178,0.18)]">
             <text>聊一聊</text>
-            <view class="i-carbon-arrow-right ml-0.5 text-xs leading-none" />
+            <view class="i-carbon-arrow-right ml-1 text-lg leading-none" />
           </view>
         </view>
       </view>
@@ -475,7 +479,7 @@ onPageScroll(({ scrollTop }) => {
           :duration="300"
           @change="handleEntryPageChange"
         >
-          <swiper-item v-for="(entryPage, pageIndex) in quickEntryPages" :key="pageIndex">
+          <swiper-item v-for="(entryPage, pageIndex) in visibleQuickEntryPages" :key="pageIndex">
             <view class="grid grid-cols-4 gap-y-5 px-1">
               <view
                 v-for="entry in entryPage"
@@ -488,21 +492,34 @@ onPageScroll(({ scrollTop }) => {
                 @keydown.space.prevent="openEntry(entry)"
                 @tap="openEntry(entry)"
               >
+                <image
+                  v-if="entry.iconUrl"
+                  class="h-84rpx w-84rpx flex-none"
+                  :src="entry.iconUrl"
+                  mode="aspectFit"
+                  aria-hidden="true"
+                />
                 <view
+                  v-else
                   class="h-84rpx w-84rpx center rounded-26rpx"
                   :style="{ background: entry.gradient, boxShadow: entry.glow }"
                 >
                   <view class="h-44rpx w-44rpx text-2xl text-white leading-none" :class="entry.iconClass" />
                 </view>
-                <text class="mt-2 text-2xs text-app-ink-soft font-600">{{ entry.title }}</text>
+                <text
+                  class="mt-2 text-2xs font-600"
+                  :class="entry.iconUrl ? 'text-[#113d78] font-700' : 'text-app-ink-soft'"
+                >
+                  {{ entry.title }}
+                </text>
               </view>
             </view>
           </swiper-item>
         </swiper>
 
-        <view v-if="quickEntryPages.length > 1" class="mt-1 flex items-center justify-center gap-1">
+        <view v-if="visibleQuickEntryPages.length > 1" class="mt-1 flex items-center justify-center gap-1">
           <view
-            v-for="(entryPage, pageIndex) in quickEntryPages"
+            v-for="(entryPage, pageIndex) in visibleQuickEntryPages"
             :key="pageIndex"
             class="h-6rpx rounded-full transition-all duration-260"
             :class="pageIndex === entryPageIndex ? 'w-28rpx bg-brand-blue' : 'w-12rpx bg-[#dbe4f2]'"
