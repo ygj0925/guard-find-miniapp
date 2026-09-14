@@ -45,10 +45,7 @@ interface HomeBanner {
 
 interface QuickEntry {
   title: string
-  iconClass: string
-  iconUrl?: string
-  gradient: string
-  glow: string
+  iconUrl: string
   pagePath?: string
   action?: 'internalReferral'
   /** 跳转职位页时携带的招聘分类编码（1=社会招聘，2=校园招聘），用于自动选中并过滤。 */
@@ -89,13 +86,13 @@ const fallbackBanners: HomeBanner[] = [
 
 const quickEntryPages: QuickEntry[][] = [
   [
-    { title: '社会招聘', iconClass: 'i-carbon-portfolio', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E7%A4%BE%E4%BC%9A%E6%8B%9B%E8%81%98.png', gradient: 'linear-gradient(140deg, #2f6fe8 0%, #4d9bf6 100%)', glow: '0 10rpx 20rpx rgba(47,111,232,0.26)', pagePath: 'pages/position/index', category: '1' },
-    { title: '校园招聘', iconClass: 'i-carbon-education', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E6%A0%A1%E5%9B%AD%E6%8B%9B%E8%81%98.png', gradient: 'linear-gradient(140deg, #12b3c7 0%, #46d8d0 100%)', glow: '0 10rpx 20rpx rgba(18,179,199,0.24)', pagePath: 'pages/position/index', category: '2' },
-    { title: '求职工作台', iconClass: 'i-carbon-dashboard', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E6%B1%82%E8%81%8C%E5%B7%A5%E4%BD%9C%E5%8F%B0.png', gradient: 'linear-gradient(140deg, #16bd8e 0%, #4ddba8 100%)', glow: '0 10rpx 20rpx rgba(22,189,142,0.24)', pagePath: 'pages/me/me' },
-    { title: '消息通知', iconClass: 'i-carbon-notification', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E6%B6%88%E6%81%AF%E9%80%9A%E7%9F%A5.png', gradient: 'linear-gradient(140deg, #5f7ce8 0%, #86a4ff 100%)', glow: '0 10rpx 20rpx rgba(95,124,232,0.24)', pagePath: 'pages/notification/index' },
-    { title: '简历完善', iconClass: 'i-carbon-user-profile', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E7%AE%80%E5%8E%86%E5%AE%8C%E5%96%84.png', gradient: 'linear-gradient(140deg, #2aa8e0 0%, #5fd0f0 100%)', glow: '0 10rpx 20rpx rgba(42,168,224,0.24)', pagePath: 'pages/me/me' },
-    { title: '生生AI', iconClass: 'i-carbon-ai-status', iconUrl: 'https://static1.3sbio.com/assets/lingcai/icon_%E7%94%9F%E7%94%9FAI.png', gradient: 'linear-gradient(140deg, #7b4df0 0%, #a97cf7 100%)', glow: '0 10rpx 20rpx rgba(123,77,240,0.24)', pagePath: 'pages/ai-chat/index' },
-    { title: '内部推荐', iconClass: 'i-carbon-share-knowledge', gradient: 'linear-gradient(140deg, #13a77e 0%, #43d0a5 100%)', glow: '0 10rpx 20rpx rgba(19,167,126,0.24)', action: 'internalReferral' },
+    { title: '社会招聘', iconUrl: 'https://static1.3sbio.com/assets/lingcai/shehui_V1.png', pagePath: 'pages/position/index', category: '1' },
+    { title: '校园招聘', iconUrl: 'https://static1.3sbio.com/assets/lingcai/xiaoyuan_V1.png', pagePath: 'pages/position/index', category: '2' },
+    { title: '求职工作台', iconUrl: 'https://static1.3sbio.com/assets/lingcai/qiuzhi_V1.png', pagePath: 'pages/me/me' },
+    { title: '消息通知', iconUrl: 'https://static1.3sbio.com/assets/lingcai/xiaoxi_V1.png', pagePath: 'pages/notification/index' },
+    { title: '简历完善', iconUrl: 'https://static1.3sbio.com/assets/lingcai/jianli_V1.png', pagePath: 'pages/me/me' },
+    { title: '生生AI', iconUrl: 'https://static1.3sbio.com/assets/lingcai/AI_V1.png', pagePath: 'pages/ai-chat/index' },
+    { title: '内部推荐', iconUrl: 'https://static1.3sbio.com/assets/lingcai/neitui_V1.png', action: 'internalReferral' },
   ],
 ]
 
@@ -456,7 +453,7 @@ onPageScroll(({ scrollTop }) => {
         <view class="relative z-1 flex items-center">
           <image
             class="h-92rpx w-92rpx flex-none"
-            src="https://static1.3sbio.com/assets/lingcai/icon_%E7%94%9F%E7%94%9F%E6%99%BA%E5%AE%B6.png"
+            src="https://static1.3sbio.com/assets/lingcai/icon_%E6%B1%82%E8%81%8C%E5%B7%A5%E4%BD%9C%E5%8F%B0_V1.png"
             mode="aspectFit"
             aria-hidden="true"
           />
@@ -475,12 +472,12 @@ onPageScroll(({ scrollTop }) => {
 
       <view class="mt-3 app-card px-1.5 pb-3 pt-3">
         <swiper
-          class="h-260rpx"
+          class="h-300rpx"
           :duration="300"
           @change="handleEntryPageChange"
         >
           <swiper-item v-for="(entryPage, pageIndex) in visibleQuickEntryPages" :key="pageIndex">
-            <view class="grid grid-cols-4 gap-y-4 px-1">
+            <view class="grid grid-cols-4 gap-y-2 px-1 pt-2">
               <view
                 v-for="entry in entryPage"
                 :key="entry.title"
@@ -492,25 +489,13 @@ onPageScroll(({ scrollTop }) => {
                 @keydown.space.prevent="openEntry(entry)"
                 @tap="openEntry(entry)"
               >
-                <view v-if="entry.iconUrl" class="relative h-84rpx w-84rpx flex-none overflow-visible">
-                  <image
-                    class="absolute h-100rpx w-100rpx -left-8rpx -top-12rpx"
-                    :src="entry.iconUrl"
-                    mode="aspectFit"
-                    aria-hidden="true"
-                  />
-                </view>
-                <view
-                  v-else
-                  class="h-84rpx w-84rpx center rounded-26rpx"
-                  :style="{ background: entry.gradient, boxShadow: entry.glow }"
-                >
-                  <view class="h-44rpx w-44rpx text-2xl text-white leading-none" :class="entry.iconClass" />
-                </view>
-                <text
-                  class="text-2xs font-600"
-                  :class="entry.iconUrl ? 'text-[#113d78] font-700' : 'text-app-ink-soft'"
-                >
+                <image
+                  class="h-106rpx w-84rpx flex-none"
+                  :src="entry.iconUrl"
+                  mode="aspectFit"
+                  aria-hidden="true"
+                />
+                <text class="whitespace-nowrap text-2xs text-[#113d78] font-700">
                   {{ entry.title }}
                 </text>
               </view>
