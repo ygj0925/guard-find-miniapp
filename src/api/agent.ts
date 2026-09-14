@@ -64,10 +64,41 @@ export type AgentChatAttachmentStatus = 'PARSING' | 'SUCCESS' | 'FAILED'
 
 /**
  * 第一期固定的字段类型，服务端拒绝下发任何组件名/HTML/脚本/正则/JSON Schema。
- * resume_upload 是设计方案 17 通用字段类型之外、独立落地的专用字段，
- * 前端不走通用编辑器渲染，而是复用小程序已有的简历上传/选择能力。
+ * resume_upload、position_select 是设计方案 17 通用字段类型之外、独立落地的专用字段，
+ * 前端不走通用编辑器渲染：resume_upload 复用小程序已有的简历上传/选择能力，
+ * position_select 渲染结构化的职位卡片列表。
  */
-export type AgentFormFieldType = 'input' | 'textarea' | 'number' | 'radio' | 'select' | 'date' | 'resume_upload'
+export type AgentFormFieldType = 'input' | 'textarea' | 'number' | 'radio' | 'select' | 'date' | 'resume_upload' | 'position_select'
+
+/** position_select 单个职位的 AI 匹配理由，只有职位推荐场景才有；普通搜索结果没有这个字段。 */
+export interface AgentFormMatchReasoning {
+  score: number
+  level: string
+  summary: string
+}
+
+/** position_select 单个职位选项；答案回传的是 positionId。 */
+export interface AgentFormPositionOption {
+  positionId: string
+  jobId: string
+  positionName?: string
+  location?: string
+  salaryText?: string
+  matchReasoning?: AgentFormMatchReasoning
+}
+
+/**
+ * position_select 的结构化选项与分页信息。options 只是建卡那一刻的首页快照，
+ * hasMore 为真时前端应调用已有的职位查询接口（queryCriteria + 下一页页码）在本地追加，
+ * 不要把翻页请求发给表单提交/续接接口。
+ */
+export interface AgentFormPositionSelect {
+  options: AgentFormPositionOption[]
+  pageNum: number
+  pageSize: number
+  hasMore: boolean
+  queryCriteria: Record<string, unknown>
+}
 
 export interface AgentFormField {
   key: string
@@ -84,6 +115,8 @@ export interface AgentFormField {
   accept?: string[]
   /** resume_upload 专用：单份简历大小上限（MB）。 */
   maxSizeMb?: number
+  /** position_select 专用：结构化职位选项与分页信息。 */
+  positionSelect?: AgentFormPositionSelect
 }
 
 /** 表单卡片状态机：ready → submitting → submitted；失败/过期分别落到 failed/unknown。 */

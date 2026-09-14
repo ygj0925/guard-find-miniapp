@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { AgentFormField, AgentFormFieldType, AgentFormStatus } from '@/api/agent'
+import type { AgentFormField, AgentFormFieldType, AgentFormPositionOption, AgentFormStatus } from '@/api/agent'
 import type { ResumeItem } from '@/api/resume'
 import type { AiMessageExtension } from '../aiHistory'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { getPositions } from '@/api/position'
 import { getResumes, uploadResume } from '@/api/resume'
 
 const props = defineProps<{
@@ -13,7 +14,7 @@ const emit = defineEmits<{
   submit: [values: Record<string, unknown>]
 }>()
 
-const KNOWN_FIELD_TYPES: AgentFormFieldType[] = ['input', 'textarea', 'number', 'radio', 'select', 'date', 'resume_upload']
+const KNOWN_FIELD_TYPES: AgentFormFieldType[] = ['input', 'textarea', 'number', 'radio', 'select', 'date', 'resume_upload', 'position_select']
 const DEFAULT_RESUME_EXTENSIONS = ['pdf', 'doc', 'docx']
 const DEFAULT_MAX_RESUME_SIZE_MB = 10
 
@@ -50,9 +51,21 @@ const resumeListLoading = ref(false)
 const resumeUploading = ref(false)
 const resumeSelecting = ref(false)
 
+// 职位选择字段的本地状态：options 初始来自建卡时的首页快照，翻页由本组件直接调用
+// 已有的职位查询接口在本地追加，不经过表单提交/续接接口。
+const positionOptions = ref<AgentFormPositionOption[]>([])
+const positionPageNum = ref(1)
+const positionHasMore = ref(false)
+const positionLoadingMore = ref(false)
+
 watch(currentField, (field) => {
   if (field?.type === 'resume_upload')
     void loadResumeOptions()
+  if (field?.type === 'position_select') {
+    positionOptions.value = field.positionSelect?.options ?? []
+    positionPageNum.value = field.positionSelect?.pageNum ?? 1
+    positionHasMore.value = field.positionSelect?.hasMore ?? false
+  }
 }, { immediate: true })
 
 onMounted(() => {
@@ -76,6 +89,44 @@ async function loadResumeOptions() {
   }
 }
 
+async function loadMorePositions(field: AgentFormField) {
+  const positionSelect = field.positionSelect
+  if (!positionSelect || positionLoadingMore.value || !positionHasMore.value)
+    return
+  positionLoadingMore.value = true
+  try {
+    const nextPageNum = positionPageNum.value + 1
+    const page = await getPositions({
+      ...positionSelect.queryCriteria,
+      pageNum: nextPageNum,
+      pageSize: positionSelect.pageSize,
+    })
+    const appended = page.list.map(item => ({
+      positionId: item.positionId,
+      jobId: String(item.jobId),
+      positionName: item.positionName,
+      location: item.location,
+      salaryText: salaryTextOf(item.salaryMin, item.salaryMax, item.salaryUnit),
+    }))
+    positionOptions.value = [...positionOptions.value, ...appended]
+    positionPageNum.value = nextPageNum
+    positionHasMore.value = nextPageNum * positionSelect.pageSize < page.total
+  }
+  catch {
+    uni.showToast({ title: '加载更多职位失败', icon: 'none' })
+  }
+  finally {
+    positionLoadingMore.value = false
+  }
+}
+
+function salaryTextOf(min?: number, max?: number, unit?: string) {
+  if (min == null && max == null)
+    return unit || '面议'
+  const range = min != null && max != null ? `${min}-${max}` : String(min ?? max)
+  return unit ? `${range} ${unit}` : range
+}
+
 function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -90,7 +141,7 @@ function validate(field: AgentFormField, rawValue: unknown): string {
   const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue
   const empty = value === undefined || value === null || value === ''
   if (field.required && empty)
-    return field.type === 'resume_upload' ? '请选择或上传一份简历' : '此项为必填'
+    return field.type === 'resume_upload' ? '请选择或上传一份简历' : field.type === 'position_select' ? '请选择一个职位' : '此项为必填'
   if (empty)
     return ''
   if (field.type === 'number' && Number.isNaN(Number(value)))
@@ -149,6 +200,12 @@ function selectResumeOption(field: AgentFormField, resume: ResumeItem) {
   if (disabled.value || resumeUploading.value)
     return
   setAnswer(field.key, resume.id)
+}
+
+function selectPositionOption(field: AgentFormField, option: AgentFormPositionOption) {
+  if (disabled.value)
+    return
+  setAnswer(field.key, option.positionId)
 }
 
 function onDateChange(field: AgentFormField, event: { detail: { value: string } }) {
@@ -250,7 +307,7 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
 
     <template v-else-if="status === 'ready' && currentField">
       <view v-if="total > 1" class="form-progress">
-        <text class="form-step-label">第 {{ currentIndex + 1 }} / {{ total }} 题</text>
+        <text class="form-step-label">第 {{ currentIndex + 1 }} / {{ total }} 步</text>
         <view class="form-progress-track">
           <view class="form-progress-bar" :style="{ width: `${progressPercent}%` }" />
         </view>
@@ -321,6 +378,41 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
           </button>
         </view>
 
+        <view v-else-if="currentField.type === 'position_select'" class="form-position-picker">
+          <view v-if="!positionOptions.length" class="form-hint">
+            没有可选择的职位
+          </view>
+          <view v-else class="form-position-list">
+            <view
+              v-for="option in positionOptions"
+              :key="option.positionId"
+              class="form-position-item"
+              :class="{ 'form-position-item-active': answers[currentField.key] === option.positionId }"
+              @tap="selectPositionOption(currentField, option)"
+            >
+              <text class="form-position-name">{{ option.positionName }}</text>
+              <view class="form-position-meta">
+                <text v-if="option.location" class="form-position-tag">{{ option.location }}</text>
+                <text v-if="option.salaryText" class="form-position-tag">{{ option.salaryText }}</text>
+                <text v-if="option.matchReasoning" class="form-position-tag form-position-tag-match">
+                  {{ option.matchReasoning.level }} {{ option.matchReasoning.score }}分
+                </text>
+              </view>
+              <text v-if="option.matchReasoning?.summary" class="form-position-summary">
+                {{ option.matchReasoning.summary }}
+              </text>
+            </view>
+          </view>
+          <button
+            v-if="positionHasMore"
+            class="form-button form-button-ghost form-position-more-button"
+            :disabled="disabled || positionLoadingMore"
+            @tap="loadMorePositions(currentField)"
+          >
+            {{ positionLoadingMore ? '加载中…' : '加载更多' }}
+          </button>
+        </view>
+
         <input
           v-else
           class="form-input"
@@ -342,7 +434,7 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
           :disabled="disabled || currentIndex === 0"
           @tap="goPrev"
         >
-          上一题
+          上一步
         </button>
         <button
           v-if="!isLastStep"
@@ -350,7 +442,7 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
           :disabled="disabled"
           @tap="goNext"
         >
-          下一题
+          下一步
         </button>
         <button
           v-else
@@ -614,6 +706,71 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
 }
 
 .form-resume-upload-button {
+  flex: none;
+}
+
+.form-position-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.form-position-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.form-position-item {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: 16rpx 20rpx;
+  border: 1rpx solid #c9d5ec;
+  border-radius: 14rpx;
+  background: #fff;
+}
+
+.form-position-item-active {
+  border-color: #4674d3;
+  background: rgba(70, 116, 211, 0.08);
+}
+
+.form-position-name {
+  color: #34435f;
+  font-size: 25rpx;
+  font-weight: 600;
+}
+
+.form-position-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.form-position-tag {
+  padding: 2rpx 12rpx;
+  border-radius: 20rpx;
+  background: #e2e9f7;
+  color: #4674d3;
+  font-size: 20rpx;
+}
+
+.form-position-tag-match {
+  background: rgba(57, 134, 91, 0.12);
+  color: #39865b;
+  font-weight: 600;
+}
+
+.form-position-summary {
+  margin-top: 4rpx;
+  color: #71809c;
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+
+.form-position-more-button {
   flex: none;
 }
 </style>
