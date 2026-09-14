@@ -394,7 +394,13 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
               <view class="form-position-meta">
                 <text v-if="option.location" class="form-position-tag">{{ option.location }}</text>
                 <text v-if="option.salaryText" class="form-position-tag">{{ option.salaryText }}</text>
+                <text v-if="option.matchReasoning" class="form-position-tag form-position-tag-match">
+                  {{ option.matchReasoning.level }} {{ option.matchReasoning.score }}分
+                </text>
               </view>
+              <text v-if="option.matchReasoning?.summary" class="form-position-summary">
+                {{ option.matchReasoning.summary }}
+              </text>
             </view>
           </view>
           <button
@@ -749,6 +755,19 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
   background: #e2e9f7;
   color: #4674d3;
   font-size: 20rpx;
+}
+
+.form-position-tag-match {
+  background: rgba(57, 134, 91, 0.12);
+  color: #39865b;
+  font-weight: 600;
+}
+
+.form-position-summary {
+  margin-top: 4rpx;
+  color: #71809c;
+  font-size: 21rpx;
+  line-height: 1.5;
 }
 
 .form-position-more-button {

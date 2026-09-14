@@ -70,6 +70,13 @@ export type AgentChatAttachmentStatus = 'PARSING' | 'SUCCESS' | 'FAILED'
  */
 export type AgentFormFieldType = 'input' | 'textarea' | 'number' | 'radio' | 'select' | 'date' | 'resume_upload' | 'position_select'
 
+/** position_select 单个职位的 AI 匹配理由，只有职位推荐场景才有；普通搜索结果没有这个字段。 */
+export interface AgentFormMatchReasoning {
+  score: number
+  level: string
+  summary: string
+}
+
 /** position_select 单个职位选项；答案回传的是 positionId。 */
 export interface AgentFormPositionOption {
   positionId: string
@@ -77,6 +84,7 @@ export interface AgentFormPositionOption {
   positionName?: string
   location?: string
   salaryText?: string
+  matchReasoning?: AgentFormMatchReasoning
 }
 
 /**
