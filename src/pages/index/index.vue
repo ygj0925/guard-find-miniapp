@@ -461,26 +461,26 @@ onPageScroll(({ scrollTop }) => {
             aria-hidden="true"
           />
 
-          <view class="ml-3 min-w-0 flex flex-1 flex-col">
-            <text class="overflow-hidden text-ellipsis whitespace-nowrap text-36rpx text-[#113d78] font-700 leading-none">生生智家 · AI 助手</text>
+          <view class="ml-2 min-w-0 flex flex-1 flex-col">
+            <text class="overflow-hidden text-ellipsis whitespace-nowrap text-32rpx text-[#113d78] font-700 leading-none">生生智家 · AI 助手</text>
             <text class="mt-2 block text-2xs text-[#315d88] font-500">说出期望，AI 帮你匹配岗位并一键投递</text>
           </view>
 
-          <view class="ml-2 h-64rpx flex flex-none items-center rounded-full bg-white px-4 text-30rpx text-[#165caa] font-700 shadow-[0_8rpx_18rpx_rgba(44,122,178,0.18)]">
+          <view class="ml-2 h-64rpx flex flex-none items-center rounded-full bg-white px-3 text-28rpx text-[#165caa] font-700 shadow-[0_8rpx_18rpx_rgba(44,122,178,0.18)]">
             <text>聊一聊</text>
             <view class="i-carbon-arrow-right ml-1 text-lg leading-none" />
           </view>
         </view>
       </view>
 
-      <view class="mt-3 app-card px-1.5 pb-3 pt-4">
+      <view class="mt-3 app-card px-1.5 pb-3 pt-3">
         <swiper
-          class="h-300rpx"
+          class="h-260rpx"
           :duration="300"
           @change="handleEntryPageChange"
         >
           <swiper-item v-for="(entryPage, pageIndex) in visibleQuickEntryPages" :key="pageIndex">
-            <view class="grid grid-cols-4 gap-y-5 px-1">
+            <view class="grid grid-cols-4 gap-y-4 px-1">
               <view
                 v-for="entry in entryPage"
                 :key="entry.title"
@@ -492,13 +492,14 @@ onPageScroll(({ scrollTop }) => {
                 @keydown.space.prevent="openEntry(entry)"
                 @tap="openEntry(entry)"
               >
-                <image
-                  v-if="entry.iconUrl"
-                  class="h-84rpx w-84rpx flex-none"
-                  :src="entry.iconUrl"
-                  mode="aspectFit"
-                  aria-hidden="true"
-                />
+                <view v-if="entry.iconUrl" class="relative h-84rpx w-84rpx flex-none overflow-visible">
+                  <image
+                    class="absolute h-100rpx w-100rpx -left-8rpx -top-12rpx"
+                    :src="entry.iconUrl"
+                    mode="aspectFit"
+                    aria-hidden="true"
+                  />
+                </view>
                 <view
                   v-else
                   class="h-84rpx w-84rpx center rounded-26rpx"
@@ -507,7 +508,7 @@ onPageScroll(({ scrollTop }) => {
                   <view class="h-44rpx w-44rpx text-2xl text-white leading-none" :class="entry.iconClass" />
                 </view>
                 <text
-                  class="mt-2 text-2xs font-600"
+                  class="text-2xs font-600"
                   :class="entry.iconUrl ? 'text-[#113d78] font-700' : 'text-app-ink-soft'"
                 >
                   {{ entry.title }}
