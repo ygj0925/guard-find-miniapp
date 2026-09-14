@@ -35,7 +35,6 @@ const pendingLoginAction = ref<PendingLoginAction>(null)
 const loading = ref(false)
 const seconds = ref(0)
 const redirectUrl = ref('')
-const feedback = ref('')
 const wechatPhoneVerificationMode = ref<WechatMiniPhoneVerificationMode>('FAST')
 const wechatPhoneConfigLoading = ref(true)
 const ENABLE_LOGIN_AREA_CODE_PICKER = false
@@ -112,6 +111,10 @@ function checkCode() {
   errors.code = validateVerificationCode(form.code)
 }
 
+function showFeedback(message: string) {
+  uni.showToast({ title: message, icon: 'none' })
+}
+
 function requireAgreement(action: Exclude<PendingLoginAction, null>) {
   if (agreed.value)
     return true
@@ -154,14 +157,13 @@ function startCountdown() {
 async function sendCodeAfterCaptcha(captchaVerification: string) {
   showCaptcha.value = false
   loading.value = true
-  feedback.value = ''
   try {
     await sendSmsCaptcha(form.phone, { captchaType: 'blockPuzzle', captchaVerification })
     startCountdown()
-    feedback.value = '验证码已发送，请注意查收。'
+    showFeedback('验证码已发送，请注意查收。')
   }
   catch (error) {
-    feedback.value = error instanceof Error ? error.message : '验证码发送失败，请稍后重试。'
+    showFeedback(error instanceof Error ? error.message : '验证码发送失败，请稍后重试。')
   }
   finally {
     loading.value = false
@@ -188,7 +190,6 @@ async function performPhoneLogin() {
   const attemptId = tokenStore.beginLoginAttempt()
   activeLoginAttemptId = attemptId
   loading.value = true
-  feedback.value = ''
   try {
     const wxLoginCode = await getWechatLoginCodeForPhoneLogin()
     const token = await phoneLogin({
@@ -208,7 +209,7 @@ async function performPhoneLogin() {
     navigateAfterAuthenticated(redirectUrl.value)
   }
   catch (error) {
-    feedback.value = error instanceof Error ? error.message : '登录失败，请稍后重试。'
+    showFeedback(error instanceof Error ? error.message : '登录失败，请稍后重试。')
   }
   finally {
     tokenStore.cancelLoginAttempt(attemptId)
@@ -239,12 +240,11 @@ async function performH5WechatLogin() {
     return
 
   loading.value = true
-  feedback.value = ''
   try {
     await startWechatH5OAuth(redirectUrl.value)
   }
   catch (error) {
-    feedback.value = error instanceof Error ? error.message : '微信登录发起失败，请稍后重试。'
+    showFeedback(error instanceof Error ? error.message : '微信登录发起失败，请稍后重试。')
   }
   finally {
     loading.value = false
@@ -281,9 +281,9 @@ async function onWechatPhoneNumber(event: PhoneNumberEvent) {
 
   const phoneCode = event.detail.code
   if (!phoneCode) {
-    feedback.value = event.detail.errMsg?.includes('deny')
+    showFeedback(event.detail.errMsg?.includes('deny')
       ? '你已取消手机号授权。'
-      : '未获取到微信手机号授权凭证，请重试。'
+      : '未获取到微信手机号授权凭证，请重试。')
     return
   }
   if (loading.value)
@@ -292,7 +292,6 @@ async function onWechatPhoneNumber(event: PhoneNumberEvent) {
   const attemptId = tokenStore.beginLoginAttempt()
   activeLoginAttemptId = attemptId
   loading.value = true
-  feedback.value = ''
   try {
     const authorization = await startWechatAuthorization()
     if (authorization.status !== 'binding_required')
@@ -314,7 +313,7 @@ async function onWechatPhoneNumber(event: PhoneNumberEvent) {
     navigateAfterAuthenticated(redirectUrl.value)
   }
   catch (error) {
-    feedback.value = error instanceof Error ? error.message : '微信登录失败，请稍后重试。'
+    showFeedback(error instanceof Error ? error.message : '微信登录失败，请稍后重试。')
   }
   finally {
     tokenStore.cancelLoginAttempt(attemptId)
@@ -460,13 +459,13 @@ function skipLogin() {
       </view>
 
       <view
-        class="mt-24rpx flex items-start text-23rpx text-[#666] leading-34rpx"
+        class="privacy-consent-row"
         role="checkbox"
         :aria-checked="agreed"
         aria-label="同意隐私政策"
         @tap="agreed = !agreed"
       >
-        <view class="h-64rpx w-64rpx flex flex-none items-center justify-center -ml-16rpx -mt-13rpx">
+        <view class="privacy-consent-check">
           <view
             class="box-border h-30rpx w-30rpx border-2rpx rounded-full border-solid text-center text-22rpx text-white leading-26rpx transition-colors duration-180"
             :class="agreed ? 'border-[#2389ef] bg-[#2389ef]' : 'border-[#bfc4c9] bg-white'"
@@ -474,16 +473,12 @@ function skipLogin() {
             {{ agreed ? '✓' : '' }}
           </view>
         </view>
-        <view class="min-w-0 flex flex-1 flex-wrap">
-          <view class="inline-flex flex-none whitespace-nowrap">
-            <text>我已阅读并同意</text>
-            <text class="tap-link text-[#087ff5]" role="link" @tap.stop="goTo(PRIVACY_PAGE)">《隐私政策》</text>
-          </view>
+        <view class="privacy-consent-copy">
+          <text>我已阅读并同意</text>
+          <text class="tap-link text-[#087ff5]" role="link" @tap.stop="goTo(PRIVACY_PAGE)">《隐私政策》</text>
           <text>，首次登录将自动创建会员账号</text>
         </view>
       </view>
-
-      <text v-if="feedback" class="mt-10rpx block text-center text-24rpx text-[#6f7780]" role="status">{{ feedback }}</text>
     </view>
 
     <view class="login-footer fixed inset-x-0 bottom-0 z-10 bg-white px-104rpx pb-[calc(12rpx+env(safe-area-inset-bottom))] pt-8rpx">
@@ -632,6 +627,43 @@ function skipLogin() {
     width: 180rpx;
     height: 270rpx;
   }
+}
+
+.privacy-consent-row {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  margin: 24rpx -104rpx 0;
+  padding: 0 24rpx;
+  color: #666;
+  font-size: 23rpx;
+  line-height: 34rpx;
+  white-space: nowrap;
+}
+
+.privacy-consent-check {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  margin-left: -16rpx;
+}
+
+.privacy-consent-copy {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.privacy-consent-copy text {
+  flex: 0 0 auto;
 }
 
 .login-placeholder {

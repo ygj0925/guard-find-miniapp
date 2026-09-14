@@ -41,7 +41,13 @@ export function login(loginForm: ILoginForm) {
  * 手机号验证码登录；传入 wxLoginCode 时，后端会在登录成功后关联微信身份。
  */
 export function phoneLogin(loginForm: PhoneLoginForm) {
-  return http.post<IAuthLoginRes>('/auth/login', loginForm)
+  return http.post<IAuthLoginRes>(
+    '/auth/login',
+    loginForm,
+    undefined,
+    undefined,
+    { hideErrorToast: true },
+  )
 }
 
 /** 微信小程序手机号授权直接登录。 */
@@ -70,7 +76,7 @@ export function getSocialAuthorizeUrl(source: SocialLoginSource) {
     `/auth/${encodeURIComponent(source)}`,
     undefined,
     undefined,
-    { skipAuth: true },
+    { hideErrorToast: true, skipAuth: true },
   )
 }
 
