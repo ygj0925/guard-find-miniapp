@@ -32,7 +32,9 @@ interface PhoneNumberEvent { detail: { code?: string, errMsg?: string } }
 const agreed = ref(false)
 const showAgreement = ref(false)
 const pendingLoginAction = ref<PendingLoginAction>(null)
-const loading = ref(false)
+const codeLoading = ref(false)
+const phoneLoading = ref(false)
+const wechatLoading = ref(false)
 const seconds = ref(0)
 const redirectUrl = ref('')
 const wechatPhoneVerificationMode = ref<WechatMiniPhoneVerificationMode>('FAST')
@@ -138,7 +140,7 @@ function selectArea(selected: AreaCodeItem) {
 
 function requestCode() {
   checkPhone()
-  if (errors.phone || seconds.value || loading.value)
+  if (errors.phone || seconds.value || codeLoading.value || phoneLoading.value || wechatLoading.value)
     return
   showCaptcha.value = true
 }
@@ -156,7 +158,7 @@ function startCountdown() {
 
 async function sendCodeAfterCaptcha(captchaVerification: string) {
   showCaptcha.value = false
-  loading.value = true
+  codeLoading.value = true
   try {
     await sendSmsCaptcha(form.phone, { captchaType: 'blockPuzzle', captchaVerification })
     startCountdown()
@@ -166,7 +168,7 @@ async function sendCodeAfterCaptcha(captchaVerification: string) {
     showFeedback(error instanceof Error ? error.message : '验证码发送失败，请稍后重试。')
   }
   finally {
-    loading.value = false
+    codeLoading.value = false
   }
 }
 
@@ -184,12 +186,12 @@ async function getWechatLoginCodeForPhoneLogin(): Promise<string | undefined> {
 }
 
 async function performPhoneLogin() {
-  if (loading.value)
+  if (codeLoading.value || phoneLoading.value || wechatLoading.value)
     return
 
   const attemptId = tokenStore.beginLoginAttempt()
   activeLoginAttemptId = attemptId
-  loading.value = true
+  phoneLoading.value = true
   try {
     const wxLoginCode = await getWechatLoginCodeForPhoneLogin()
     const token = await phoneLogin({
@@ -215,14 +217,14 @@ async function performPhoneLogin() {
     tokenStore.cancelLoginAttempt(attemptId)
     if (activeLoginAttemptId === attemptId)
       activeLoginAttemptId = null
-    loading.value = false
+    phoneLoading.value = false
   }
 }
 
 async function submitPhoneLogin() {
   checkPhone()
   checkCode()
-  if (loading.value || errors.phone || errors.code)
+  if (codeLoading.value || phoneLoading.value || wechatLoading.value || errors.phone || errors.code)
     return
   if (!agreed.value) {
     pendingLoginAction.value = 'phone'
@@ -234,12 +236,12 @@ async function submitPhoneLogin() {
 
 async function performH5WechatLogin() {
   // #ifdef H5
-  if (loading.value)
+  if (codeLoading.value || phoneLoading.value || wechatLoading.value)
     return
   if (!requireAgreement('wechat'))
     return
 
-  loading.value = true
+  wechatLoading.value = true
   try {
     await startWechatH5OAuth(redirectUrl.value)
   }
@@ -247,7 +249,7 @@ async function performH5WechatLogin() {
     showFeedback(error instanceof Error ? error.message : '微信登录发起失败，请稍后重试。')
   }
   finally {
-    loading.value = false
+    wechatLoading.value = false
   }
   // #endif
 }
@@ -269,6 +271,8 @@ async function confirmAgreementAndLogin() {
 }
 
 function confirmAgreementAndWechatLogin(event: PhoneNumberEvent) {
+  if (codeLoading.value || phoneLoading.value || wechatLoading.value)
+    return
   agreed.value = true
   showAgreement.value = false
   pendingLoginAction.value = null
@@ -276,6 +280,8 @@ function confirmAgreementAndWechatLogin(event: PhoneNumberEvent) {
 }
 
 async function onWechatPhoneNumber(event: PhoneNumberEvent) {
+  if (codeLoading.value || phoneLoading.value || wechatLoading.value)
+    return
   if (!requireAgreement('wechat'))
     return
 
@@ -286,12 +292,9 @@ async function onWechatPhoneNumber(event: PhoneNumberEvent) {
       : '未获取到微信手机号授权凭证，请重试。')
     return
   }
-  if (loading.value)
-    return
-
   const attemptId = tokenStore.beginLoginAttempt()
   activeLoginAttemptId = attemptId
-  loading.value = true
+  wechatLoading.value = true
   try {
     const authorization = await startWechatAuthorization()
     if (authorization.status !== 'binding_required')
@@ -319,7 +322,7 @@ async function onWechatPhoneNumber(event: PhoneNumberEvent) {
     tokenStore.cancelLoginAttempt(attemptId)
     if (activeLoginAttemptId === attemptId)
       activeLoginAttemptId = null
-    loading.value = false
+    wechatLoading.value = false
   }
 }
 
@@ -419,7 +422,7 @@ function skipLogin() {
           >
           <button
             class="code-button h-full flex flex-none items-center justify-center whitespace-nowrap border-0 bg-transparent pl-26rpx text-30rpx text-[#087ff5] font-400"
-            :disabled="Boolean(seconds || loading)"
+            :disabled="Boolean(seconds || codeLoading || phoneLoading || wechatLoading)"
             :aria-label="seconds ? `${seconds} 秒后可重新获取验证码` : '获取短信验证码'"
             @tap="requestCode"
           >
@@ -428,15 +431,18 @@ function skipLogin() {
         </view>
         <text v-if="errors.code" class="mt-8rpx block text-24rpx text-[#d74b3f]" role="alert">{{ errors.code }}</text>
 
-        <button
-          class="login-button mt-44rpx h-92rpx rounded-48rpx border-none bg-[#2389ef] text-34rpx text-white font-600 leading-92rpx transition-opacity duration-180"
-          :disabled="loading"
-          :loading="loading"
-          aria-label="登录"
-          @tap="submitPhoneLogin"
-        >
-          登录
-        </button>
+        <view class="relative mt-44rpx">
+          <button
+            class="login-button h-92rpx w-full rounded-48rpx border-none bg-[#2389ef] text-34rpx text-white font-600 leading-92rpx transition-opacity duration-180"
+            :disabled="phoneLoading"
+            :loading="phoneLoading"
+            aria-label="登录"
+            @tap="submitPhoneLogin"
+          >
+            登录
+          </button>
+          <view v-if="wechatLoading" class="login-action-blocker" aria-hidden="true" @tap.stop />
+        </view>
 
         <!-- #ifdef H5 -->
         <view v-if="wechatH5LoginEnabled" class="mt-32rpx">
@@ -445,15 +451,19 @@ function skipLogin() {
             <text class="text-24rpx text-[#8a94a3]">其他登录方式</text>
             <view class="h-1rpx flex-1 bg-[#e5e7eb]" />
           </view>
-          <button
-            class="wechat-login-button mt-24rpx h-88rpx w-full flex items-center justify-center border-2rpx border-[#07a84f] rounded-44rpx border-solid bg-white p-0 text-31rpx text-[#079447] font-600 leading-88rpx"
-            :disabled="loading"
-            aria-label="使用微信一键登录"
-            @tap="performH5WechatLogin"
-          >
-            <view class="i-carbon-logo-wechat mr-12rpx text-38rpx leading-none" aria-hidden="true" />
-            <text>微信一键登录</text>
-          </button>
+          <view class="relative mt-24rpx">
+            <button
+              class="wechat-login-button h-88rpx w-full flex items-center justify-center border-2rpx border-[#07a84f] rounded-44rpx border-solid bg-white p-0 text-31rpx text-[#079447] font-600 leading-88rpx"
+              :disabled="wechatLoading"
+              :loading="wechatLoading"
+              aria-label="使用微信一键登录"
+              @tap="performH5WechatLogin"
+            >
+              <view class="i-carbon-logo-wechat mr-12rpx text-38rpx leading-none" aria-hidden="true" />
+              <text>微信一键登录</text>
+            </button>
+            <view v-if="phoneLoading" class="login-action-blocker" aria-hidden="true" @tap.stop />
+          </view>
         </view>
         <!-- #endif -->
       </view>
@@ -483,30 +493,33 @@ function skipLogin() {
 
     <view class="login-footer fixed inset-x-0 bottom-0 z-10 bg-white px-104rpx pb-[calc(12rpx+env(safe-area-inset-bottom))] pt-8rpx">
       <!-- #ifdef MP-WEIXIN -->
-      <!-- @vue-ignore 微信已支持 getRealtimePhoneNumber，当前 uni 组件类型声明尚未同步。 -->
-      <button
-        v-if="agreed"
-        class="wechat-login-button box-border h-88rpx w-full flex items-center justify-center border-2rpx border-[#07a84f] rounded-44rpx border-solid bg-[#effcf4] px-28rpx text-30rpx text-[#078f45] font-700 leading-84rpx shadow-[0_8rpx_24rpx_rgba(7,168,79,0.16)]"
-        :disabled="loading || wechatPhoneConfigLoading"
-        :loading="loading"
-        :open-type="wechatPhoneOpenType"
-        aria-label="使用微信一键登录"
-        @getphonenumber="onWechatPhoneNumber"
-        @getrealtimephonenumber="onWechatPhoneNumber"
-      >
-        <view class="i-carbon-logo-wechat mr-12rpx text-38rpx leading-none" aria-hidden="true" />
-        <text>微信一键登录</text>
-      </button>
-      <button
-        v-else
-        class="wechat-login-button box-border h-88rpx w-full flex items-center justify-center border-2rpx border-[#07a84f] rounded-44rpx border-solid bg-[#effcf4] px-28rpx text-30rpx text-[#078f45] font-700 leading-84rpx shadow-[0_8rpx_24rpx_rgba(7,168,79,0.16)]"
-        :disabled="loading || wechatPhoneConfigLoading"
-        aria-label="使用微信一键登录"
-        @tap="requireAgreement('wechat')"
-      >
-        <view class="i-carbon-logo-wechat mr-12rpx text-38rpx leading-none" aria-hidden="true" />
-        <text>微信一键登录</text>
-      </button>
+      <view class="relative">
+        <!-- @vue-ignore 微信已支持 getRealtimePhoneNumber，当前 uni 组件类型声明尚未同步。 -->
+        <button
+          v-if="agreed"
+          class="wechat-login-button box-border h-88rpx w-full flex items-center justify-center border-2rpx border-[#07a84f] rounded-44rpx border-solid bg-[#effcf4] px-28rpx text-30rpx text-[#078f45] font-700 leading-84rpx shadow-[0_8rpx_24rpx_rgba(7,168,79,0.16)]"
+          :disabled="wechatLoading || wechatPhoneConfigLoading"
+          :loading="wechatLoading"
+          :open-type="wechatPhoneOpenType"
+          aria-label="使用微信一键登录"
+          @getphonenumber="onWechatPhoneNumber"
+          @getrealtimephonenumber="onWechatPhoneNumber"
+        >
+          <view class="i-carbon-logo-wechat mr-12rpx text-38rpx leading-none" aria-hidden="true" />
+          <text>微信一键登录</text>
+        </button>
+        <button
+          v-else
+          class="wechat-login-button box-border h-88rpx w-full flex items-center justify-center border-2rpx border-[#07a84f] rounded-44rpx border-solid bg-[#effcf4] px-28rpx text-30rpx text-[#078f45] font-700 leading-84rpx shadow-[0_8rpx_24rpx_rgba(7,168,79,0.16)]"
+          :disabled="wechatLoading || wechatPhoneConfigLoading"
+          aria-label="使用微信一键登录"
+          @tap="requireAgreement('wechat')"
+        >
+          <view class="i-carbon-logo-wechat mr-12rpx text-38rpx leading-none" aria-hidden="true" />
+          <text>微信一键登录</text>
+        </button>
+        <view v-if="phoneLoading" class="login-action-blocker" aria-hidden="true" @tap.stop />
+      </view>
       <!-- #endif -->
       <view
         class="tap-target h-72rpx flex items-center justify-center text-29rpx text-[#777]"
@@ -547,7 +560,7 @@ function skipLogin() {
             <button
               v-if="pendingLoginAction === 'wechat'"
               class="login-button h-84rpx flex-1 rounded-44rpx border-none bg-[linear-gradient(90deg,#21a9ef_0%,#2d6fe6_100%)] p-0 text-31rpx text-white font-600 leading-84rpx"
-              :disabled="loading || wechatPhoneConfigLoading"
+              :disabled="phoneLoading || wechatLoading || wechatPhoneConfigLoading"
               :open-type="wechatPhoneOpenType"
               @getphonenumber="confirmAgreementAndWechatLogin"
               @getrealtimephonenumber="confirmAgreementAndWechatLogin"
@@ -683,6 +696,12 @@ function skipLogin() {
   background: transparent !important;
   font-weight: 400;
   line-height: 1;
+}
+
+.login-action-blocker {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
 }
 
 .code-button[disabled] {
