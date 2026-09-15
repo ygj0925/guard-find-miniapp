@@ -702,10 +702,11 @@ function isAbortError(error: unknown) {
 }
 
 function normalizeStreamEvent(eventName: string, value: Record<string, unknown>): AgentChatStreamEvent {
+  const runIdText = readOptionalString(value.runId)
   return {
     type: readString(value.type) || eventName,
     sessionId: readOptionalString(value.sessionId),
-    runId: readOptionalString(value.runId).trim() || readOptionalNumber(value.runId),
+    runId: runIdText?.trim() || readOptionalNumber(value.runId),
     delta: readOptionalString(value.delta),
     reply: readOptionalString(value.reply),
     reasoningDelta: readOptionalString(value.reasoningDelta),

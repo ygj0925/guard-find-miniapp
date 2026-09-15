@@ -774,10 +774,19 @@ function handleFormSubmit(
   const formId = readString(extension.data.formId)
   if (!formId || readString(extension.data.status) !== 'ready')
     return
-  if (!ensureAuthenticatedAiSession())
+  if (!reconcileAuthenticatedAiSession()) {
+    toLoginPage({
+      queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
+    })
     return
+  }
   if (!currentConversation.value)
     return
+  const sessionId = currentConversation.value.id.trim()
+  if (!sessionId) {
+    uni.showToast({ title: '当前会话尚未建立，请重新发起对话', icon: 'none' })
+    return
+  }
 
   extension.data = { ...extension.data, status: 'submitting' }
 
@@ -793,7 +802,7 @@ function handleFormSubmit(
     {
       message: '',
       stream: true,
-      sessionId: currentConversation.value.id || undefined,
+      sessionId,
       mode: 'form_submission',
       formSubmission: { formId, values },
     },
