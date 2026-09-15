@@ -548,7 +548,11 @@ function handleStreamEvent(event: AgentChatStreamEvent, assistantMessage: AiChat
       break
     case 'form':
       addOrUpdateExtension(assistantMessage, event, 'form')
+      // 表单暂停代表服务端已等待用户输入，不应继续占用前端回复锁。
+      // 不取消 activeStream：后端需要保留暂停的 Agent run，提交时才能续接。
+      assistantMessage.status = 'complete'
       streamStatusText.value = '需要你填写表单'
+      finishReply()
       scheduleAutoScroll()
       break
     case 'done':
