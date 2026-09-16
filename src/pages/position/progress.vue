@@ -20,23 +20,28 @@ definePage({
 
 const progress = ref<PositionApplyProgress>()
 const isLoading = ref(true)
+const applyRecordId = ref('')
 const hasProgress = computed(() => Boolean(progress.value?.progressList.length))
+const importStatus = computed(() => String(progress.value?.apply.importStatus || '').toUpperCase())
+const isProcessing = computed(() => importStatus.value === 'PROCESSING')
+const isFailed = computed(() => importStatus.value === 'FAILED')
 const currentProgress = computed(() => progress.value?.progressList[0] || progress.value?.apply)
+const statusLabel = computed(() => {
+  if (isProcessing.value)
+    return '投递处理中'
+  if (isFailed.value)
+    return '投递失败'
+  if (importStatus.value === 'SUCCESS')
+    return '投递成功'
+  return '投递状态'
+})
 
-function handleBack() {
-  uni.navigateBack()
-}
-
-onLoad(async (options) => {
-  const applyId = String(options?.id ?? '').trim()
-  if (!applyId) {
-    isLoading.value = false
-    uni.showToast({ title: '投递记录不存在', icon: 'none' })
+async function loadProgress() {
+  if (!applyRecordId.value)
     return
-  }
-
+  isLoading.value = true
   try {
-    progress.value = await getPositionApplyProgress(applyId)
+    progress.value = await getPositionApplyProgress(applyRecordId.value)
   }
   catch {
     progress.value = undefined
@@ -44,6 +49,21 @@ onLoad(async (options) => {
   finally {
     isLoading.value = false
   }
+}
+
+function handleBack() {
+  uni.navigateBack()
+}
+
+onLoad(async (options) => {
+  applyRecordId.value = String(options?.id ?? '').trim()
+  if (!applyRecordId.value) {
+    isLoading.value = false
+    uni.showToast({ title: '投递记录不存在', icon: 'none' })
+    return
+  }
+
+  await loadProgress()
 })
 </script>
 
@@ -63,14 +83,26 @@ onLoad(async (options) => {
     </view>
 
     <view v-else-if="progress" class="px-4 py-4">
-      <view class="bg-white px-4 py-5 shadow-[0_8rpx_24rpx_rgba(38,64,105,0.05)] rounded-xl">
-        <text class="block text-lg text-app-ink font-700">{{ progress.apply.jobTitle || '职位投递' }}</text>
-        <text v-if="currentProgress" class="mt-2 block text-sm text-app-ink-soft">
-          当前进度：{{ currentProgress.phaseName || currentProgress.processName || '处理中' }}{{ currentProgress.statusName ? `（${currentProgress.statusName}）` : '' }}
+      <view class="rounded-xl bg-white px-4 py-5 shadow-[0_8rpx_24rpx_rgba(38,64,105,0.05)]">
+        <view class="flex items-center justify-between gap-3">
+          <text class="block min-w-0 flex-1 text-lg text-app-ink font-700">{{ progress.apply.jobTitle || '职位投递' }}</text>
+          <text
+            class="flex-none rounded-full px-3 py-1 text-xs font-600"
+            :class="isFailed ? 'bg-[#fff1f0] text-[#d6453d]' : isProcessing ? 'bg-[#fff7e6] text-[#c77b16]' : 'bg-[#edf8f1] text-[#2f8f55]'"
+          >
+            {{ statusLabel }}
+          </text>
+        </view>
+        <text v-if="progress.apply.failedReason" class="mt-2 block text-sm text-[#d6453d]">
+          {{ progress.apply.failedReason }}
         </text>
+        <text v-else-if="currentProgress" class="mt-2 block text-sm text-app-ink-soft">
+          当前进度：{{ currentProgress.phaseName || currentProgress.processName || (isProcessing ? '等待招聘系统确认' : '处理中') }}{{ currentProgress.statusName ? `（${currentProgress.statusName}）` : '' }}
+        </text>
+        <text v-if="isProcessing" class="mt-2 block text-xs text-app-muted">投递已提交，系统正在等待招聘平台返回结果</text>
       </view>
 
-      <view class="mt-3 bg-white px-5 py-6 shadow-[0_8rpx_24rpx_rgba(38,64,105,0.05)] rounded-xl">
+      <view class="mt-3 rounded-xl bg-white px-5 py-6 shadow-[0_8rpx_24rpx_rgba(38,64,105,0.05)]">
         <view v-if="hasProgress" class="relative">
           <view v-for="(item, index) in progress.progressList" :key="`${item.createTime}-${index}`" class="relative flex pb-7 last:pb-0">
             <view class="relative z-1 mt-1 h-4 w-4 flex flex-none items-center justify-center rounded-full" :class="index === 0 ? 'bg-brand-blue' : 'bg-[#d6dee9]'">

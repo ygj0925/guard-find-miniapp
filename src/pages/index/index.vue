@@ -106,6 +106,7 @@ const bannerImageErrors = reactive<Record<string, boolean>>({})
 const hotPositions = ref<PositionListItem[]>([])
 const hotPositionsLoading = ref(false)
 const hotPositionsFailed = ref(false)
+const publisherAvatarErrors = reactive<Record<string, boolean>>({})
 const headerScrolled = ref(false)
 const bannerIndex = ref(0)
 const entryPageIndex = ref(0)
@@ -279,6 +280,15 @@ function getJobMeta(job: PositionListItem) {
   const meta = [job.location, job.edu, job.experience, ...job.tags]
     .filter((item): item is string => Boolean(item))
   return meta.filter((item, index) => meta.indexOf(item) === index).slice(0, 3)
+}
+
+function publisherAvatarUrl(job: PositionListItem) {
+  const avatar = job.publisherAvatar?.trim()
+  return avatar && !publisherAvatarErrors[job.positionId] ? avatar : ''
+}
+
+function handlePublisherAvatarError(positionId: string) {
+  publisherAvatarErrors[positionId] = true
 }
 
 function isBannerImageVisible(banner: HomeBanner) {
@@ -573,11 +583,23 @@ onPageScroll(({ scrollTop }) => {
           </view>
 
           <view class="mt-3 flex items-center justify-between border-t-1rpx border-t-[#eef2f8] border-t-solid pt-2.5">
-            <view class="flex items-center text-2xs text-app-muted">
-              <view class="i-carbon-building mr-1 text-sm leading-none" />
-              <text>三生制药 · 官方直招</text>
+            <view class="min-w-0 flex items-center">
+              <image
+                v-if="publisherAvatarUrl(job)"
+                class="h-42rpx w-42rpx flex-none rounded-full"
+                :src="publisherAvatarUrl(job)"
+                mode="aspectFill"
+                alt=""
+                @error="handlePublisherAvatarError(job.positionId)"
+              />
+              <view v-else class="h-42rpx w-42rpx flex flex-none items-center justify-center rounded-full bg-[#e9f3ff] text-sm text-brand-blue leading-none">
+                <view class="i-carbon-user-avatar" />
+              </view>
+              <text class="ml-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-2xs text-app-muted">
+                {{ job.publisherName || '招聘团队' }}
+              </text>
             </view>
-            <text class="text-2xs text-brand-blue font-600">立即查看</text>
+            <text class="ml-3 flex-none text-2xs text-brand-blue font-600">立即查看</text>
           </view>
         </view>
       </view>

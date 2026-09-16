@@ -85,6 +85,15 @@ function normalizeTextList(value?: string[] | string) {
     .filter(Boolean)
 }
 
+function getResumeFileIconMeta(fileType?: string) {
+  const extension = String(fileType || '').replace(/^\./, '').toLowerCase()
+  if (extension === 'pdf')
+    return { icon: 'i-carbon-document-pdf', bg: 'bg-[#e84040]' }
+  if (extension === 'doc' || extension === 'docx')
+    return { icon: 'i-carbon-document', bg: 'bg-[#2b5fd9]' }
+  return { icon: 'i-carbon-document', bg: 'bg-[#6b7a8d]' }
+}
+
 function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
   return {
     id: source.positionId,
@@ -375,10 +384,20 @@ async function confirmApply() {
       resumeId: selectedResumeId.value,
       jobId: position.value.jobId,
     })
-    const applyRecordId = applyResult.applyId || position.value.applyRecordId
+    const status = String(applyResult.status || '').toUpperCase()
+    const applyRecordId = applyResult.applyRecordId || applyResult.applyId || position.value.applyRecordId
     position.value = { ...position.value, applied: true, applyRecordId }
     isResumePickerVisible.value = false
-    uni.showToast({ title: '简历投递成功', icon: 'success' })
+
+    if (status === 'FAILED') {
+      uni.showToast({ title: applyResult.message || '投递失败，请稍后查看投递记录', icon: 'none' })
+    }
+    else if (status === 'PROCESSING') {
+      uni.showToast({ title: applyResult.message || '投递已提交，正在处理中', icon: 'none' })
+    }
+    else {
+      uni.showToast({ title: applyResult.message || '简历投递成功', icon: 'success' })
+    }
 
     void getPositionDetail(positionId)
       .then((detail) => {
@@ -389,7 +408,13 @@ async function confirmApply() {
           applyRecordId: refreshedPosition.applyRecordId ?? applyRecordId,
         }
       })
-      .catch(error => console.warn('投递成功，但刷新职位详情失败:', error))
+      .catch(error => console.warn('投递已提交，但刷新职位详情失败:', error))
+  }
+  catch (error) {
+    uni.showToast({
+      title: error instanceof Error ? error.message : '投递失败，请稍后重试',
+      icon: 'none',
+    })
   }
   finally {
     isApplying.value = false
@@ -557,11 +582,9 @@ function openApplyProgress() {
             >
               <view
                 class="h-11 w-11 flex flex-none items-center justify-center rounded-xl text-xl transition-colors duration-180 motion-reduce:transition-none"
-                :class="selectedResumeId === resume.id
-                  ? 'bg-brand-blue text-white shadow-[0_6rpx_16rpx_rgba(45,111,230,0.2)]'
-                  : 'bg-[#edf4ff] text-brand-blue'"
+                :class="getResumeFileIconMeta(resume.fileType).bg"
               >
-                <view class="i-carbon-document-pdf leading-none" />
+                <view class="leading-none" :class="getResumeFileIconMeta(resume.fileType).icon" />
               </view>
 
               <view class="ml-3 min-w-0 flex-1">

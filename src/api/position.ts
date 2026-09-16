@@ -43,7 +43,7 @@ export interface PositionAppliesItem {
   applicantPhone: string
   resumeName: string
   importStatus: string
-  failedReason: string
+  failedReason?: string
   /**
    * 招聘职位名称
    */
@@ -84,6 +84,10 @@ export interface PositionListItem {
   location: string
   experience: string
   tags: string[]
+  /** 招聘者头像，来自麟才岗位列表/热门岗位接口。 */
+  publisherAvatar?: string
+  /** 招聘者姓名，来自麟才岗位列表/热门岗位接口。 */
+  publisherName?: string
 }
 
 export interface PositionListPage {
@@ -123,10 +127,14 @@ export interface PositionApplyForm {
   jobId: string | number
 }
 
+export type PositionApplyStatus = 'SUCCESS' | 'PROCESSING' | 'FAILED'
+
 export interface PositionApplyResult {
-  status: string
-  /** 投递记录可能是雪花 ID，必须保持字符串语义。 */
-  applyId: string
+  status: PositionApplyStatus | string
+  /** 本地投递记录 ID，雪花 ID 必须保持字符串语义。 */
+  applyRecordId: string
+  /** 兼容旧后端字段，新的后端使用 applyRecordId。 */
+  applyId?: string
   message: string
 }
 

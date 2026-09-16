@@ -46,6 +46,17 @@ function toDayLabel(dateStr: string) {
   return `${m}月${day}日`
 }
 
+function getApplyStatusLabel(record: PositionApplyRecord) {
+  const status = String(record.importStatus || '').toUpperCase()
+  if (status === 'PROCESSING')
+    return '投递处理中'
+  if (status === 'SUCCESS')
+    return '投递成功'
+  if (status === 'FAILED')
+    return '投递失败'
+  return record.statusName || '待更新'
+}
+
 async function load() {
   isLoading.value = true
   isError.value = false
@@ -170,8 +181,20 @@ onLoad(() => load())
                   <!-- 第二行：流程名称 -->
                   <text class="mt-1.5 block text-sm text-[#6b7a8d]">{{ record.processName }}</text>
 
-                  <!-- 当前进度 -->
-                  <text class="mt-1.5 block text-xs text-[#6b7a8d]">当前进度：{{ record.statusName }}</text>
+                  <!-- 当前投递状态 -->
+                  <view class="mt-1.5 flex items-center gap-2">
+                    <text
+                      class="rounded-full px-2 py-0.5 text-xs font-600"
+                      :class="String(record.importStatus || '').toUpperCase() === 'FAILED'
+                        ? 'bg-[#fff1f0] text-[#d6453d]'
+                        : String(record.importStatus || '').toUpperCase() === 'PROCESSING'
+                          ? 'bg-[#fff7e6] text-[#c77b16]'
+                          : 'bg-[#edf8f1] text-[#2f8f55]'"
+                    >
+                      {{ getApplyStatusLabel(record) }}
+                    </text>
+                    <text v-if="record.statusName" class="text-xs text-[#6b7a8d]">{{ record.statusName }}</text>
+                  </view>
 
                   <!-- 简历名称 -->
                   <view v-if="record.resumeName" class="mt-2">
