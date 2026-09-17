@@ -208,6 +208,11 @@ function selectPositionOption(field: AgentFormField, option: AgentFormPositionOp
   setAnswer(field.key, option.positionId)
 }
 
+/** 跳转复用已有详情页，并阻止冒泡以免用户查看岗位时误选中准备投递。 */
+function viewPositionDetail(option: AgentFormPositionOption) {
+  uni.navigateTo({ url: `/pages/position/detail?id=${encodeURIComponent(option.positionId)}` })
+}
+
 function onDateChange(field: AgentFormField, event: { detail: { value: string } }) {
   setAnswer(field.key, event.detail.value)
 }
@@ -401,6 +406,7 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
               <text v-if="option.matchReasoning?.summary" class="form-position-summary">
                 {{ option.matchReasoning.summary }}
               </text>
+              <button class="form-position-detail-button" @tap.stop="viewPositionDetail(option)">查看详情</button>
             </view>
           </view>
           <button
@@ -768,6 +774,23 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
   color: #71809c;
   font-size: 21rpx;
   line-height: 1.5;
+}
+
+.form-position-detail-button {
+  align-self: flex-start;
+  min-height: 52rpx;
+  margin: 4rpx 0 0;
+  padding: 0 16rpx;
+  border: 1rpx solid #c9d5ec;
+  border-radius: 26rpx;
+  background: #fff;
+  color: #4674d3;
+  font-size: 21rpx;
+  line-height: 50rpx;
+}
+
+.form-position-detail-button::after {
+  border: 0;
 }
 
 .form-position-more-button {
