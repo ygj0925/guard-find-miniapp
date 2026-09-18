@@ -12,6 +12,12 @@ const NOTIFICATION_TABBAR_PATH = '/pages/notification/index'
 const POLL_INTERVAL_MS = 5 * 60 * 1000
 const RECONNECT_BASE_DELAY_MS = 3000
 const RECONNECT_MAX_DELAY_MS = 30000
+// #ifdef MP-WEIXIN
+/** 小程序连接连续空闲一分钟后发送心跳，为网关 180 秒空闲超时预留足够的调度延迟。 */
+const HEARTBEAT_IDLE_MS = 60 * 1000
+/** 心跳使用固定协议帧，便于后端静默识别，避免污染业务消息日志。 */
+const HEARTBEAT_PAYLOAD = '{"type":"PING"}'
+// #endif
 
 /** 推送事件名，对应后端 MessageServiceImpl 的常量。 */
 type MessagePushEvent = 'MESSAGE_CREATED' | 'UNREAD_CHANGED'
@@ -75,6 +81,10 @@ export const useMessageStore = defineStore('message', () => {
   let socketTask: UniApp.SocketTask | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  // #ifdef MP-WEIXIN
+  /** 只保留一个空闲心跳定时器，业务帧到达时重置，避免活跃连接产生无意义心跳。 */
+  let heartbeatTimer: ReturnType<typeof setTimeout> | null = null
+  // #endif
   let reconnectAttempts = 0
   /** onShow/onHide 或登录态变化驱动的生命周期开关，避免应用隐藏后仍在后台重连。 */
   let active = false
@@ -116,7 +126,38 @@ export const useMessageStore = defineStore('message', () => {
     }
   }
 
+  // #ifdef MP-WEIXIN
+  /**
+   * 清理待发送心跳，连接关闭或应用隐藏后不得继续操作旧 SocketTask。
+   */
+  function clearHeartbeatTimer() {
+    if (heartbeatTimer) {
+      clearTimeout(heartbeatTimer)
+      heartbeatTimer = null
+    }
+  }
+
+  /**
+   * 从最近一次连接活动重新计算空闲时间，只在微信小程序持续空闲时发送心跳。
+   */
+  function scheduleHeartbeat(task: UniApp.SocketTask) {
+    if (socketTask !== task)
+      return
+    clearHeartbeatTimer()
+    heartbeatTimer = setTimeout(() => {
+      heartbeatTimer = null
+      if (!active || socketTask !== task)
+        return
+      task.send({ data: HEARTBEAT_PAYLOAD })
+      scheduleHeartbeat(task)
+    }, HEARTBEAT_IDLE_MS)
+  }
+  // #endif
+
   function closeSocket() {
+    // #ifdef MP-WEIXIN
+    clearHeartbeatTimer()
+    // #endif
     if (!socketTask)
       return
     const task = socketTask
@@ -162,9 +203,15 @@ export const useMessageStore = defineStore('message', () => {
     task.onOpen(() => {
       reconnectAttempts = 0
       stopPolling()
+      // #ifdef MP-WEIXIN
+      scheduleHeartbeat(task)
+      // #endif
     })
 
     task.onMessage((res) => {
+      // #ifdef MP-WEIXIN
+      scheduleHeartbeat(task)
+      // #endif
       const frame = parsePushFrame(res?.data)
       // 帧解析不出或后端没带未读数（群发时各人不同），回退主动回查
       if (!frame || typeof frame.unreadCount !== 'number' || !Number.isFinite(frame.unreadCount)) {
@@ -181,15 +228,21 @@ export const useMessageStore = defineStore('message', () => {
       }
     })
 
-    task.onError(() => {
+    /**
+     * 只处理当前连接的断开事件，避免旧 SocketTask 的迟到回调清空新连接并触发重复重连。
+     */
+    function handleDisconnect() {
+      if (socketTask !== task)
+        return
+      // #ifdef MP-WEIXIN
+      clearHeartbeatTimer()
+      // #endif
       socketTask = null
       scheduleReconnect()
-    })
+    }
 
-    task.onClose(() => {
-      socketTask = null
-      scheduleReconnect()
-    })
+    task.onError(handleDisconnect)
+    task.onClose(handleDisconnect)
   }
 
   /** App 可见且已登录时调用；重复调用是安全的（幂等）。 */
