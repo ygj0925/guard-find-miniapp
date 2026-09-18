@@ -755,7 +755,8 @@ button::after {
   display: flex;
   align-items: center;
   gap: 14rpx;
-  padding: 10rpx 8rpx;
+  margin-top: 12rpx;
+  padding: 6rpx 8rpx;
   border-radius: 16rpx;
   transition:
     background-color 0.15s ease,
@@ -905,6 +906,15 @@ button::after {
   display: flex;
   align-items: center;
   gap: 22rpx;
+}
+
+.toolbar-button,
+.delete-button {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .toolbar-button {
