@@ -83,6 +83,10 @@ export interface AgentFormPositionOption {
   jobId: string
   positionName?: string
   location?: string
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit?: string
+  /** 兼容旧表单和推荐接口已格式化的薪资文案。 */
   salaryText?: string
   matchReasoning?: AgentFormMatchReasoning
 }

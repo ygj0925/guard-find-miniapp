@@ -11,6 +11,8 @@ export interface PositionLocationOption extends PositionFilterOption {
 
 export interface PositionFilterOptions {
   kinds: PositionFilterOption[]
+  /** 招聘分类由后端筛选字典提供，包含社会、校园和实习生招聘等。 */
+  categories: PositionFilterOption[]
   educationInfos: PositionFilterOption[]
   workExperiences: PositionFilterOption[]
   locations: PositionLocationOption[]

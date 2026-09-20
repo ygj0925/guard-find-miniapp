@@ -5,6 +5,7 @@ import type { AiMessageExtension } from '../aiHistory'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { getPositions } from '@/api/position'
 import { getResumes, uploadResume } from '@/api/resume'
+import { formatPositionSalary } from '@/utils/positionSalary'
 
 const props = defineProps<{
   extension: AiMessageExtension
@@ -106,7 +107,9 @@ async function loadMorePositions(field: AgentFormField) {
       jobId: String(item.jobId),
       positionName: item.positionName,
       location: item.location,
-      salaryText: salaryTextOf(item.salaryMin, item.salaryMax, item.salaryUnit),
+      salaryMin: item.salaryMin,
+      salaryMax: item.salaryMax,
+      salaryUnit: item.salaryUnit,
     }))
     positionOptions.value = [...positionOptions.value, ...appended]
     positionPageNum.value = nextPageNum
@@ -120,11 +123,11 @@ async function loadMorePositions(field: AgentFormField) {
   }
 }
 
-function salaryTextOf(min?: number, max?: number, unit?: string) {
-  if (min == null && max == null)
-    return unit || '面议'
-  const range = min != null && max != null ? `${min}-${max}` : String(min ?? max)
-  return unit ? `${range} ${unit}` : range
+function positionSalaryText(option: AgentFormPositionOption) {
+  const hasRawSalary = option.salaryMin != null || option.salaryMax != null || option.salaryUnit != null
+  return hasRawSalary
+    ? formatPositionSalary(option)
+    : option.salaryText || '面议'
 }
 
 function readString(value: unknown) {
@@ -398,7 +401,7 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
               <text class="form-position-name">{{ option.positionName }}</text>
               <view class="form-position-meta">
                 <text v-if="option.location" class="form-position-tag">{{ option.location }}</text>
-                <text v-if="option.salaryText" class="form-position-tag">{{ option.salaryText }}</text>
+                <text class="form-position-tag">{{ positionSalaryText(option) }}</text>
                 <text v-if="option.matchReasoning" class="form-position-tag form-position-tag-match">
                   {{ option.matchReasoning.level }} {{ option.matchReasoning.score }}分
                 </text>
@@ -406,7 +409,9 @@ async function uploadChosenResume(field: AgentFormField, filePath: string, origi
               <text v-if="option.matchReasoning?.summary" class="form-position-summary">
                 {{ option.matchReasoning.summary }}
               </text>
-              <button class="form-position-detail-button" @tap.stop="viewPositionDetail(option)">查看详情</button>
+              <button class="form-position-detail-button" @tap.stop="viewPositionDetail(option)">
+                查看详情
+              </button>
             </view>
           </view>
           <button
