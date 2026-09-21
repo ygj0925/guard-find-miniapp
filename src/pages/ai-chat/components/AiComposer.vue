@@ -178,8 +178,8 @@ function showVoiceTip() {
         }"
         @tap="showVoiceTip"
         @longpress.stop.prevent="beginRecording"
-        @touchend.stop="finishRecording"
-        @touchcancel.stop="cancelRecording"
+        @touchend.capture="finishRecording"
+        @touchcancel.capture="cancelRecording"
       >
         <template v-if="speechActive">
           <view v-if="speechState === 'recording'" class="speech-wave" aria-hidden="true">

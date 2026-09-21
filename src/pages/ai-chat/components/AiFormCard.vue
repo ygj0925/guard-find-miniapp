@@ -18,6 +18,7 @@ const emit = defineEmits<{
 const KNOWN_FIELD_TYPES: AgentFormFieldType[] = ['input', 'textarea', 'number', 'radio', 'select', 'date', 'resume_upload', 'position_select']
 const DEFAULT_RESUME_EXTENSIONS = ['pdf', 'doc', 'docx']
 const DEFAULT_MAX_RESUME_SIZE_MB = 10
+const ZERO_MONTHLY_SALARY_TEXT = /^0(?:\.0+)?(?:[kK])?(?:[-~至]0(?:\.0+)?(?:[kK])?)?(?:[·/.]?(?:月薪|月))?$/
 
 const title = computed(() => readString(props.extension.data.title) || '请填写')
 const description = computed(() => readString(props.extension.data.description))
@@ -125,9 +126,12 @@ async function loadMorePositions(field: AgentFormField) {
 
 function positionSalaryText(option: AgentFormPositionOption) {
   const hasRawSalary = option.salaryMin != null || option.salaryMax != null || option.salaryUnit != null
-  return hasRawSalary
-    ? formatPositionSalary(option)
-    : option.salaryText || '面议'
+  if (hasRawSalary)
+    return formatPositionSalary(option)
+
+  const salaryText = readString(option.salaryText)
+  // Legacy recommendations only have salaryText; zero means salary is negotiable.
+  return ZERO_MONTHLY_SALARY_TEXT.test(salaryText.replace(/\s+/g, '')) ? '面议' : salaryText || '面议'
 }
 
 function readString(value: unknown) {

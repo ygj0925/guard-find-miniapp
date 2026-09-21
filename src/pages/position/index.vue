@@ -87,38 +87,24 @@ const activeCategories = ref<string[]>([])
 interface RecruitmentCategory {
   value: string
   label: string
-  description: string
-  icon?: string
-  fallbackIcon?: string
-  iconClass?: string
+  icon: string
   activeGradient: string
   activeGlow: string
 }
 
 const RECRUITMENT_CATEGORY_VISUALS: Record<string, Omit<RecruitmentCategory, 'value' | 'label'>> = {
   社会招聘: {
-    description: '经验人才 · 全职机会',
     icon: 'https://static1.3sbio.com/assets/%E7%A4%BE%E4%BC%9A%E6%8B%9B%E8%81%98.png',
-    fallbackIcon: 'https://static1.3sbio.com/assets/lingcai/recruit-social.svg',
     activeGradient: 'linear-gradient(135deg, #2f6fe8 0%, #4d9bf6 100%)',
     activeGlow: '0 16rpx 32rpx rgba(47,111,232,0.28)',
   },
   校园招聘: {
-    description: '应届启航 · 培养计划',
     icon: 'https://static1.3sbio.com/assets/%E6%A0%A1%E5%9B%AD%E6%8B%9B%E8%81%98.png',
-    fallbackIcon: 'https://static1.3sbio.com/assets/lingcai/recruit-campus.svg',
     activeGradient: 'linear-gradient(135deg, #12b3c7 0%, #46d8d0 100%)',
     activeGlow: '0 16rpx 32rpx rgba(18,179,199,0.26)',
   },
   实习生招聘: {
-    description: '实践成长 · 探索职场',
-    iconClass: 'i-carbon-education',
-    activeGradient: 'linear-gradient(135deg, #7165e8 0%, #9b7eea 100%)',
-    activeGlow: '0 16rpx 32rpx rgba(113,101,232,0.26)',
-  },
-  实习招聘: {
-    description: '实践成长 · 探索职场',
-    iconClass: 'i-carbon-education',
+    icon: 'https://static1.3sbio.com/assets/%E5%AE%9E%E4%B9%A0%E7%94%9F-2.png',
     activeGradient: 'linear-gradient(135deg, #7165e8 0%, #9b7eea 100%)',
     activeGlow: '0 16rpx 32rpx rgba(113,101,232,0.26)',
   },
@@ -130,32 +116,20 @@ const DEFAULT_RECRUITMENT_CATEGORIES: RecruitmentCategory[] = [
 ]
 
 const recruitmentCategories = computed<RecruitmentCategory[]>(() => {
-  const categories = filterOptions.value.categories.filter(item => item.value && item.label)
+  const categories = filterOptions.value.categories
+    .filter(item => item.value && item.label)
+    .map(item => item.label === '实习招聘' ? { ...item, label: '实习生招聘' } : item)
   if (!categories.length)
     return DEFAULT_RECRUITMENT_CATEGORIES
 
   return categories.map((item) => {
-    const visual = RECRUITMENT_CATEGORY_VISUALS[item.label] || {
-      description: '探索更多职业机会',
-      iconClass: 'i-carbon-apps',
-      activeGradient: 'linear-gradient(135deg, #4d78c9 0%, #76a2eb 100%)',
-      activeGlow: '0 16rpx 32rpx rgba(77,120,201,0.22)',
-    }
+    const visual = RECRUITMENT_CATEGORY_VISUALS[item.label]
+    if (!visual)
+      return null
     return { value: item.value, label: item.label, ...visual }
-  })
+  }).filter((item): item is RecruitmentCategory => item !== null)
 })
-const recruitmentIconError = reactive<Record<string, boolean>>({})
 let positionRequestVersion = 0
-
-function resolveRecruitmentIcon(item: RecruitmentCategory) {
-  if (!item.icon)
-    return ''
-  return recruitmentIconError[item.value] ? item.fallbackIcon || '' : item.icon
-}
-
-function handleRecruitmentIconError(value: string) {
-  recruitmentIconError[value] = true
-}
 
 let statusBarHeight = 0
 let headerSearchExpandedWidth = 0
@@ -321,6 +295,7 @@ async function centerKindOption(index: number) {
   await nextTick()
   let viewportLeft = 0
   let viewportWidth = 0
+  let contentWidth = 0
   let currentScrollLeft = 0
   let optionLeft = 0
   let optionWidth = 0
@@ -337,6 +312,11 @@ async function centerKindOption(index: number) {
       const nodeInfo = Array.isArray(offset) ? offset[0] : offset
       currentScrollLeft = Number(nodeInfo?.scrollLeft || 0)
     })
+    .select('#position-kind-scroll-content')
+    .boundingClientRect((rect) => {
+      const nodeInfo = Array.isArray(rect) ? rect[0] : rect
+      contentWidth = Number(nodeInfo?.width || 0)
+    })
     .select(`#position-kind-${index}`)
     .boundingClientRect((rect) => {
       const nodeInfo = Array.isArray(rect) ? rect[0] : rect
@@ -346,6 +326,10 @@ async function centerKindOption(index: number) {
     .exec(() => {
       if (viewportWidth <= 0 || optionWidth <= 0)
         return
+      if (contentWidth <= viewportWidth) {
+        kindScrollLeft.value = 0
+        return
+      }
       const target = currentScrollLeft + optionLeft - viewportLeft - (viewportWidth - optionWidth) / 2
       kindScrollLeft.value = Math.max(0, Math.round(target))
     })
@@ -356,9 +340,7 @@ function handleCategoryTap(kind: string, index: number) {
     activeKinds.value = []
   }
   else {
-    activeKinds.value = activeKinds.value.includes(kind)
-      ? activeKinds.value.filter(item => item !== kind)
-      : [...activeKinds.value, kind]
+    activeKinds.value = activeKinds.value[0] === kind ? [] : [kind]
   }
   void centerKindOption(index)
   loadPositions(true)
@@ -548,13 +530,12 @@ onUnload(() => {
           />
         </view>
 
-        <view class="grid grid-cols-2 mt-4 gap-3">
+        <view class="grid grid-cols-3 mt-4 gap-2">
           <view
             v-for="item in recruitmentCategories"
             :key="item.value"
-            class="relative min-h-116rpx flex cursor-pointer items-center overflow-hidden border-1rpx rounded-2xl border-solid px-3.5 transition-all duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:opacity-88 motion-reduce:transition-none"
+            class="min-w-0 h-112rpx flex cursor-pointer items-center justify-center gap-1 overflow-hidden border-1rpx rounded-xl border-solid px-1 text-center transition-all duration-220 ease-[cubic-bezier(0.32,0.72,0,1)] active:opacity-88 motion-reduce:transition-none"
             :class="[
-              recruitmentCategories.length % 2 === 1 && index === recruitmentCategories.length - 1 ? 'col-span-2' : '',
               isRecruitmentCategoryActive(item.value)
                 ? 'border-white/60 shadow-[0_18rpx_38rpx_rgba(39,105,180,0.22)]'
                 : 'border-white/60 bg-white/72 shadow-[0_12rpx_32rpx_rgba(39,105,180,0.08)] backdrop-blur-8rpx',
@@ -566,30 +547,12 @@ onUnload(() => {
             @tap="toggleRecruitmentCategory(item.value)"
           >
             <view
-              class="mr-3 h-72rpx w-72rpx flex flex-none items-center justify-center rounded-xl transition-colors duration-220"
+              class="h-58rpx w-58rpx flex flex-none items-center justify-center rounded-lg transition-colors duration-220"
               :class="isRecruitmentCategoryActive(item.value) ? 'bg-white/22' : 'bg-white/70'"
             >
-              <image
-                v-if="resolveRecruitmentIcon(item)"
-                class="h-56rpx w-56rpx"
-                :src="resolveRecruitmentIcon(item)"
-                mode="aspectFit"
-                @error="handleRecruitmentIconError(item.value)"
-              />
-              <view v-else class="text-4xl leading-none" :class="isRecruitmentCategoryActive(item.value) ? 'text-white' : 'text-[#7165e8]'">
-                <view :class="item.iconClass" />
-              </view>
+              <image class="h-48rpx w-48rpx" :src="item.icon" mode="aspectFit" />
             </view>
-            <view class="min-w-0 flex flex-1 flex-col">
-              <text class="text-sm font-700" :class="isRecruitmentCategoryActive(item.value) ? 'text-white' : 'text-app-ink'">{{ item.label }}</text>
-              <text class="mt-1 block text-2xs" :class="isRecruitmentCategoryActive(item.value) ? 'text-white/82' : 'text-app-muted'">{{ item.description }}</text>
-            </view>
-            <view
-              v-if="isRecruitmentCategoryActive(item.value)"
-              class="absolute right-3 top-3 h-32rpx w-32rpx flex items-center justify-center rounded-full bg-white/28"
-            >
-              <view class="i-carbon-checkmark text-xs text-white leading-none" />
-            </view>
+            <text class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-700 leading-none" :class="isRecruitmentCategoryActive(item.value) ? 'text-white' : 'text-app-ink'">{{ item.label }}</text>
           </view>
         </view>
 
@@ -627,7 +590,7 @@ onUnload(() => {
       :scroll-left="kindScrollLeft"
       :show-scrollbar="false"
     >
-      <view class="h-92rpx min-w-full inline-flex items-stretch px-3">
+      <view id="position-kind-scroll-content" class="box-border h-92rpx min-w-full grid grid-flow-col auto-cols-[minmax(120rpx,max-content)] justify-start px-3">
         <view
           v-for="(category, index) in kindOptions"
           :id="`position-kind-${index}`"

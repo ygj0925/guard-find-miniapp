@@ -44,6 +44,7 @@ interface NormalizedRecognitionError {
 }
 
 const MAX_RECORDING_DURATION = 60_000
+const STOP_CALLBACK_TIMEOUT = 3_000
 
 export function useSpeechRecognition(options: SpeechRecognitionOptions) {
   const state = ref<SpeechRecognitionState>('idle')
@@ -51,13 +52,16 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
   const interimText = ref('')
   let manager: WechatSpeechRecognitionManager | null = null
   let timer: ReturnType<typeof setInterval> | null = null
+  let stopCallbackTimer: ReturnType<typeof setTimeout> | null = null
   let recordingStartedAt = 0
   let startAttemptSequence = 0
   let permissionCheckPending = false
   let managerStarted = false
   let managerStartPending = false
   let managerStopPending = false
+  let stopRetriedAfterManagerStart = false
   let stopRequested = false
+  let stopRecoveryPending = false
   let ignoreNextResult = false
   let disposed = false
 
@@ -77,8 +81,16 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     }
   }
 
+  function clearStopCallbackTimer() {
+    if (stopCallbackTimer) {
+      clearTimeout(stopCallbackTimer)
+      stopCallbackTimer = null
+    }
+  }
+
   function resetState() {
     stopTimer()
+    clearStopCallbackTimer()
     state.value = 'idle'
     durationSeconds.value = 0
     interimText.value = ''
@@ -86,7 +98,9 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     permissionCheckPending = false
     managerStartPending = false
     managerStopPending = false
+    stopRetriedAfterManagerStart = false
     stopRequested = false
+    stopRecoveryPending = false
   }
 
   function resetVisibleState() {
@@ -96,13 +110,58 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     interimText.value = ''
   }
 
+  function handleStopCallbackTimeout() {
+    stopCallbackTimer = null
+    if (!managerStopPending && !(stopRequested && managerStartPending))
+      return
+
+    // Keep the plugin session isolated until its terminal callback arrives. The plugin
+    // does not identify callbacks by recording session, so starting again here could
+    // deliver an old result into a new recording.
+    const shouldNotify = !disposed && !ignoreNextResult
+    stopRecoveryPending = true
+    ignoreNextResult = true
+    resetVisibleState()
+    if (shouldNotify)
+      options.onError('语音服务未及时结束，请稍后再试')
+  }
+
+  function scheduleStopCallbackTimeout() {
+    clearStopCallbackTimer()
+    stopCallbackTimer = setTimeout(handleStopCallbackTimeout, STOP_CALLBACK_TIMEOUT)
+  }
+
+  function requestManagerStop(target = manager, force = false) {
+    if (!target || (managerStopPending && !force))
+      return
+
+    managerStopPending = true
+    try {
+      // Do not wait for onStart: users can release before the plugin confirms startup.
+      target.stop()
+    }
+    catch {
+      managerStopPending = false
+      // The plugin can reject stop while its start callback is still pending.
+      // Keep waiting for that callback and retry from onStart.
+      scheduleStopCallbackTimeout()
+      return
+    }
+
+    scheduleStopCallbackTimeout()
+  }
+
   function bindManagerCallbacks(target: WechatSpeechRecognitionManager) {
     target.onStart = () => {
+      const shouldStop = stopRequested || disposed || state.value === 'idle'
       managerStartPending = false
       managerStarted = true
-      if (stopRequested || disposed) {
-        managerStopPending = true
-        target.stop()
+      if (shouldStop) {
+        // A stop issued before onStart can be ignored by WechatSI without throwing.
+        // Retry once after the manager confirms that the recording actually started.
+        const retryAfterManagerStart = !stopRetriedAfterManagerStart
+        stopRetriedAfterManagerStart = true
+        requestManagerStop(target, retryAfterManagerStart)
       }
     }
     target.onRecognize = ({ result }) => {
@@ -224,7 +283,10 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
       || permissionCheckPending
       || managerStartPending
       || managerStopPending
+      || stopRecoveryPending
     ) {
+      if (stopRecoveryPending)
+        options.onError('上一段语音仍在结束，请稍后再试')
       return 'cancelled'
     }
 
@@ -258,6 +320,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
       managerStarted = false
       managerStartPending = true
       managerStopPending = false
+      stopRetriedAfterManagerStart = false
       ignoreNextResult = false
       interimText.value = ''
       state.value = 'recording'
@@ -288,10 +351,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     stopTimer()
     stopRequested = true
     state.value = 'recognizing'
-    if (managerStarted && !managerStopPending) {
-      managerStopPending = true
-      manager.stop()
-    }
+    requestManagerStop()
   }
 
   function cancel() {
@@ -314,10 +374,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     ignoreNextResult = true
     stopRequested = true
     resetVisibleState()
-    if (manager && managerStarted && !managerStopPending) {
-      managerStopPending = true
-      manager.stop()
-    }
+    requestManagerStop()
   }
 
   function dispose() {
@@ -327,10 +384,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     ignoreNextResult = true
     stopRequested = true
     resetVisibleState()
-    if (manager && managerStarted && !managerStopPending) {
-      managerStopPending = true
-      manager.stop()
-    }
+    requestManagerStop()
   }
 
   return {
