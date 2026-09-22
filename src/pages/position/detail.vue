@@ -103,6 +103,11 @@ function toPositionDetail(source: PositionDetailResponse): PositionDetailView {
 }
 
 onLoad(async (options) => {
+  // 从朋友圈分享进来（带 shareId），直接跳到分享列表页
+  if (options?.shareId && options?.id) {
+    uni.redirectTo({ url: `${SHARE_LIST_PATH}?id=${encodeURIComponent(options.id)}&shareId=${encodeURIComponent(options.shareId)}` })
+    return
+  }
   if (!options?.id) {
     isLoading.value = false
     return
@@ -111,6 +116,7 @@ onLoad(async (options) => {
     position.value = toPositionDetail(await getPositionDetail(options.id))
     // #ifdef MP-WEIXIN
     nextTick(() => drawSharePoster())
+    callShareApi() // 提前获取 shareId，确保朋友圈分享（同步）也能携带
     // #endif
   }
   catch {
@@ -247,6 +253,7 @@ onShareAppMessage(async () => {
 
 onShareTimeline(() => ({
   title: shareTitle.value,
+  imageUrl: screenshotPath.value || 'https://static1.3sbio.com/logo/2.png',
   query: sharePositionId.value
     ? `id=${encodeURIComponent(position.value.id)}&shareId=${encodeURIComponent(sharePositionId.value)}`
     : `id=${encodeURIComponent(position.value.id)}`,
@@ -260,13 +267,17 @@ function handleBack() {
   uni.switchTab({ url: POSITION_LIST_PATH })
 }
 
+let shareApiCallPromise: Promise<void> | null = null
 function callShareApi() {
-  return createPositionShares([position.value.id])
-    .then((res) => {
-      sharePositionId.value = res?.id ?? ''
-      console.log('[分享接口成功]', res)
-    })
-    .catch(err => console.log('[分享接口失败]', err))
+  if (!shareApiCallPromise) {
+    shareApiCallPromise = createPositionShares([position.value.id])
+      .then((res) => {
+        sharePositionId.value = res?.id ?? ''
+        console.log('[分享接口成功]', res)
+      })
+      .catch(err => console.log('[分享接口失败]', err))
+  }
+  return shareApiCallPromise
 }
 
 function handleShareLogin() {
