@@ -55,6 +55,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
   let stopCallbackTimer: ReturnType<typeof setTimeout> | null = null
   let recordingStartedAt = 0
   let startAttemptSequence = 0
+  let startInProgress = false
   let permissionCheckPending = false
   let managerStarted = false
   let managerStartPending = false
@@ -280,6 +281,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     if (
       disposed
       || state.value !== 'idle'
+      || startInProgress
       || permissionCheckPending
       || managerStartPending
       || managerStopPending
@@ -291,6 +293,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     }
 
     const startAttempt = ++startAttemptSequence
+    startInProgress = true
     permissionCheckPending = true
     stopRequested = false
     const permissionState = await getMicrophonePermissionState()
@@ -298,6 +301,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
     if (startAttempt !== startAttemptSequence || disposed || stopRequested) {
       if (startAttempt === startAttemptSequence)
         permissionCheckPending = false
+      startInProgress = false
       return 'cancelled'
     }
 
@@ -307,14 +311,22 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
         options.onError('暂时无法检查麦克风权限，请稍后重试')
       else if (permissionState === 'unsupported')
         options.onError('当前环境暂不支持语音识别')
+      startInProgress = false
       return permissionState === 'denied' || permissionState === 'prompt'
         ? 'permission-required'
         : 'failed'
     }
 
     const recognitionManager = getManager()
-    if (!recognitionManager)
+    if (!recognitionManager) {
+      startInProgress = false
       return 'failed'
+    }
+
+    if (startAttempt !== startAttemptSequence || disposed || stopRequested) {
+      startInProgress = false
+      return 'cancelled'
+    }
 
     try {
       managerStarted = false
@@ -330,17 +342,19 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
         durationSeconds.value = Math.min(60, Math.floor((Date.now() - recordingStartedAt) / 1000))
       }, 250)
       recognitionManager.start({ duration: MAX_RECORDING_DURATION, lang: 'zh_CN' })
+      startInProgress = false
       return 'started'
     }
     catch {
       resetState()
+      startInProgress = false
       options.onError('无法启动录音，请重试')
       return 'failed'
     }
   }
 
   function stop() {
-    if (state.value === 'idle' && permissionCheckPending) {
+    if (state.value === 'idle' && startInProgress) {
       startAttemptSequence += 1
       permissionCheckPending = false
       stopRequested = true
@@ -355,7 +369,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions) {
   }
 
   function cancel() {
-    if (state.value === 'idle' && permissionCheckPending) {
+    if (state.value === 'idle' && startInProgress) {
       startAttemptSequence += 1
       permissionCheckPending = false
       stopRequested = true

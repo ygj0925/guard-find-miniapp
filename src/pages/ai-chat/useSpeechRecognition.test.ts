@@ -60,6 +60,35 @@ describe('useSpeechRecognition', () => {
     expect(speech.state.value).toBe('idle')
   })
 
+  it('cancels the first start when the user releases during async initialization', async () => {
+    let releasePermissionCheck: (() => void) | undefined
+    let firstPermissionCheck = true
+    Object.assign(uni, {
+      getSetting: ({ success }: { success: (result: { authSetting: { 'scope.record': boolean } }) => void }) => {
+        if (firstPermissionCheck) {
+          firstPermissionCheck = false
+          releasePermissionCheck = () => success({ authSetting: { 'scope.record': true } })
+          return
+        }
+        success({ authSetting: { 'scope.record': true } })
+      },
+    })
+
+    const { speech } = createRecognition()
+    const firstStart = speech.start()
+    speech.stop()
+    releasePermissionCheck?.()
+
+    await expect(firstStart).resolves.toBe('cancelled')
+    expect(manager.start).not.toHaveBeenCalled()
+    expect(speech.state.value).toBe('idle')
+
+    await expect(speech.start()).resolves.toBe('started')
+    expect(manager.start).toHaveBeenCalledTimes(1)
+    speech.cancel()
+    manager.onStop?.({})
+  })
+
   it('isolates a timed-out recording until its late terminal callback arrives', async () => {
     vi.useFakeTimers()
     const { speech, onResult } = createRecognition()
