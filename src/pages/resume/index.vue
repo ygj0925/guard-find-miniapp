@@ -19,7 +19,6 @@ const selecting = ref(false)
 const editing = ref<ResumeItem>()
 const inputFocus = ref(false)
 const editName = ref('')
-const showUploadPicker = ref(false)
 
 function releaseSelecting() {
   selecting.value = false
@@ -104,11 +103,23 @@ function chooseResume() {
     uni.showToast({ title: `最多上传 ${MAX_RESUMES} 份简历`, icon: 'none' })
     return
   }
+  selecting.value = true
   // #ifdef MP-WEIXIN
-  showUploadPicker.value = true
+  uni.chooseMessageFile({
+    count: 1,
+    type: 'file',
+    extension: ['pdf', 'doc', 'docx'],
+    success: (result) => {
+      releaseSelecting()
+      const file = result.tempFiles[0]
+      if (file)
+        void uploadSelectedResume(file.path, file.name, typeof file.size === 'number' ? file.size : undefined)
+    },
+    fail: releaseSelecting,
+    complete: releaseSelecting,
+  })
   // #endif
   // #ifndef MP-WEIXIN
-  selecting.value = true
   uni.chooseFile({
     count: 1,
     type: 'all',
@@ -135,50 +146,6 @@ function chooseResume() {
   })
   // #endif
 }
-
-// #ifdef MP-WEIXIN
-function pickFromWechatChat() {
-  showUploadPicker.value = false
-  selecting.value = true
-  uni.chooseMessageFile({
-    count: 1,
-    type: 'file',
-    extension: ['pdf', 'doc', 'docx'],
-    success: (result) => {
-      releaseSelecting()
-      const file = result.tempFiles[0]
-      if (file)
-        void uploadSelectedResume(file.path, file.name, typeof file.size === 'number' ? file.size : undefined)
-    },
-    fail: releaseSelecting,
-    complete: releaseSelecting,
-  })
-}
-
-function pickFromFileManager() {
-  showUploadPicker.value = false
-  selecting.value = true
-  ;(wx as any).chooseFile({
-    count: 1,
-    type: 'all',
-    extension: ['pdf', 'doc', 'docx'],
-    success: (result: any) => {
-      releaseSelecting()
-      const file = result.tempFiles?.[0]
-      const filePath = result.tempFilePaths?.[0] || file?.path || ''
-      const originalName = file?.name || ''
-      const fileSize = typeof file?.size === 'number' ? file.size : undefined
-      if (!filePath) {
-        uni.showToast({ title: '无法读取所选文件，请重新选择', icon: 'none' })
-        return
-      }
-      void uploadSelectedResume(filePath, originalName, fileSize)
-    },
-    fail: releaseSelecting,
-    complete: releaseSelecting,
-  })
-}
-// #endif
 
 function showItemActions(item: ResumeItem) {
   const actions = item.isDefault
@@ -442,50 +409,5 @@ onShow(loadResumes)
         </view>
       </view>
     </view>
-
-    <!-- 上传方式选择弹窗 -->
-    <!-- #ifdef MP-WEIXIN -->
-    <view
-      v-if="showUploadPicker"
-      class="fixed inset-0 z-100 flex items-end justify-center bg-black/45"
-      @tap="showUploadPicker = false"
-    >
-      <view class="w-full rounded-t-3xl bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+20rpx)] pt-6" @tap.stop>
-        <text class="block text-center text-base text-[#1a2640] font-700">请选择上传方式</text>
-        <text class="mt-2 block text-center text-xs text-[#98a2b3]">支持 PDF、DOC、DOCX 格式，大小不超过 10MB</text>
-        <view class="mt-5 flex flex-col gap-3">
-          <view
-            class="flex items-center rounded-2xl bg-[#f5f7fa] px-4 py-4 active:opacity-70"
-            role="button"
-            @tap="pickFromWechatChat"
-          >
-            <view class="h-88rpx w-88rpx flex flex-shrink-0 items-center justify-center rounded-full bg-[#07c160]">
-              <view class="i-carbon-chat text-xl text-white leading-none" />
-            </view>
-            <text class="ml-3 flex-1 text-sm text-[#1a2640] font-500">微信聊天文件上传</text>
-            <text class="mr-2 rounded-full bg-[#e8f9ef] px-[10rpx] py-[4rpx] text-xs text-[#07c160] font-500">推荐</text>
-            <view class="i-carbon-chevron-right text-base text-[#c4c9d4] leading-none" />
-          </view>
-          <view
-            class="flex items-center rounded-2xl bg-[#f5f7fa] px-4 py-4 active:opacity-70"
-            role="button"
-            @tap="pickFromFileManager"
-          >
-            <view class="h-88rpx w-88rpx flex flex-shrink-0 items-center justify-center rounded-full bg-[#2b5fd9]">
-              <view class="i-carbon-folder text-xl text-white leading-none" />
-            </view>
-            <text class="ml-3 flex-1 text-sm text-[#1a2640] font-500">文件管理器上传</text>
-            <view class="i-carbon-chevron-right text-base text-[#c4c9d4] leading-none" />
-          </view>
-        </view>
-        <view
-          class="mt-4 min-h-88rpx flex cursor-pointer items-center justify-center rounded-2xl bg-[#f2f4f7] text-sm text-[#6b7a8d] font-600 active:opacity-70"
-          @tap="showUploadPicker = false"
-        >
-          取消
-        </view>
-      </view>
-    </view>
-    <!-- #endif -->
   </view>
 </template>
