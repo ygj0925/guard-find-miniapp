@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 type SpeechRecognitionState = 'idle' | 'recording' | 'recognizing'
 
@@ -44,6 +44,15 @@ const isFocused = ref(false)
 const inputFocused = ref(false)
 const recordingGestureActive = ref(false)
 const speechActive = computed(() => props.speechState !== 'idle')
+const LONG_PRESS_DELAY = 350
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearLongPressTimer() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
 
 watch(
   () => props.speechState,
@@ -59,6 +68,8 @@ watch(
       recordingGestureActive.value = false
   },
 )
+
+onBeforeUnmount(clearLongPressTimer)
 
 function updateValue(event: ComposerInputEvent) {
   emit('update:modelValue', event.detail.value)
@@ -113,7 +124,20 @@ function beginRecording() {
   emit('record-start')
 }
 
+function prepareRecording() {
+  if (!props.voiceMode || props.disabled || props.speechState !== 'idle') {
+    return
+  }
+
+  clearLongPressTimer()
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null
+    beginRecording()
+  }, LONG_PRESS_DELAY)
+}
+
 function finishRecording() {
+  clearLongPressTimer()
   if (!recordingGestureActive.value) {
     return
   }
@@ -123,6 +147,7 @@ function finishRecording() {
 }
 
 function cancelRecording() {
+  clearLongPressTimer()
   if (!recordingGestureActive.value) {
     return
   }
@@ -177,7 +202,7 @@ function showVoiceTip() {
           recognizing: speechState === 'recognizing',
         }"
         @tap="showVoiceTip"
-        @longpress.stop.prevent="beginRecording"
+        @touchstart.stop="prepareRecording"
         @touchend.capture="finishRecording"
         @touchcancel.capture="cancelRecording"
       >

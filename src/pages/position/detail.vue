@@ -6,6 +6,7 @@ import { getResumes } from '@/api/resume'
 import type { ResumeItem } from '@/api/resume'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { useTokenStore } from '@/store/token'
+import { createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 import { formatPositionSalary } from '@/utils/positionSalary'
 import { toLoginPage } from '@/utils/toLoginPage'
 
@@ -22,6 +23,8 @@ definePage({
     backgroundColor: '#F5F7FA',
     backgroundColorTop: '#FFFFFF',
     backgroundColorBottom: '#FFFFFF',
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
 
@@ -254,12 +257,12 @@ onShareAppMessage(async () => {
   }
 })
 
-onShareTimeline(() => ({
-  title: shareTitle.value,
-  query: sharePositionId.value
+onShareTimeline(() => createMiniProgramTimelineShare(
+  shareTitle.value,
+  sharePositionId.value
     ? `id=${encodeURIComponent(position.value.id)}&shareId=${encodeURIComponent(sharePositionId.value)}`
     : `id=${encodeURIComponent(position.value.id)}`,
-}))
+))
 
 function handleBack() {
   if (getCurrentPages().length > 1) {

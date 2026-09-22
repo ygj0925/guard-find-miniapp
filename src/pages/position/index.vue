@@ -6,6 +6,7 @@ import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { tabbarStore } from '@/tabbar/store'
 import { formatPositionSalary } from '@/utils/positionSalary'
+import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 import PositionLocationFilter from './components/PositionLocationFilter.vue'
 import PositionSearchBar from './components/PositionSearchBar.vue'
 
@@ -22,8 +23,13 @@ definePage({
     backgroundColor: '#EDF6FF',
     backgroundColorTop: '#EDF6FF',
     backgroundColorBottom: '#EDF6FF',
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
+
+onShareAppMessage(() => createMiniProgramShare('生生智家 - 职位', '/pages/position/index'))
+onShareTimeline(() => createMiniProgramTimelineShare('生生智家 - 职位'))
 
 const POSITION_PATH = '/pages/position/index'
 const HEADER_SEARCH_START = uni.upx2px(24)

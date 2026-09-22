@@ -7,6 +7,7 @@ import AppPageHeader from '@/components/AppPageHeader.vue'
 import { useMessageStore } from '@/store/message'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 
 defineOptions({
   name: 'Notification',
@@ -18,8 +19,13 @@ definePage({
     navigationBarTitleText: '消息',
     backgroundColor: '#EDF6FF',
     enablePullDownRefresh: true,
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
+
+onShareAppMessage(() => createMiniProgramShare('生生智家 - 消息', '/pages/notification/index'))
+onShareTimeline(() => createMiniProgramTimelineShare('生生智家 - 消息'))
 
 interface TypeMeta {
   iconClass: string

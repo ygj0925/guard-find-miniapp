@@ -6,6 +6,7 @@ import { PRIVACY_PAGE } from '@/router/config'
 import { useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 
 definePage({
   style: {
@@ -16,8 +17,13 @@ definePage({
     backgroundColor: '#F5F7FA',
     backgroundColorTop: '#dbeafe',
     backgroundColorBottom: '#F5F7FA',
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
+
+onShareAppMessage(() => createMiniProgramShare('生生智家 - 我的', '/pages/me/me'))
+onShareTimeline(() => createMiniProgramTimelineShare('生生智家 - 我的'))
 
 const userStore = useUserStore()
 const tokenStore = useTokenStore()

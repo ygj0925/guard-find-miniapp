@@ -14,6 +14,7 @@ import AuthAreaCodePicker from './components/AuthAreaCodePicker.vue'
 import type { AreaCodeItem } from './area-code'
 import { DEFAULT_AREA_ISO, getAreaByIso } from './area-code'
 import { getPhoneMaxLength, normalizePhone, validatePhoneByAreaCode, validateVerificationCode } from './auth'
+import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 
 definePage({
   excludeLoginPath: true,
@@ -23,8 +24,13 @@ definePage({
     navigationBarTextStyle: 'black',
     navigationBarTitleText: '会员登录',
     backgroundColor: '#FFFFFF',
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
+
+onShareAppMessage(() => createMiniProgramShare('生生智家', '/pages/index/index'))
+onShareTimeline(() => createMiniProgramTimelineShare('生生智家'))
 
 type PendingLoginAction = 'phone' | 'wechat' | null
 interface PhoneNumberEvent { detail: { code?: string, errMsg?: string } }

@@ -29,6 +29,7 @@ import { useTokenStore } from '@/store/token'
 import { useUserStore } from '@/store/user'
 import { navigateToLoginPage, toLoginPage } from '@/utils/toLoginPage'
 import { safeAreaInsets, systemInfo } from '@/utils/systemInfo'
+import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 import {
   clearNewConversationRequest,
   consumeActiveHistoryConversation,
@@ -55,8 +56,13 @@ definePage({
     navigationBarTitleText: '生生智家',
     backgroundColor: '#EDF6FF',
     disableScroll: true,
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
+
+onShareAppMessage(() => createMiniProgramShare('生生智家 - AI 招聘助手', '/pages/ai-chat/index'))
+onShareTimeline(() => createMiniProgramTimelineShare('生生智家 - AI 招聘助手'))
 
 interface ScrollEvent {
   detail: {
@@ -1420,6 +1426,14 @@ function handleRecordCancel() {
   speech.cancel()
 }
 
+function handlePageTouchEnd() {
+  speech.stop()
+}
+
+function handlePageTouchCancel() {
+  speech.cancel()
+}
+
 watch(
   () => tokenStore.tokenInfo,
   () => {
@@ -1463,7 +1477,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <view class="ai-page">
+  <view
+    class="ai-page"
+    @touchend.capture="handlePageTouchEnd"
+    @touchcancel.capture="handlePageTouchCancel"
+  >
     <view class="ai-header-fixed">
       <AiBrandHeader
         :show-history="isAiAuthenticated"
