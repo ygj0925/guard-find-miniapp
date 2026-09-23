@@ -472,13 +472,12 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #edf6ff url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg') center / cover fixed;
+  background: #edf6ff url('https://static1.3sbio.com/assets/lingcai/%E8%83%8C%E6%99%AF.jpg') center / cover fixed;
   color: #202a3d;
 }
 
 :global(page) {
-  background: #edf6ff url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg') center / cover
-    no-repeat;
+  background: #edf6ff url('https://static1.3sbio.com/assets/lingcai/%E8%83%8C%E6%99%AF.jpg') center / cover no-repeat;
 }
 
 button {

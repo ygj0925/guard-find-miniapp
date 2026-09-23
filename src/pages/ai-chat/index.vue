@@ -1850,13 +1850,12 @@ onUnmounted(() => {
   box-sizing: border-box;
   width: 100%;
   overflow: hidden;
-  background: #edf6ff url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg') center / cover fixed;
+  background: #edf6ff url('https://static1.3sbio.com/assets/lingcai/%E8%83%8C%E6%99%AF.jpg') center / cover fixed;
   color: var(--app-ink);
 }
 
 :global(page) {
-  background: #edf6ff url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg') center / cover
-    no-repeat;
+  background: #edf6ff url('https://static1.3sbio.com/assets/lingcai/%E8%83%8C%E6%99%AF.jpg') center / cover no-repeat;
 }
 
 .ai-header-fixed {
@@ -1893,7 +1892,7 @@ onUnmounted(() => {
   padding-top: 32rpx;
   background-image:
     linear-gradient(180deg, rgba(237, 246, 255, 0) 0%, rgba(237, 246, 255, 0.68) 38%, rgba(237, 246, 255, 0.16) 100%),
-    url('https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/背景.jpg');
+    url('https://static1.3sbio.com/assets/lingcai/%E8%83%8C%E6%99%AF.jpg');
   background-repeat: no-repeat;
   background-position:
     center,
