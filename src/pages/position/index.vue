@@ -473,7 +473,9 @@ onShow(() => {
     loadPositions(true)
 })
 
-onLoad(() => {
+onLoad((options?: { category?: string }) => {
+  if (options?.category === '1' || options?.category === '2')
+    positionStore.setPendingCategory(options.category)
   applyPendingCategory()
   void loadFilterOptions()
   void loadPositions(true)
