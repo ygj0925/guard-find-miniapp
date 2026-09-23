@@ -41,7 +41,7 @@ export const customTabbarList: CustomTabBarItem[] = [
   },
   {
     text: '',
-    pagePath: 'pages/ai-chat/index',
+    pagePath: 'pages/ai-chat/entry',
     iconType: 'image',
     icon: 'https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/底部入口图标.png',
     iconActive: 'https://3sbio-yizhantong.oss-cn-shanghai.aliyuncs.com/images/底部入口图标.png',

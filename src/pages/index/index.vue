@@ -61,7 +61,6 @@ interface QuickEntry {
 const TAB_PAGES = [
   'pages/index/index',
   'pages/position/index',
-  'pages/ai-chat/index',
   'pages/notification/index',
   'pages/me/me',
 ]

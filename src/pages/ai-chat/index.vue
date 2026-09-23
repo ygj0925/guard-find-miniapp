@@ -15,7 +15,7 @@ import type {
   AiMessageExtension,
   AiMessageExtensionType,
 } from './aiHistory'
-import { onHide, onShow } from '@dcloudio/uni-app'
+import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   getAgentChatSession,
@@ -45,7 +45,6 @@ import AiFormCard from './components/AiFormCard.vue'
 import AiMessageActivityGroup from './components/AiMessageActivityGroup.vue'
 import AiRichText from './components/AiRichText.vue'
 import { useSpeechRecognition } from './useSpeechRecognition'
-import { isPageBackSwipe } from './aiSwipe'
 
 defineOptions({
   name: 'AiChat',
@@ -57,13 +56,12 @@ definePage({
     navigationBarTitleText: '生生智家',
     backgroundColor: '#EDF6FF',
     disableScroll: true,
-    disableSwipeBack: true,
     enableShareAppMessage: true,
     enableShareTimeline: true,
   },
 })
 
-onShareAppMessage(() => createMiniProgramShare('生生智家 - AI 招聘助手', '/pages/ai-chat/index'))
+onShareAppMessage(() => createMiniProgramShare('生生智家 - AI 招聘助手', '/pages/ai-chat/entry'))
 onShareTimeline(() => createMiniProgramTimelineShare('生生智家 - AI 招聘助手'))
 
 interface ScrollEvent {
@@ -89,11 +87,31 @@ interface PageTouchEvent {
   changedTouches?: PageTouchPoint[]
 }
 
+interface AiPageOptions {
+  fromEntry?: string
+}
+
 interface ActiveStream {
   cancel: () => void
 }
 
+interface SwipePoint {
+  x: number
+  y: number
+}
+
+function isPageBackSwipe(start: SwipePoint, end: SwipePoint) {
+  const deltaX = end.x - start.x
+  const deltaY = Math.abs(end.y - start.y)
+
+  if (deltaY > 80)
+    return false
+
+  return deltaX <= -80 || (start.x <= 36 && deltaX >= 80)
+}
+
 const AI_PAGE_PATH = '/pages/ai-chat/index'
+const AI_ENTRY_PATH = '/pages/ai-chat/entry'
 const PROCESSING_STATUS_TEXT = '正在处理你的问题…'
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
@@ -102,7 +120,11 @@ const recommendMessagesLoading = ref(false)
 const recommendMessagesFailed = ref(false)
 const isAiAuthenticated = computed(() => tokenStore.hasLogin && Boolean(tokenStore.validToken))
 
-const hasStarted = ref(false)
+const AI_WELCOME_DISMISSED_KEY = 'sss-recruitment:ai-chat:welcome-dismissed'
+const hasStarted = ref(
+  uni.getStorageSync(AI_WELCOME_DISMISSED_KEY) === true
+  || uni.getStorageSync(AI_WELCOME_DISMISSED_KEY) === 'true',
+)
 const inputValue = ref('')
 const voiceMode = ref(false)
 const voicePermissionPending = ref(false)
@@ -148,6 +170,16 @@ let conversationOwnerId: string | null = null
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
 let swipeStartPoint: { x: number, y: number } | null = null
 let swipeNavigating = false
+
+function setHasStarted(started: boolean) {
+  hasStarted.value = started
+  if (started) {
+    uni.setStorageSync(AI_WELCOME_DISMISSED_KEY, true)
+  }
+  else {
+    uni.removeStorageSync(AI_WELCOME_DISMISSED_KEY)
+  }
+}
 
 const speech = useSpeechRecognition({
   onResult(text) {
@@ -251,7 +283,7 @@ function createConversationTitle(question: string) {
 }
 
 function startExperience() {
-  hasStarted.value = true
+  setHasStarted(true)
   void measureContentViewport()
   if (currentConversation.value)
     void scrollToBottom(true, false)
@@ -280,7 +312,7 @@ function resetConversationState(started: boolean) {
   if (isReplying.value || activeStream)
     cancelReply()
   clearNewConversationRequest()
-  hasStarted.value = started
+  setHasStarted(started)
   currentConversation.value = null
   inputValue.value = ''
   isReplying.value = false
@@ -406,7 +438,7 @@ function restorePendingQuestion() {
   if (!pendingQuestion)
     return
 
-  hasStarted.value = true
+  setHasStarted(true)
   inputValue.value = pendingQuestion
   uni.showToast({ title: '已登录，请确认问题后发送', icon: 'none' })
 }
@@ -1006,7 +1038,7 @@ async function restoreHistorySelection() {
 
 async function restoreConversation(sessionId: string) {
   const sequence = ++restoreSequence
-  hasStarted.value = true
+  setHasStarted(true)
   isRestoringHistory.value = true
   isFollowingLatest.value = true
   expandedReasoningIds.value = []
@@ -1514,6 +1546,18 @@ function handlePageTouchCancel() {
   speech.cancel()
 }
 
+onLoad((options?: AiPageOptions) => {
+  if (options?.fromEntry === '1')
+    return
+
+  // Shared links and auth redirects can open the conversation as the root page.
+  // Rebuild the tab entry underneath it so the system back gesture returns home.
+  if (getCurrentPages().length !== 1)
+    return
+
+  uni.reLaunch({ url: AI_ENTRY_PATH })
+})
+
 watch(
   () => tokenStore.tokenInfo,
   () => {
@@ -1821,7 +1865,7 @@ onUnmounted(() => {
   right: 0;
   left: 0;
   z-index: 30;
-  background: rgba(237, 246, 255, 0.96);
+  background: transparent;
 }
 
 .page-scroll {
