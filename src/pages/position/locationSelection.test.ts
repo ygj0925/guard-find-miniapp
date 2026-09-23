@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectSelectedLocationIds } from './locationSelection'
+import { collectSelectedLocationIds } from '@/api/position'
 
 const locations = [
   { value: '', label: '全国' },

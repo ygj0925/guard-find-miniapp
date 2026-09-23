@@ -45,3 +45,11 @@ export function normalizeTrustedBannerUrl(rawUrl: string) {
     || hostname.endsWith(`.${TRUSTED_BANNER_DOMAIN}`)
   return trusted ? targetUrl : ''
 }
+
+/** switchTab drops query strings, so carry a position banner's category through the store. */
+export function getBannerPositionCategory(pagePath: string) {
+  const normalizedPath = pagePath.replace(/^\/+/, '')
+  if (!normalizedPath.startsWith('pages/position/index?'))
+    return ''
+  return normalizedPath.match(/[?&]category=(1|2)(?:[&#]|$)/)?.[1] || ''
+}

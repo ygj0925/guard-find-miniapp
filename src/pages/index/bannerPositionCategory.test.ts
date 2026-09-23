@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getBannerPositionCategory } from './bannerPositionCategory'
+import { getBannerPositionCategory } from '@/utils/bannerTarget'
 
 describe('getBannerPositionCategory', () => {
   it('reads campus category from a position banner target', () => {

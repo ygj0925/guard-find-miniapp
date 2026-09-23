@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
-import { getPositionFilterOptions, getPositions } from '@/api/position'
+import { collectSelectedLocationIds, getPositionFilterOptions, getPositions } from '@/api/position'
 import type { PositionFilterOption, PositionFilterOptions, PositionListItem } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
 import { usePositionStore } from '@/store/position'
 import { tabbarStore } from '@/tabbar/store'
 import { formatPositionSalary } from '@/utils/positionSalary'
 import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
-import { collectSelectedLocationIds } from './locationSelection'
 import PositionLocationFilter from './components/PositionLocationFilter.vue'
 import PositionSearchBar from './components/PositionSearchBar.vue'
 

@@ -9,12 +9,11 @@ import AppPageHeader from '@/components/AppPageHeader.vue'
 import { useUserStore } from '@/store'
 import { usePositionStore } from '@/store/position'
 import { useTokenStore } from '@/store/token'
-import { normalizeTrustedBannerUrl } from '@/utils/bannerTarget'
+import { getBannerPositionCategory, normalizeTrustedBannerUrl } from '@/utils/bannerTarget'
 import { clearInternalReferralIntent, consumeInternalReferralIntent, saveInternalReferralIntent } from '@/utils/internalReferralIntent'
 import { formatPositionSalary } from '@/utils/positionSalary'
 import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 import { navigateToLoginPage } from '@/utils/toLoginPage'
-import { getBannerPositionCategory } from './bannerPositionCategory'
 import InternalReferralModal from './components/InternalReferralModal.vue'
 
 defineOptions({
