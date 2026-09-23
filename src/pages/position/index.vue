@@ -7,6 +7,7 @@ import { usePositionStore } from '@/store/position'
 import { tabbarStore } from '@/tabbar/store'
 import { formatPositionSalary } from '@/utils/positionSalary'
 import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
+import { collectSelectedLocationIds } from './locationSelection'
 import PositionLocationFilter from './components/PositionLocationFilter.vue'
 import PositionSearchBar from './components/PositionSearchBar.vue'
 
@@ -248,7 +249,9 @@ async function loadPositions(reset = false) {
       kinds: kindValues.length ? kindValues : undefined,
       educationInfos: appliedFilters.educationInfos.length ? appliedFilters.educationInfos : undefined,
       workExperiences: appliedFilters.workExperiences.length ? appliedFilters.workExperiences : undefined,
-      locIds: appliedFilters.locIds.length ? appliedFilters.locIds : undefined,
+      locIds: appliedFilters.locIds.length
+        ? collectSelectedLocationIds(filterOptions.value.locations, appliedFilters.locIds)
+        : undefined,
       categories: activeCategories.value.length ? activeCategories.value : undefined,
     })
     if (requestVersion !== positionRequestVersion)

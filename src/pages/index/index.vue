@@ -14,6 +14,7 @@ import { clearInternalReferralIntent, consumeInternalReferralIntent, saveInterna
 import { formatPositionSalary } from '@/utils/positionSalary'
 import { createMiniProgramShare, createMiniProgramTimelineShare } from '@/utils/miniProgramShare'
 import { navigateToLoginPage } from '@/utils/toLoginPage'
+import { getBannerPositionCategory } from './bannerPositionCategory'
 import InternalReferralModal from './components/InternalReferralModal.vue'
 
 defineOptions({
@@ -149,6 +150,9 @@ function openPage(pagePath: string) {
   const routePath = normalizedPath.split(/[?#]/)[0]
   const url = `/${normalizedPath}`
   if (TAB_PAGES.includes(routePath)) {
+    const category = getBannerPositionCategory(normalizedPath)
+    if (category)
+      positionStore.setPendingCategory(category)
     uni.switchTab({ url: `/${routePath}` })
     return
   }
