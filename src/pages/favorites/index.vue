@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { getPositionShares } from '@/api/position'
 import type { PositionShareItem } from '@/api/position'
 import AppPageHeader from '@/components/AppPageHeader.vue'
@@ -18,11 +18,21 @@ const PAGE_SIZE = 100
 
 const shareList = ref<PositionShareItem[]>([])
 const isLoading = ref(true)
+const publisherAvatarErrors = reactive<Record<string, boolean>>({})
 const isLoadingMore = ref(false)
 const isError = ref(false)
 const total = ref(0)
 const pageNum = ref(0)
 const hasMore = computed(() => shareList.value.length < total.value)
+
+function publisherAvatarUrl(job: PositionShareItem['positions'][number]) {
+  const avatar = job.publisherAvatar?.trim()
+  return avatar && !publisherAvatarErrors[job.positionId] ? avatar : ''
+}
+
+function handlePublisherAvatarError(positionId: string) {
+  publisherAvatarErrors[positionId] = true
+}
 
 function formatDate(dateStr: string) {
   if (!dateStr)
@@ -179,13 +189,31 @@ onReachBottom(() => load())
               <text v-for="tag in job.tags.filter(Boolean)" :key="tag" class="rounded-lg bg-[#f2f4f7] px-2 py-1 text-xs text-app-ink-soft">{{ tag }}</text>
             </view>
 
-            <!-- 底部：招聘信息 + 日期 -->
+            <!-- 底部：发布者 + 日期 -->
             <view class="mt-3 flex items-center justify-between border-t-1rpx border-t-[#f1f3f6] border-t-solid pt-3">
-              <view class="flex items-center text-2xs text-app-muted">
-                <view class="i-carbon-building mr-1 text-sm leading-none" />
-                <text>三生制药 · 官方直招</text>
+              <view class="min-w-0 flex items-center">
+                <template v-if="job.publisherName">
+                  <image
+                    v-if="publisherAvatarUrl(job)"
+                    class="h-42rpx w-42rpx flex-none rounded-full"
+                    :src="publisherAvatarUrl(job)"
+                    mode="aspectFill"
+                    alt=""
+                    @error="handlePublisherAvatarError(job.positionId)"
+                  />
+                  <view v-else class="h-42rpx w-42rpx flex flex-none items-center justify-center rounded-full bg-[#e9f3ff] text-sm text-brand-blue leading-none">
+                    <view class="i-carbon-user-avatar" />
+                  </view>
+                  <text class="ml-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-ink-soft">
+                    {{ job.publisherName }}
+                  </text>
+                </template>
+                <template v-else>
+                  <view class="i-carbon-building mr-1 text-sm leading-none" />
+                  <text class="text-2xs text-app-muted">三生制药 · 官方直招</text>
+                </template>
               </view>
-              <text class="ml-3 text-xs text-app-muted">{{ formatDate(share.createTime) }}</text>
+              <text class="ml-3 flex-none text-xs text-app-muted">{{ formatDate(share.createTime) }}</text>
             </view>
           </view>
 
