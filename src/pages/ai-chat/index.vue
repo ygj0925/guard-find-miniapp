@@ -45,6 +45,7 @@ import AiFormCard from './components/AiFormCard.vue'
 import AiMessageActivityGroup from './components/AiMessageActivityGroup.vue'
 import AiRichText from './components/AiRichText.vue'
 import { useSpeechRecognition } from './useSpeechRecognition'
+import { isPageBackSwipe } from './aiSwipe'
 
 defineOptions({
   name: 'AiChat',
@@ -56,6 +57,7 @@ definePage({
     navigationBarTitleText: '生生智家',
     backgroundColor: '#EDF6FF',
     disableScroll: true,
+    disableSwipeBack: true,
     enableShareAppMessage: true,
     enableShareTimeline: true,
   },
@@ -73,6 +75,18 @@ interface ScrollEvent {
 
 interface KeyboardHeightEvent {
   height: number
+}
+
+interface PageTouchPoint {
+  clientX?: number
+  clientY?: number
+  pageX?: number
+  pageY?: number
+}
+
+interface PageTouchEvent {
+  touches?: PageTouchPoint[]
+  changedTouches?: PageTouchPoint[]
 }
 
 interface ActiveStream {
@@ -132,6 +146,8 @@ let restoreSequence = 0
 let activeStream: ActiveStream | null = null
 let conversationOwnerId: string | null = null
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
+let swipeStartPoint: { x: number, y: number } | null = null
+let swipeNavigating = false
 
 const speech = useSpeechRecognition({
   onResult(text) {
@@ -1426,11 +1442,75 @@ function handleRecordCancel() {
   speech.cancel()
 }
 
-function handlePageTouchEnd() {
+function readPageTouchPoint(event: PageTouchEvent, preferChanged = false) {
+  const touch = (preferChanged ? event.changedTouches?.[0] : event.touches?.[0])
+    || event.changedTouches?.[0]
+    || event.touches?.[0]
+  if (!touch)
+    return null
+
+  const x = touch.clientX ?? touch.pageX
+  const y = touch.clientY ?? touch.pageY
+  return typeof x === 'number' && typeof y === 'number' ? { x, y } : null
+}
+
+function handlePageTouchStart(event: PageTouchEvent) {
+  swipeStartPoint = readPageTouchPoint(event)
+}
+
+function handlePageTouchMove(event: PageTouchEvent) {
+  if (!swipeStartPoint)
+    return
+
+  const point = readPageTouchPoint(event)
+  if (!point)
+    return
+
+  // Once the gesture is predominantly vertical, leave it to scroll-view.
+  if (Math.abs(point.y - swipeStartPoint.y) > 80)
+    swipeStartPoint = null
+}
+
+function navigateBackFromSwipe() {
+  if (swipeNavigating)
+    return
+
+  swipeNavigating = true
+  const pages = getCurrentPages()
+  if (pages.length > 1) {
+    uni.navigateBack({
+      delta: 1,
+      fail: () => uni.switchTab({ url: '/pages/index/index' }),
+      complete: () => {
+        swipeNavigating = false
+      },
+    })
+    return
+  }
+
+  uni.switchTab({
+    url: '/pages/index/index',
+    complete: () => {
+      swipeNavigating = false
+    },
+  })
+}
+
+function handlePageTouchEnd(event: PageTouchEvent) {
+  const endPoint = readPageTouchPoint(event, true)
+  const shouldNavigate = Boolean(
+    swipeStartPoint
+    && endPoint
+    && isPageBackSwipe(swipeStartPoint, endPoint),
+  )
+  swipeStartPoint = null
   speech.stop()
+  if (shouldNavigate)
+    navigateBackFromSwipe()
 }
 
 function handlePageTouchCancel() {
+  swipeStartPoint = null
   speech.cancel()
 }
 
@@ -1479,6 +1559,8 @@ onUnmounted(() => {
 <template>
   <view
     class="ai-page"
+    @touchstart="handlePageTouchStart"
+    @touchmove="handlePageTouchMove"
     @touchend.capture="handlePageTouchEnd"
     @touchcancel.capture="handlePageTouchCancel"
   >
