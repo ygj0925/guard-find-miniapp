@@ -95,7 +95,7 @@ const quickEntryPages: QuickEntry[][] = [
     { title: '校园招聘', iconUrl: 'https://static1.3sbio.com/assets/lingcai/xiaoyuan_V1.png', pagePath: 'pages/position/index', category: '2' },
     { title: '求职工作台', iconUrl: 'https://static1.3sbio.com/assets/lingcai/qiuzhi_V1.png', pagePath: 'pages/me/me' },
     { title: '消息通知', iconUrl: 'https://static1.3sbio.com/assets/lingcai/xiaoxi_V1.png', pagePath: 'pages/notification/index' },
-    { title: '简历完善', iconUrl: 'https://static1.3sbio.com/assets/lingcai/jianli_V1.png', pagePath: 'pages/me/me' },
+    { title: '简历完善', iconUrl: 'https://static1.3sbio.com/assets/lingcai/jianli_V1.png', pagePath: 'pages/resume/index' },
     { title: '生生AI', iconUrl: 'https://static1.3sbio.com/assets/lingcai/AI_V1.png', pagePath: 'pages/ai-chat/index' },
     { title: '内部推荐', iconUrl: 'https://static1.3sbio.com/assets/lingcai/neitui_V1.png', action: 'internalReferral' },
   ],
