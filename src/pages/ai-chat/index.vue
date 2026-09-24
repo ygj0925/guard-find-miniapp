@@ -46,6 +46,7 @@ import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
 import AiFormCard from './components/AiFormCard.vue'
 import AiMessageActivityGroup from './components/AiMessageActivityGroup.vue'
+import AiResumePicker from './components/AiResumePicker.vue'
 import AiRichText from './components/AiRichText.vue'
 import { useSpeechRecognition } from './useSpeechRecognition'
 
@@ -130,6 +131,7 @@ const hasStarted = ref(
 )
 const inputValue = ref('')
 const selectedResume = ref<ResumeItem | null>(null)
+const pickerResume = ref<ResumeItem | null>(null)
 const resumePickerOpen = ref(false)
 const resumeOptions = ref<ResumeItem[]>([])
 const resumePickerLoading = ref(false)
@@ -328,6 +330,7 @@ function resetConversationState(started: boolean) {
   currentConversation.value = null
   inputValue.value = ''
   selectedResume.value = null
+  pickerResume.value = null
   resumePickerOpen.value = false
   resumeSelecting.value = false
   resumePickerLoading.value = false
@@ -369,6 +372,8 @@ async function openResumePicker() {
     return
   }
   uni.hideKeyboard()
+  swipeStartPoint = null
+  pickerResume.value = selectedResume.value
   resumePickerOpen.value = true
   await loadResumePicker()
 }
@@ -385,8 +390,12 @@ async function loadResumePicker() {
   resumePickerError.value = false
   try {
     const resumes = await getResumes()
-    if (isCurrent())
+    if (isCurrent()) {
       resumeOptions.value = resumes
+      if (pickerResume.value && !resumes.some(item => item.id === pickerResume.value?.id))
+        pickerResume.value = null
+      pickerResume.value ||= resumes.find(item => item.isDefault) || resumes[0] || null
+    }
   }
   catch (error) {
     if (!isCurrent())
@@ -402,21 +411,26 @@ async function loadResumePicker() {
 }
 
 function selectResume(resume: ResumeItem) {
-  if (resumePickerLoading.value)
+  if (resumePickerLoading.value || resumeUploading.value)
     return
-  resumePickerSequence += 1
-  resumeSelecting.value = false
-  selectedResume.value = resume
-  voiceMode.value = false
-  resumePickerOpen.value = false
+  pickerResume.value = resume
 }
 
 function closeResumePicker() {
-  if (!resumeUploading.value && !resumeSelecting.value) {
-    resumePickerSequence += 1
-    resumePickerOpen.value = false
-    resumePickerLoading.value = false
-  }
+  resumePickerSequence += 1
+  resumePickerOpen.value = false
+  resumePickerLoading.value = false
+  resumeSelecting.value = false
+  pickerResume.value = null
+}
+
+function sendSelectedResume() {
+  if (!pickerResume.value || resumePickerLoading.value || resumeUploading.value || resumeSelecting.value || resumePickerError.value)
+    return
+  selectedResume.value = pickerResume.value
+  voiceMode.value = false
+  closeResumePicker()
+  sendMessage()
 }
 
 function chooseResumeForChat() {
@@ -500,8 +514,8 @@ async function uploadResumeForChat(path: string, originalName: string, size?: nu
       return
     }
     resumeOptions.value = [uploaded, ...resumeOptions.value.filter(item => item.id !== uploaded.id)]
-    selectResume(uploaded)
-    uni.showToast({ title: '已添加简历，请点击发送', icon: 'none' })
+    pickerResume.value = uploaded
+    uni.showToast({ title: '上传成功，请确认发送', icon: 'none' })
   }
   catch (error) {
     if (owner !== currentUserId() || token !== tokenStore.validToken || conversationVersion !== restoreSequence)
@@ -1219,6 +1233,7 @@ async function restoreConversation(sessionId: string) {
   const sequence = ++restoreSequence
   resumePickerSequence += 1
   selectedResume.value = null
+  pickerResume.value = null
   resumePickerOpen.value = false
   resumeSelecting.value = false
   resumePickerLoading.value = false
@@ -1671,6 +1686,10 @@ function readPageTouchPoint(event: PageTouchEvent, preferChanged = false) {
 }
 
 function handlePageTouchStart(event: PageTouchEvent) {
+  if (resumePickerOpen.value) {
+    swipeStartPoint = null
+    return
+  }
   swipeStartPoint = readPageTouchPoint(event)
 }
 
@@ -1713,6 +1732,10 @@ function navigateBackFromSwipe() {
 }
 
 function handlePageTouchEnd(event: PageTouchEvent) {
+  if (resumePickerOpen.value) {
+    swipeStartPoint = null
+    return
+  }
   const endPoint = readPageTouchPoint(event, true)
   const shouldNavigate = Boolean(
     swipeStartPoint
@@ -1727,7 +1750,8 @@ function handlePageTouchEnd(event: PageTouchEvent) {
 
 function handlePageTouchCancel() {
   swipeStartPoint = null
-  speech.cancel()
+  if (!resumePickerOpen.value)
+    speech.cancel()
 }
 
 onLoad((options?: AiPageOptions) => {
@@ -2028,152 +2052,25 @@ onUnmounted(() => {
         />
       </view>
     </template>
-    <view v-if="resumePickerOpen" class="resume-picker-backdrop" @tap="closeResumePicker" @touchstart.stop @touchmove.stop @touchend.stop>
-      <view class="resume-picker-panel" :style="{ paddingBottom: `${safeBottom + 24}px` }" @tap.stop>
-        <view class="resume-picker-header">
-          <text class="resume-picker-title">发送简历给 AI</text>
-          <button class="resume-picker-close" aria-label="关闭简历选择" :disabled="resumeUploading" @tap="closeResumePicker">
-            ×
-          </button>
-        </view>
-        <view v-if="resumePickerLoading" class="resume-picker-state">
-          正在加载简历…
-        </view>
-        <button v-else-if="resumePickerError" class="resume-picker-retry" @tap="loadResumePicker">
-          加载失败，点击重试
-        </button>
-        <scroll-view v-else scroll-y class="resume-picker-list">
-          <view v-if="!resumeOptions.length" class="resume-picker-state">
-            暂无已保存的简历
-          </view>
-          <button v-for="resume in resumeOptions" :key="resume.id" class="resume-picker-item" :disabled="resumeUploading" @tap="selectResume(resume)">
-            <text class="resume-picker-name">{{ resume.name }}</text>
-            <text v-if="resume.isDefault" class="resume-picker-default">默认</text>
-            <text class="resume-picker-arrow">›</text>
-          </button>
-        </scroll-view>
-        <button class="resume-picker-upload" :disabled="resumeUploading || resumePickerLoading" @tap="chooseResumeForChat">
-          {{ resumeUploading ? '上传中…' : '＋ 上传新简历' }}
-        </button>
-      </view>
-    </view>
+    <AiResumePicker
+      v-if="resumePickerOpen"
+      :resumes="resumeOptions"
+      :selected-resume-id="pickerResume?.id"
+      :loading="resumePickerLoading"
+      :uploading="resumeUploading"
+      :selecting="resumeSelecting"
+      :error="resumePickerError"
+      :safe-bottom="safeBottom"
+      @close="closeResumePicker"
+      @retry="loadResumePicker"
+      @select="selectResume"
+      @upload="chooseResumeForChat"
+      @send="sendSelectedResume"
+    />
   </view>
 </template>
 
 <style scoped lang="scss">
-.resume-picker-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: flex;
-  align-items: flex-end;
-  background: rgba(22, 37, 58, 0.42);
-}
-.resume-picker-panel {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 30rpx 32rpx 0;
-  border-radius: 8px 8px 0 0;
-  background: #fff;
-}
-.resume-picker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20rpx;
-}
-.resume-picker-title {
-  color: #20344f;
-  font-size: 32rpx;
-  font-weight: 650;
-}
-.resume-picker-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56rpx;
-  height: 56rpx;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #586b80;
-  font-size: 30rpx;
-}
-.resume-picker-close::after,
-.resume-picker-item::after,
-.resume-picker-upload::after {
-  border: 0;
-}
-.resume-picker-list {
-  max-height: 48vh;
-}
-.resume-picker-state {
-  padding: 42rpx 0;
-  color: #65758a;
-  font-size: 26rpx;
-  text-align: center;
-}
-.resume-picker-retry {
-  padding: 42rpx 0;
-  border: 0;
-  background: transparent;
-  color: #225da6;
-  font-size: 26rpx;
-}
-.resume-picker-retry::after {
-  border: 0;
-}
-.resume-picker-item {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 92rpx;
-  margin: 0;
-  padding: 12rpx 4rpx;
-  border: 0;
-  border-bottom: 1rpx solid #e6ebf2;
-  border-radius: 0;
-  background: transparent;
-  color: #315d91;
-  text-align: left;
-}
-.resume-picker-name {
-  flex: 1;
-  overflow: hidden;
-  color: #20344f;
-  font-size: 28rpx;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.resume-picker-default {
-  color: #426da8;
-  font-size: 22rpx;
-}
-.resume-picker-arrow {
-  color: #8193a9;
-  font-size: 36rpx;
-  line-height: 1;
-}
-.resume-picker-upload {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12rpx;
-  width: 100%;
-  height: 82rpx;
-  margin: 24rpx 0 0;
-  border: 1rpx solid #b9d1ef;
-  border-radius: 8rpx;
-  background: #eef5ff;
-  color: #225da6;
-  font-size: 27rpx;
-}
-.resume-picker-upload[disabled] {
-  opacity: 0.5;
-}
 .ai-page {
   position: fixed;
   inset: 0;

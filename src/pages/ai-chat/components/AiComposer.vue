@@ -175,108 +175,116 @@ function showVoiceTip() {
         <text>×</text>
       </button>
     </view>
-    <view
-      class="composer-shell"
-      :class="{
-        'focused': isFocused,
-        'disabled': disabled,
-        'replying': replying,
-        'voice-mode': voiceMode,
-        'recording': speechState === 'recording',
-        'recognizing': speechState === 'recognizing',
-      }"
-    >
-      <!-- #ifdef MP-WEIXIN -->
+    <view class="composer-row">
       <view
-        class="icon-button voice-button"
-        :class="{ active: voiceMode, pending: voicePermissionPending }"
-        role="button"
-        :aria-label="voiceMode ? '切换为文字输入' : '切换为语音输入'"
-        :aria-disabled="voicePermissionPending"
-        @tap.stop="toggleVoiceMode"
+        class="composer-shell"
+        :class="{
+          'focused': isFocused,
+          'disabled': disabled,
+          'replying': replying,
+          'voice-mode': voiceMode,
+          'recording': speechState === 'recording',
+          'recognizing': speechState === 'recognizing',
+        }"
       >
-        <view v-if="voicePermissionPending" class="voice-permission-spinner" aria-hidden="true" />
+        <!-- #ifdef MP-WEIXIN -->
         <view
-          v-else
-          class="composer-icon voice-icon"
-          :class="voiceMode ? 'i-carbon-keyboard' : 'i-carbon-microphone'"
-        />
-      </view>
-      <!-- #endif -->
-
-      <view class="input-area">
-        <view
-          v-if="voiceMode"
-          class="hold-to-talk"
-          :class="{
-            recording: speechState === 'recording',
-            recognizing: speechState === 'recognizing',
-          }"
-          @tap="showVoiceTip"
-          @touchstart.stop="prepareRecording"
-          @touchend.capture="finishRecording"
-          @touchcancel.capture="cancelRecording"
+          class="icon-button voice-button"
+          :class="{ active: voiceMode, pending: voicePermissionPending }"
+          role="button"
+          :aria-label="voiceMode ? '切换为文字输入' : '切换为语音输入'"
+          :aria-disabled="voicePermissionPending"
+          @tap.stop="toggleVoiceMode"
         >
-          <template v-if="speechActive">
-            <view v-if="speechState === 'recording'" class="speech-wave" aria-hidden="true">
-              <view v-for="index in 5" :key="index" class="speech-wave-bar" />
-            </view>
-            <view v-else class="recognizing-spinner" />
-            <text class="speech-state-text">{{ speechStateText }}</text>
-          </template>
-          <text v-else>按住说话</text>
+          <view v-if="voicePermissionPending" class="voice-permission-spinner" aria-hidden="true" />
+          <view
+            v-else
+            class="composer-icon voice-icon"
+            :class="voiceMode ? 'i-carbon-keyboard' : 'i-carbon-microphone'"
+          />
+        </view>
+        <!-- #endif -->
+
+        <view class="input-area">
+          <view
+            v-if="voiceMode"
+            class="hold-to-talk"
+            :class="{
+              recording: speechState === 'recording',
+              recognizing: speechState === 'recognizing',
+            }"
+            @tap="showVoiceTip"
+            @touchstart.stop="prepareRecording"
+            @touchend.capture="finishRecording"
+            @touchcancel.capture="cancelRecording"
+          >
+            <template v-if="speechActive">
+              <view v-if="speechState === 'recording'" class="speech-wave" aria-hidden="true">
+                <view v-for="index in 5" :key="index" class="speech-wave-bar" />
+              </view>
+              <view v-else class="recognizing-spinner" />
+              <text class="speech-state-text">{{ speechStateText }}</text>
+            </template>
+            <text v-else>按住说话</text>
+          </view>
+
+          <input
+            v-else
+            class="composer-input"
+            :value="modelValue"
+            :focus="inputFocused"
+            :disabled="disabled"
+            :adjust-position="false"
+            confirm-type="send"
+            :cursor-spacing="12"
+            :maxlength="500"
+            :placeholder="placeholder"
+            placeholder-class="composer-placeholder"
+            @input="updateValue"
+            @confirm="send"
+            @focus="handleFocus"
+            @blur="handleBlur"
+          >
         </view>
 
-        <input
-          v-else
-          class="composer-input"
-          :value="modelValue"
-          :focus="inputFocused"
-          :disabled="disabled"
-          :adjust-position="false"
-          confirm-type="send"
-          :cursor-spacing="12"
-          :maxlength="500"
-          :placeholder="placeholder"
-          placeholder-class="composer-placeholder"
-          @input="updateValue"
-          @confirm="send"
-          @focus="handleFocus"
-          @blur="handleBlur"
+        <view
+          v-if="replying"
+          class="stop-button"
+          @tap="stop"
         >
-      </view>
+          <view class="composer-icon stop-icon i-carbon-stop-filled" />
+        </view>
 
+        <view
+          v-else-if="!voiceMode && speechState === 'idle'"
+          class="send-button"
+          :class="{ disabled: disabled || (!modelValue.trim() && !resumeName) }"
+          @tap="send"
+        >
+          <view class="composer-icon send-icon i-carbon-arrow-up" />
+        </view>
+      </view>
       <button
-        class="icon-button resume-button"
+        class="resume-button"
         :disabled="disabled || speechState !== 'idle'"
         aria-label="选择简历发送给 AI"
         title="选择简历"
         @tap="$emit('choose-resume')"
       >
-        <text class="resume-add-symbol">＋</text>
+        <text class="resume-attachment-icon">＋</text>
       </button>
-      <view
-        v-if="replying"
-        class="stop-button"
-        @tap="stop"
-      >
-        <view class="composer-icon stop-icon i-carbon-stop-filled" />
-      </view>
-
-      <view
-        v-else-if="!voiceMode && speechState === 'idle'"
-        class="send-button"
-        :class="{ disabled: disabled || (!modelValue.trim() && !resumeName) }"
-        @tap="send"
-      >
-        <view class="composer-icon send-icon i-carbon-arrow-up" />
-      </view>
     </view>
   </view>
 </template>
 
 <style scoped lang="scss">
 .composer-wrap {
+  width: 100%;
+}
+.composer-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
   width: 100%;
 }
 .resume-chip {
@@ -322,27 +330,30 @@ function showVoiceTip() {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 66rpx;
-  height: 66rpx;
+  box-sizing: border-box;
+  width: 92rpx;
+  height: 92rpx;
   margin: 0;
   padding: 0;
-  border: 0;
+  border: 1rpx solid rgba(107, 139, 204, 0.35);
   border-radius: 50%;
-  background: transparent;
-  color: #426dad;
-  font-size: 32rpx;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 10rpx 28rpx rgba(63, 92, 155, 0.13);
+  color: #315fa8;
+}
+.resume-button:active:not([disabled]) {
+  background: #e9f2ff;
 }
 .resume-button[disabled] {
   opacity: 0.45;
 }
-.resume-add-symbol {
-  font-size: 42rpx;
-  font-weight: 400;
-  line-height: 1;
+.resume-attachment-icon {
+  font-size: 40rpx;
 }
 .composer-shell {
   box-sizing: border-box;
-  width: 100%;
+  min-width: 0;
+  flex: 1;
   min-height: 104rpx;
   display: flex;
   align-items: center;
