@@ -25,6 +25,8 @@ import {
   streamAgentChat,
 } from '@/api/agent'
 import { getMiniappRecommendMessages } from '@/api/recommend-message'
+import { getResumes, uploadResume } from '@/api/resume'
+import type { ResumeItem } from '@/api/resume'
 import { useTokenStore } from '@/store/token'
 import { useUserStore } from '@/store/user'
 import { navigateToLoginPage, toLoginPage } from '@/utils/toLoginPage'
@@ -39,6 +41,7 @@ import {
   savePendingAiQuestion,
 } from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
+import { createResumeChatRequest, displayResumeChatMessage } from './resumeMessage'
 import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
 import AiFormCard from './components/AiFormCard.vue'
@@ -126,6 +129,14 @@ const hasStarted = ref(
   || uni.getStorageSync(AI_WELCOME_DISMISSED_KEY) === 'true',
 )
 const inputValue = ref('')
+const selectedResume = ref<ResumeItem | null>(null)
+const resumePickerOpen = ref(false)
+const resumeOptions = ref<ResumeItem[]>([])
+const resumePickerLoading = ref(false)
+const resumeSelecting = ref(false)
+const resumeUploading = ref(false)
+const resumePickerError = ref(false)
+let resumePickerSequence = 0
 const voiceMode = ref(false)
 const voicePermissionPending = ref(false)
 const currentConversation = ref<AiChatConversation | null>(null)
@@ -216,7 +227,7 @@ const splashActionsStyle = computed(() => ({
 
 const contentScrollStyle = computed(() => ({
   paddingTop: `${aiHeaderMetrics.height}px`,
-  paddingBottom: `${keyboardHeight.value + (keyboardHeight.value > 0 ? 76 : safeBottom + 76)}px`,
+  paddingBottom: `${keyboardHeight.value + (keyboardHeight.value > 0 ? 76 : safeBottom + 76) + (selectedResume.value ? 42 : 0)}px`,
 }))
 
 const composerStyle = computed(() => ({
@@ -225,7 +236,7 @@ const composerStyle = computed(() => ({
 }))
 
 const scrollLatestStyle = computed(() => ({
-  bottom: `${keyboardHeight.value + (keyboardHeight.value > 0 ? 82 : safeBottom + 82)}px`,
+  bottom: `${keyboardHeight.value + (keyboardHeight.value > 0 ? 82 : safeBottom + 82) + (selectedResume.value ? 42 : 0)}px`,
 }))
 
 const visibleMessages = computed(() => (currentConversation.value?.messages || [])
@@ -278,7 +289,7 @@ function formatMessageTime(timestamp: number) {
 }
 
 function createConversationTitle(question: string) {
-  const title = question.replace(/\s+/g, ' ').trim()
+  const title = displayResumeChatMessage(question).replace(/\s+/g, ' ').trim()
   return title.length > 18 ? `${title.slice(0, 18)}…` : title
 }
 
@@ -309,12 +320,17 @@ function openHistory() {
 
 function resetConversationState(started: boolean) {
   restoreSequence += 1
+  resumePickerSequence += 1
   if (isReplying.value || activeStream)
     cancelReply()
   clearNewConversationRequest()
   setHasStarted(started)
   currentConversation.value = null
   inputValue.value = ''
+  selectedResume.value = null
+  resumePickerOpen.value = false
+  resumeSelecting.value = false
+  resumePickerLoading.value = false
   isReplying.value = false
   isRestoringHistory.value = false
   isOpeningHistory.value = false
@@ -343,6 +359,159 @@ function clearAuthenticatedAiSession(preserveDraft = true) {
   resetConversationState(keepComposerOpen)
   inputValue.value = draft
   conversationOwnerId = null
+}
+
+async function openResumePicker() {
+  if (isReplying.value || isRestoringHistory.value || resumeUploading.value || resumeSelecting.value || resumePickerOpen.value)
+    return
+  if (!reconcileAuthenticatedAiSession()) {
+    toLoginPage({ queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}` })
+    return
+  }
+  uni.hideKeyboard()
+  resumePickerOpen.value = true
+  await loadResumePicker()
+}
+
+async function loadResumePicker() {
+  if (!resumePickerOpen.value || resumePickerLoading.value)
+    return
+  const sequence = ++resumePickerSequence
+  const owner = currentUserId()
+  const token = tokenStore.validToken
+  const isCurrent = () => sequence === resumePickerSequence && resumePickerOpen.value
+    && owner === currentUserId() && token === tokenStore.validToken
+  resumePickerLoading.value = true
+  resumePickerError.value = false
+  try {
+    const resumes = await getResumes()
+    if (isCurrent())
+      resumeOptions.value = resumes
+  }
+  catch (error) {
+    if (!isCurrent())
+      return
+    if (handleAsyncAuthLoss(error))
+      return
+    resumePickerError.value = true
+  }
+  finally {
+    if (sequence === resumePickerSequence)
+      resumePickerLoading.value = false
+  }
+}
+
+function selectResume(resume: ResumeItem) {
+  if (resumePickerLoading.value)
+    return
+  resumePickerSequence += 1
+  resumeSelecting.value = false
+  selectedResume.value = resume
+  voiceMode.value = false
+  resumePickerOpen.value = false
+}
+
+function closeResumePicker() {
+  if (!resumeUploading.value && !resumeSelecting.value) {
+    resumePickerSequence += 1
+    resumePickerOpen.value = false
+    resumePickerLoading.value = false
+  }
+}
+
+function chooseResumeForChat() {
+  if (!resumePickerOpen.value || resumeSelecting.value || resumeUploading.value || resumePickerLoading.value)
+    return
+  if (resumeOptions.value.length >= 3) {
+    uni.showToast({ title: '最多保存 3 份简历，请先到附件简历中管理', icon: 'none' })
+    return
+  }
+  const sequence = resumePickerSequence
+  const owner = currentUserId()
+  const token = tokenStore.validToken
+  resumeSelecting.value = true
+  const releaseSelecting = () => {
+    if (sequence === resumePickerSequence)
+      resumeSelecting.value = false
+  }
+  const acceptFile = (path: string, name: string, size?: number) => {
+    if (sequence === resumePickerSequence && resumePickerOpen.value
+      && owner === currentUserId() && token === tokenStore.validToken) {
+      void uploadResumeForChat(path, name, size)
+    }
+  }
+  // #ifdef MP-WEIXIN
+  uni.chooseMessageFile({
+    count: 1,
+    type: 'file',
+    extension: ['pdf', 'doc', 'docx'],
+    success: ({ tempFiles }) => {
+      const file = tempFiles[0]
+      if (file)
+        acceptFile(file.path, file.name, file.size)
+    },
+    fail: releaseSelecting,
+    complete: releaseSelecting,
+  })
+  // #endif
+  // #ifndef MP-WEIXIN
+  uni.chooseFile({
+    count: 1,
+    type: 'all',
+    extension: ['pdf', 'doc', 'docx'],
+    success: (result) => {
+      const files = Array.isArray(result.tempFiles) ? result.tempFiles : [result.tempFiles]
+      const paths = Array.isArray(result.tempFilePaths) ? result.tempFilePaths : [result.tempFilePaths]
+      const file = files[0]
+      const path = paths[0] || (file && 'path' in file ? file.path : '')
+      if (typeof path !== 'string' || !path) {
+        uni.showToast({ title: '无法读取所选文件', icon: 'none' })
+        return
+      }
+      const originalName = file && 'name' in file && typeof file.name === 'string' ? file.name : ''
+      acceptFile(path, originalName, file?.size)
+    },
+    fail: releaseSelecting,
+    complete: releaseSelecting,
+  })
+  // #endif
+}
+
+async function uploadResumeForChat(path: string, originalName: string, size?: number) {
+  if (resumeUploading.value)
+    return
+  const extension = originalName.split('.').pop()?.toLowerCase()
+  if (!extension || !['pdf', 'doc', 'docx'].includes(extension)) {
+    uni.showToast({ title: '仅支持 PDF、DOC、DOCX 简历', icon: 'none' })
+    return
+  }
+  if (typeof size === 'number' && size > 10 * 1024 * 1024) {
+    uni.showToast({ title: '简历文件不能超过 10MB', icon: 'none' })
+    return
+  }
+  resumeUploading.value = true
+  const owner = currentUserId()
+  const token = tokenStore.validToken
+  const conversationVersion = restoreSequence
+  try {
+    const uploaded = await uploadResume(originalName.replace(/\.[^.]+$/, '') || '我的简历', path)
+    if (owner !== currentUserId() || token !== tokenStore.validToken
+      || conversationVersion !== restoreSequence || !resumePickerOpen.value || !reconcileAuthenticatedAiSession()) {
+      return
+    }
+    resumeOptions.value = [uploaded, ...resumeOptions.value.filter(item => item.id !== uploaded.id)]
+    selectResume(uploaded)
+    uni.showToast({ title: '已添加简历，请点击发送', icon: 'none' })
+  }
+  catch (error) {
+    if (owner !== currentUserId() || token !== tokenStore.validToken || conversationVersion !== restoreSequence)
+      return
+    if (!handleAsyncAuthLoss(error))
+      uni.showToast({ title: error instanceof Error ? error.message : '简历上传失败', icon: 'none' })
+  }
+  finally {
+    resumeUploading.value = false
+  }
 }
 
 function isAuthenticationError(error: unknown) {
@@ -405,7 +574,8 @@ async function requestLoginForQuestion(question: string) {
   if (loginPromptPending.value)
     return
 
-  inputValue.value = question
+  const draft = question.trim() || '请分析简历并推荐适合的职位'
+  inputValue.value = draft
   loginPromptPending.value = true
   try {
     if (!await confirmQuestionLogin())
@@ -416,7 +586,7 @@ async function requestLoginForQuestion(question: string) {
       return
     }
 
-    savePendingAiQuestion(question)
+    savePendingAiQuestion(draft)
     speech.cancel()
     const navigation = await navigateToLoginPage({
       queryString: `?redirect=${encodeURIComponent(AI_PAGE_PATH)}`,
@@ -492,11 +662,18 @@ function startNewConversation() {
 }
 
 function sendMessage(content = inputValue.value) {
-  const question = content.trim()
+  if (resumeUploading.value)
+    return
+  const resumeRequest = selectedResume.value ? createResumeChatRequest(selectedResume.value, content) : null
+  if (selectedResume.value && !resumeRequest) {
+    uni.showToast({ title: '简历信息无效，请重新选择', icon: 'none' })
+    return
+  }
+  const question = resumeRequest?.message || content.trim()
   if (!question || isReplying.value || isRestoringHistory.value)
     return
   if (!reconcileAuthenticatedAiSession()) {
-    void requestLoginForQuestion(question)
+    void requestLoginForQuestion(content)
     return
   }
 
@@ -512,7 +689,8 @@ function sendMessage(content = inputValue.value) {
   }
 
   inputValue.value = ''
-  currentConversation.value.messages.push(createMessage('user', question))
+  selectedResume.value = null
+  currentConversation.value.messages.push(createMessage('user', displayResumeChatMessage(question)))
   currentConversation.value.messages.push(createMessage('assistant', '', 'streaming'))
   // Keep the proxy returned by the reactive array; mutating the raw object would not update the view.
   const assistantMessage = currentConversation.value.messages[currentConversation.value.messages.length - 1]
@@ -527,6 +705,7 @@ function sendMessage(content = inputValue.value) {
       message: question,
       stream: true,
       sessionId: currentConversation.value.id || undefined,
+      ...(resumeRequest ? { fileIds: resumeRequest.fileIds } : {}),
     },
     {
       onEvent: event => handleStreamEvent(event, assistantMessage),
@@ -1038,6 +1217,11 @@ async function restoreHistorySelection() {
 
 async function restoreConversation(sessionId: string) {
   const sequence = ++restoreSequence
+  resumePickerSequence += 1
+  selectedResume.value = null
+  resumePickerOpen.value = false
+  resumeSelecting.value = false
+  resumePickerLoading.value = false
   setHasStarted(true)
   isRestoringHistory.value = true
   isFollowingLatest.value = true
@@ -1144,7 +1328,7 @@ function mapHistoryMessages(records: AgentChatMessageRecord[], asks: AgentChatAs
       messages.push({
         id: `history-message-${record.messageId}`,
         role: 'user',
-        content: record.content || '',
+        content: displayResumeChatMessage(record.content || ''),
         createdAt: parseDate(record.createdAt),
         status: 'complete',
         runId: record.runId,
@@ -1591,6 +1775,7 @@ onHide(() => speech.cancel())
 onMounted(() => uni.onKeyboardHeightChange(handleKeyboardHeightChange))
 onUnmounted(() => {
   restoreSequence += 1
+  resumePickerSequence += 1
   if (activeStream)
     cancelReply()
   speech.dispose()
@@ -1823,7 +2008,7 @@ onUnmounted(() => {
       <view class="composer-fixed" :style="composerStyle">
         <AiComposer
           v-model="inputValue"
-          :disabled="isReplying || isRestoringHistory"
+          :disabled="isReplying || isRestoringHistory || resumeUploading"
           :replying="isReplying"
           :chat-mode="Boolean(currentConversation)"
           :placeholder="isAiAuthenticated ? '请输入内容' : '输入问题，发送时需登录'"
@@ -1831,7 +2016,10 @@ onUnmounted(() => {
           :speech-state-text="speechStateText"
           :voice-mode="voiceMode"
           :voice-permission-pending="voicePermissionPending"
+          :resume-name="selectedResume?.name || ''"
           @send="sendMessage()"
+          @choose-resume="openResumePicker"
+          @remove-resume="selectedResume = null"
           @stop="cancelReply"
           @voice-mode-request="handleVoiceModeRequest"
           @record-start="handleRecordStart"
@@ -1840,10 +2028,152 @@ onUnmounted(() => {
         />
       </view>
     </template>
+    <view v-if="resumePickerOpen" class="resume-picker-backdrop" @tap="closeResumePicker" @touchstart.stop @touchmove.stop @touchend.stop>
+      <view class="resume-picker-panel" :style="{ paddingBottom: `${safeBottom + 24}px` }" @tap.stop>
+        <view class="resume-picker-header">
+          <text class="resume-picker-title">发送简历给 AI</text>
+          <button class="resume-picker-close" aria-label="关闭简历选择" :disabled="resumeUploading" @tap="closeResumePicker">
+            ×
+          </button>
+        </view>
+        <view v-if="resumePickerLoading" class="resume-picker-state">
+          正在加载简历…
+        </view>
+        <button v-else-if="resumePickerError" class="resume-picker-retry" @tap="loadResumePicker">
+          加载失败，点击重试
+        </button>
+        <scroll-view v-else scroll-y class="resume-picker-list">
+          <view v-if="!resumeOptions.length" class="resume-picker-state">
+            暂无已保存的简历
+          </view>
+          <button v-for="resume in resumeOptions" :key="resume.id" class="resume-picker-item" :disabled="resumeUploading" @tap="selectResume(resume)">
+            <text class="resume-picker-name">{{ resume.name }}</text>
+            <text v-if="resume.isDefault" class="resume-picker-default">默认</text>
+            <text class="resume-picker-arrow">›</text>
+          </button>
+        </scroll-view>
+        <button class="resume-picker-upload" :disabled="resumeUploading || resumePickerLoading" @tap="chooseResumeForChat">
+          {{ resumeUploading ? '上传中…' : '＋ 上传新简历' }}
+        </button>
+      </view>
+    </view>
   </view>
 </template>
 
 <style scoped lang="scss">
+.resume-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(22, 37, 58, 0.42);
+}
+.resume-picker-panel {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 30rpx 32rpx 0;
+  border-radius: 8px 8px 0 0;
+  background: #fff;
+}
+.resume-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.resume-picker-title {
+  color: #20344f;
+  font-size: 32rpx;
+  font-weight: 650;
+}
+.resume-picker-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #586b80;
+  font-size: 30rpx;
+}
+.resume-picker-close::after,
+.resume-picker-item::after,
+.resume-picker-upload::after {
+  border: 0;
+}
+.resume-picker-list {
+  max-height: 48vh;
+}
+.resume-picker-state {
+  padding: 42rpx 0;
+  color: #65758a;
+  font-size: 26rpx;
+  text-align: center;
+}
+.resume-picker-retry {
+  padding: 42rpx 0;
+  border: 0;
+  background: transparent;
+  color: #225da6;
+  font-size: 26rpx;
+}
+.resume-picker-retry::after {
+  border: 0;
+}
+.resume-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 92rpx;
+  margin: 0;
+  padding: 12rpx 4rpx;
+  border: 0;
+  border-bottom: 1rpx solid #e6ebf2;
+  border-radius: 0;
+  background: transparent;
+  color: #315d91;
+  text-align: left;
+}
+.resume-picker-name {
+  flex: 1;
+  overflow: hidden;
+  color: #20344f;
+  font-size: 28rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resume-picker-default {
+  color: #426da8;
+  font-size: 22rpx;
+}
+.resume-picker-arrow {
+  color: #8193a9;
+  font-size: 36rpx;
+  line-height: 1;
+}
+.resume-picker-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  width: 100%;
+  height: 82rpx;
+  margin: 24rpx 0 0;
+  border: 1rpx solid #b9d1ef;
+  border-radius: 8rpx;
+  background: #eef5ff;
+  color: #225da6;
+  font-size: 27rpx;
+}
+.resume-picker-upload[disabled] {
+  opacity: 0.5;
+}
 .ai-page {
   position: fixed;
   inset: 0;
@@ -2447,7 +2777,7 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.composer-fixed :deep(.composer-shell) {
+.composer-fixed :deep(.composer-wrap) {
   pointer-events: auto;
 }
 

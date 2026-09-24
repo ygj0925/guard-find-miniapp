@@ -21,6 +21,16 @@ afterEach(() => {
 })
 
 describe('ai composer voice gesture', () => {
+  it('allows sending a selected resume without typed text', async () => {
+    const wrapper = mount(AiComposer, { props: { modelValue: '', resumeName: '我的简历' } })
+    await wrapper.get('.resume-button').trigger('tap')
+    expect(wrapper.emitted('choose-resume')).toHaveLength(1)
+    await wrapper.get('.send-button').trigger('tap')
+    expect(wrapper.emitted('send')).toHaveLength(1)
+    await wrapper.get('.resume-chip-remove').trigger('tap')
+    expect(wrapper.emitted('remove-resume')).toHaveLength(1)
+  })
+
   it('starts after a deliberate hold and stops when the finger is released', async () => {
     vi.useFakeTimers()
     const wrapper = mountVoiceComposer()

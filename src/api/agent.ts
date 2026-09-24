@@ -31,7 +31,8 @@ export interface AgentChatRequest {
   stream: true
   sessionId?: string
   websearch?: boolean
-  fileIds?: number[]
+  /** Snowflake sys_file IDs must remain strings until the server deserializes them as Long. */
+  fileIds?: string[]
   thinking?: boolean
   thinkingLevel?: 'high' | 'max'
   /** 本轮输入语义；message（默认）或 form_submission。 */

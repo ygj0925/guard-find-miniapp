@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<{
   speechStateText?: string
   voiceMode?: boolean
   voicePermissionPending?: boolean
+  resumeName?: string
   placeholder?: string
 }>(), {
   disabled: false,
@@ -27,6 +28,7 @@ const props = withDefaults(defineProps<{
   speechStateText: '',
   voiceMode: false,
   voicePermissionPending: false,
+  resumeName: '',
   placeholder: '请输入内容',
 })
 
@@ -38,6 +40,8 @@ const emit = defineEmits<{
   'record-start': []
   'record-stop': []
   'record-cancel': []
+  'choose-resume': []
+  'remove-resume': []
 }>()
 
 const isFocused = ref(false)
@@ -76,7 +80,7 @@ function updateValue(event: ComposerInputEvent) {
 }
 
 function send() {
-  if (!props.disabled && !props.voiceMode && props.modelValue.trim() && props.speechState === 'idle') {
+  if (!props.disabled && !props.voiceMode && (props.modelValue.trim() || props.resumeName) && props.speechState === 'idle') {
     emit('send')
   }
 }
@@ -164,97 +168,178 @@ function showVoiceTip() {
 </script>
 
 <template>
-  <view
-    class="composer-shell"
-    :class="{
-      'focused': isFocused,
-      'disabled': disabled,
-      'replying': replying,
-      'voice-mode': voiceMode,
-      'recording': speechState === 'recording',
-      'recognizing': speechState === 'recognizing',
-    }"
-  >
-    <!-- #ifdef MP-WEIXIN -->
-    <view
-      class="icon-button voice-button"
-      :class="{ active: voiceMode, pending: voicePermissionPending }"
-      role="button"
-      :aria-label="voiceMode ? '切换为文字输入' : '切换为语音输入'"
-      :aria-disabled="voicePermissionPending"
-      @tap.stop="toggleVoiceMode"
-    >
-      <view v-if="voicePermissionPending" class="voice-permission-spinner" aria-hidden="true" />
-      <view
-        v-else
-        class="composer-icon voice-icon"
-        :class="voiceMode ? 'i-carbon-keyboard' : 'i-carbon-microphone'"
-      />
+  <view class="composer-wrap">
+    <view v-if="resumeName" class="resume-chip">
+      <text class="resume-chip-name">{{ resumeName }}</text>
+      <button class="resume-chip-remove" aria-label="移除待发送简历" :disabled="disabled" @tap="$emit('remove-resume')">
+        <text>×</text>
+      </button>
     </view>
-    <!-- #endif -->
-
-    <view class="input-area">
+    <view
+      class="composer-shell"
+      :class="{
+        'focused': isFocused,
+        'disabled': disabled,
+        'replying': replying,
+        'voice-mode': voiceMode,
+        'recording': speechState === 'recording',
+        'recognizing': speechState === 'recognizing',
+      }"
+    >
+      <!-- #ifdef MP-WEIXIN -->
       <view
-        v-if="voiceMode"
-        class="hold-to-talk"
-        :class="{
-          recording: speechState === 'recording',
-          recognizing: speechState === 'recognizing',
-        }"
-        @tap="showVoiceTip"
-        @touchstart.stop="prepareRecording"
-        @touchend.capture="finishRecording"
-        @touchcancel.capture="cancelRecording"
+        class="icon-button voice-button"
+        :class="{ active: voiceMode, pending: voicePermissionPending }"
+        role="button"
+        :aria-label="voiceMode ? '切换为文字输入' : '切换为语音输入'"
+        :aria-disabled="voicePermissionPending"
+        @tap.stop="toggleVoiceMode"
       >
-        <template v-if="speechActive">
-          <view v-if="speechState === 'recording'" class="speech-wave" aria-hidden="true">
-            <view v-for="index in 5" :key="index" class="speech-wave-bar" />
-          </view>
-          <view v-else class="recognizing-spinner" />
-          <text class="speech-state-text">{{ speechStateText }}</text>
-        </template>
-        <text v-else>按住说话</text>
+        <view v-if="voicePermissionPending" class="voice-permission-spinner" aria-hidden="true" />
+        <view
+          v-else
+          class="composer-icon voice-icon"
+          :class="voiceMode ? 'i-carbon-keyboard' : 'i-carbon-microphone'"
+        />
+      </view>
+      <!-- #endif -->
+
+      <view class="input-area">
+        <view
+          v-if="voiceMode"
+          class="hold-to-talk"
+          :class="{
+            recording: speechState === 'recording',
+            recognizing: speechState === 'recognizing',
+          }"
+          @tap="showVoiceTip"
+          @touchstart.stop="prepareRecording"
+          @touchend.capture="finishRecording"
+          @touchcancel.capture="cancelRecording"
+        >
+          <template v-if="speechActive">
+            <view v-if="speechState === 'recording'" class="speech-wave" aria-hidden="true">
+              <view v-for="index in 5" :key="index" class="speech-wave-bar" />
+            </view>
+            <view v-else class="recognizing-spinner" />
+            <text class="speech-state-text">{{ speechStateText }}</text>
+          </template>
+          <text v-else>按住说话</text>
+        </view>
+
+        <input
+          v-else
+          class="composer-input"
+          :value="modelValue"
+          :focus="inputFocused"
+          :disabled="disabled"
+          :adjust-position="false"
+          confirm-type="send"
+          :cursor-spacing="12"
+          :maxlength="500"
+          :placeholder="placeholder"
+          placeholder-class="composer-placeholder"
+          @input="updateValue"
+          @confirm="send"
+          @focus="handleFocus"
+          @blur="handleBlur"
+        >
       </view>
 
-      <input
-        v-else
-        class="composer-input"
-        :value="modelValue"
-        :focus="inputFocused"
-        :disabled="disabled"
-        :adjust-position="false"
-        confirm-type="send"
-        :cursor-spacing="12"
-        :maxlength="500"
-        :placeholder="placeholder"
-        placeholder-class="composer-placeholder"
-        @input="updateValue"
-        @confirm="send"
-        @focus="handleFocus"
-        @blur="handleBlur"
+      <button
+        class="icon-button resume-button"
+        :disabled="disabled || speechState !== 'idle'"
+        aria-label="选择简历发送给 AI"
+        title="选择简历"
+        @tap="$emit('choose-resume')"
       >
-    </view>
+        <text class="resume-add-symbol">＋</text>
+      </button>
+      <view
+        v-if="replying"
+        class="stop-button"
+        @tap="stop"
+      >
+        <view class="composer-icon stop-icon i-carbon-stop-filled" />
+      </view>
 
-    <view
-      v-if="replying"
-      class="stop-button"
-      @tap="stop"
-    >
-      <view class="composer-icon stop-icon i-carbon-stop-filled" />
-    </view>
-
-    <view
-      v-else-if="!voiceMode && speechState === 'idle'"
-      class="send-button"
-      :class="{ disabled: disabled || !modelValue.trim() }"
-      @tap="send"
-    >
-      <view class="composer-icon send-icon i-carbon-arrow-up" />
+      <view
+        v-else-if="!voiceMode && speechState === 'idle'"
+        class="send-button"
+        :class="{ disabled: disabled || (!modelValue.trim() && !resumeName) }"
+        @tap="send"
+      >
+        <view class="composer-icon send-icon i-carbon-arrow-up" />
+      </view>
     </view>
   </view>
 </template>
 
 <style scoped lang="scss">
+.composer-wrap {
+  width: 100%;
+}
+.resume-chip {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  width: fit-content;
+  max-width: 90%;
+  height: 58rpx;
+  margin-bottom: 12rpx;
+  padding: 0 8rpx 0 18rpx;
+  border: 1rpx solid #c5d7f0;
+  border-radius: 8rpx;
+  background: #fff;
+  color: #285284;
+  font-size: 24rpx;
+}
+.resume-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resume-chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 42rpx;
+  height: 42rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #54677d;
+  font-size: 26rpx;
+}
+.resume-chip-remove::after,
+.resume-button::after {
+  border: 0;
+}
+.resume-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 66rpx;
+  height: 66rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #426dad;
+  font-size: 32rpx;
+}
+.resume-button[disabled] {
+  opacity: 0.45;
+}
+.resume-add-symbol {
+  font-size: 42rpx;
+  font-weight: 400;
+  line-height: 1;
+}
 .composer-shell {
   box-sizing: border-box;
   width: 100%;
