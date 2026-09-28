@@ -123,8 +123,7 @@ function resumeIcon(fileType?: string) {
           :disabled="!selectedResumeId || loading || uploading || selecting || error"
           @tap="$emit('attach')"
         >
-          <text class="mr-2 text-lg leading-none">↑</text>
-          <text>添加到输入框</text>
+          <text>使用这份简历</text>
         </button>
       </view>
     </view>

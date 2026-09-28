@@ -623,11 +623,13 @@ async function requestLoginForQuestion(question: string) {
 function restorePendingQuestion() {
   const pendingQuestion = consumePendingAiQuestion()
   if (!pendingQuestion)
-    return
+    return false
 
   setHasStarted(true)
+  preferNewConversation = true
   inputValue.value = pendingQuestion
   uni.showToast({ title: '已登录，请确认问题后发送', icon: 'none' })
+  return true
 }
 
 function normalizeRecommendMessages(messages: MiniappRecommendMessage[]) {
@@ -1262,6 +1264,8 @@ async function restoreHistorySelection() {
     }
     if (currentConversation.value?.id !== sessionId)
       await restoreConversation(sessionId)
+    else
+      await scrollToBottom(true, false)
   }
   catch (error) {
     if (sequence !== restoreSequence || owner !== currentUserId() || token !== tokenStore.validToken)
@@ -1836,11 +1840,15 @@ onShow(() => {
   // 游客直接加载后端匿名快捷问题配置。
   void loadRecommendMessages()
   if (authenticated) {
-    restorePendingQuestion()
-    void restoreHistorySelection()
+    const restoredPendingQuestion = restorePendingQuestion()
+    if (!restoredPendingQuestion)
+      void restoreHistorySelection()
   }
-  if (hasStarted.value)
+  if (hasStarted.value) {
     void measureContentViewport()
+    if (currentConversation.value)
+      void scrollToBottom(true, false)
+  }
 })
 onHide(() => speech.cancel())
 onMounted(() => uni.onKeyboardHeightChange(handleKeyboardHeightChange))

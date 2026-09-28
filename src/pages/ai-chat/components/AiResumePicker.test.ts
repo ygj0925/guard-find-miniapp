@@ -41,7 +41,7 @@ describe('ai resume picker', () => {
 
     await wrapper.get('button[aria-label="关闭简历选择"]').trigger('tap')
     expect(wrapper.emitted('close')).toHaveLength(1)
-    await wrapper.findAll('button').find(button => button.text().includes('添加到输入框'))!.trigger('tap')
+    await wrapper.findAll('button').find(button => button.text().includes('使用这份简历'))!.trigger('tap')
     expect(wrapper.emitted('attach')).toHaveLength(1)
   })
 
@@ -53,7 +53,7 @@ describe('ai resume picker', () => {
     await wrapper.setProps({ uploading: true })
     await wrapper.findAll('button').find(button => button.text() === '取消')!.trigger('tap')
     expect(wrapper.emitted('close')).toHaveLength(1)
-    expect(wrapper.findAll('button').find(button => button.text().includes('添加到输入框'))!.attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('button').find(button => button.text().includes('使用这份简历'))!.attributes('disabled')).toBeDefined()
   })
 
   it('lets users retry a failed list and dismiss the backdrop', async () => {
