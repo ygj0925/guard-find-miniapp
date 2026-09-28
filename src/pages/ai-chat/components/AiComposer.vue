@@ -255,24 +255,29 @@ function showVoiceTip() {
           <view class="composer-icon stop-icon i-carbon-stop-filled" />
         </view>
 
+        <button
+          v-else-if="!voiceMode && speechState === 'idle' && !modelValue.trim()"
+          class="resume-button"
+          :disabled="disabled"
+          aria-label="选择简历发送给 AI"
+          title="选择简历"
+          @tap.stop="$emit('choose-resume')"
+        >
+          <view class="resume-add-icon" aria-hidden="true">
+            <view class="resume-add-line resume-add-line-horizontal" />
+            <view class="resume-add-line resume-add-line-vertical" />
+          </view>
+        </button>
+
         <view
           v-else-if="!voiceMode && speechState === 'idle'"
           class="send-button"
-          :class="{ disabled: disabled || (!modelValue.trim() && !resumeName) }"
+          :class="{ disabled: disabled || !modelValue.trim() }"
           @tap="send"
         >
           <view class="composer-icon send-icon i-carbon-arrow-up" />
         </view>
       </view>
-      <button
-        class="resume-button"
-        :disabled="disabled || speechState !== 'idle'"
-        aria-label="选择简历发送给 AI"
-        title="选择简历"
-        @tap="$emit('choose-resume')"
-      >
-        <text class="resume-attachment-icon">＋</text>
-      </button>
     </view>
   </view>
 </template>
@@ -331,14 +336,14 @@ function showVoiceTip() {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 92rpx;
-  height: 92rpx;
+  width: 68rpx;
+  height: 68rpx;
   margin: 0;
   padding: 0;
-  border: 1rpx solid rgba(107, 139, 204, 0.35);
+  border: 1rpx solid rgba(107, 139, 204, 0.25);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 10rpx 28rpx rgba(63, 92, 155, 0.13);
+  background: #eef4ff;
+  box-shadow: 0 5rpx 14rpx rgba(63, 92, 155, 0.1);
   color: #315fa8;
 }
 .resume-button:active:not([disabled]) {
@@ -347,8 +352,23 @@ function showVoiceTip() {
 .resume-button[disabled] {
   opacity: 0.45;
 }
-.resume-attachment-icon {
-  font-size: 40rpx;
+.resume-add-icon {
+  position: relative;
+  width: 32rpx;
+  height: 32rpx;
+}
+.resume-add-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26rpx;
+  height: 4rpx;
+  border-radius: 4rpx;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+.resume-add-line-vertical {
+  transform: translate(-50%, -50%) rotate(90deg);
 }
 .composer-shell {
   box-sizing: border-box;

@@ -684,6 +684,7 @@ function sendMessage(content = inputValue.value) {
     return
   }
   const question = resumeRequest?.message || content.trim()
+  const displayQuestion = resumeRequest?.displayMessage || displayResumeChatMessage(question)
   if (!question || isReplying.value || isRestoringHistory.value)
     return
   if (!reconcileAuthenticatedAiSession()) {
@@ -704,7 +705,7 @@ function sendMessage(content = inputValue.value) {
 
   inputValue.value = ''
   selectedResume.value = null
-  currentConversation.value.messages.push(createMessage('user', displayResumeChatMessage(question)))
+  currentConversation.value.messages.push(createMessage('user', displayQuestion))
   currentConversation.value.messages.push(createMessage('assistant', '', 'streaming'))
   // Keep the proxy returned by the reactive array; mutating the raw object would not update the view.
   const assistantMessage = currentConversation.value.messages[currentConversation.value.messages.length - 1]

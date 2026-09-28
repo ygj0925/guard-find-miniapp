@@ -21,10 +21,12 @@ afterEach(() => {
 })
 
 describe('ai composer voice gesture', () => {
-  it('allows sending a selected resume without typed text', async () => {
+  it('opens the resume picker when the composer is empty', async () => {
     const wrapper = mount(AiComposer, { props: { modelValue: '', resumeName: '我的简历' } })
     await wrapper.get('.resume-button').trigger('tap')
     expect(wrapper.emitted('choose-resume')).toHaveLength(1)
+    expect(wrapper.find('.send-button').exists()).toBe(false)
+    await wrapper.setProps({ modelValue: '请帮我推荐岗位' })
     await wrapper.get('.send-button').trigger('tap')
     expect(wrapper.emitted('send')).toHaveLength(1)
     await wrapper.get('.resume-chip-remove').trigger('tap')
