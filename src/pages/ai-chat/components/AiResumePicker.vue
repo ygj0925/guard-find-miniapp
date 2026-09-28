@@ -36,8 +36,8 @@ function resumeIcon(fileType?: string) {
       <view class="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[#d7dee8]" />
       <view class="flex items-start justify-between px-5 pb-3 pt-2.5">
         <view class="min-w-0 flex-1 pr-4">
-          <text class="block text-base text-app-ink font-700 leading-tight">选择发送简历</text>
-          <text class="mt-1 block text-xs text-app-muted leading-relaxed">选择一份附件简历发送给 AI</text>
+          <text class="block text-base text-app-ink font-700 leading-tight">选择简历</text>
+          <text class="mt-1 block text-xs text-app-muted leading-relaxed">根据所选简历推荐合适的职位</text>
         </view>
         <button class="plain-button h-10 w-10 flex flex-none items-center justify-center border-0 rounded-full bg-[#f3f5f8] p-0 text-lg text-app-ink-soft active:bg-[#e5eaf1]" aria-label="关闭简历选择" @tap="$emit('close')">
           <text class="text-xl leading-none">×</text>

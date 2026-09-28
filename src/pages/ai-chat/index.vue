@@ -41,7 +41,7 @@ import {
   savePendingAiQuestion,
 } from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
-import { createResumeChatRequest, displayResumeChatMessage } from './resumeMessage'
+import { canChooseReturnedResume, createResumeChatRequest, displayResumeChatMessage } from './resumeMessage'
 import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
 import AiFormCard from './components/AiFormCard.vue'
@@ -720,7 +720,6 @@ function sendMessage(content = inputValue.value) {
       message: question,
       stream: true,
       sessionId: currentConversation.value.id || undefined,
-      ...(resumeRequest ? { fileIds: resumeRequest.fileIds } : {}),
     },
     {
       onEvent: event => handleStreamEvent(event, assistantMessage),
@@ -1997,6 +1996,16 @@ onUnmounted(() => {
                 @rendered="handleRichTextRendered"
               />
 
+              <button
+                v-if="canChooseReturnedResume(message)"
+                class="resume-recommend-action"
+                :disabled="isReplying || isRestoringHistory"
+                @tap="openResumePicker"
+              >
+                <view class="i-carbon-document-add" />
+                <text>选择简历推荐职位</text>
+              </button>
+
               <view
                 v-if="shouldShowStreamingActivity(message)"
                 class="typing-content"
@@ -2522,6 +2531,30 @@ onUnmounted(() => {
 
 .assistant .message-bubble :deep(.ai-rich-text p:last-child) {
   margin-bottom: 0 !important;
+}
+
+.resume-recommend-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  min-height: 72rpx;
+  margin: 18rpx 0 0;
+  padding: 0 20rpx;
+  border: 1rpx solid rgba(45, 111, 230, 0.25);
+  border-radius: 8rpx;
+  background: #edf4ff;
+  color: #2464ca;
+  font-size: 25rpx;
+  line-height: 1.4;
+}
+
+.resume-recommend-action::after {
+  border: 0;
+}
+
+.resume-recommend-action[disabled] {
+  opacity: 0.5;
 }
 
 .typing-bubble {
