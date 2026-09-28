@@ -21,6 +21,7 @@ import {
   getAgentChatSession,
   listAgentChatAsks,
   listAgentChatMessages,
+  listAgentChatSessions,
   resolveAgentToolAsk,
   streamAgentChat,
 } from '@/api/agent'
@@ -41,6 +42,7 @@ import {
   savePendingAiQuestion,
 } from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
+import { latestTodayConversationId } from './recentConversation'
 import { canChooseReturnedResume, createResumeChatRequest, displayResumeChatMessage } from './resumeMessage'
 import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
@@ -180,6 +182,7 @@ let extensionSequence = 0
 let restoreSequence = 0
 let activeStream: ActiveStream | null = null
 let conversationOwnerId: string | null = null
+let preferNewConversation = false
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
 let swipeStartPoint: { x: number, y: number } | null = null
 let swipeNavigating = false
@@ -362,6 +365,7 @@ function clearAuthenticatedAiSession(preserveDraft = true) {
   resetConversationState(keepComposerOpen)
   inputValue.value = draft
   conversationOwnerId = null
+  preferNewConversation = false
 }
 
 async function openResumePicker() {
@@ -424,13 +428,12 @@ function closeResumePicker() {
   pickerResume.value = null
 }
 
-function sendSelectedResume() {
+function attachSelectedResume() {
   if (!pickerResume.value || resumePickerLoading.value || resumeUploading.value || resumeSelecting.value || resumePickerError.value)
     return
   selectedResume.value = pickerResume.value
   voiceMode.value = false
   closeResumePicker()
-  sendMessage()
 }
 
 function chooseResumeForChat() {
@@ -515,7 +518,7 @@ async function uploadResumeForChat(path: string, originalName: string, size?: nu
     }
     resumeOptions.value = [uploaded, ...resumeOptions.value.filter(item => item.id !== uploaded.id)]
     pickerResume.value = uploaded
-    uni.showToast({ title: '上传成功，请确认发送', icon: 'none' })
+    uni.showToast({ title: '上传成功，请选择这份简历', icon: 'none' })
   }
   catch (error) {
     if (owner !== currentUserId() || token !== tokenStore.validToken || conversationVersion !== restoreSequence)
@@ -672,6 +675,7 @@ async function loadRecommendMessages() {
 
 function startNewConversation() {
   resetConversationState(true)
+  preferNewConversation = true
   void measureContentViewport()
 }
 
@@ -692,6 +696,7 @@ function sendMessage(content = inputValue.value) {
     return
   }
 
+  preferNewConversation = false
   if (!currentConversation.value) {
     const createdAt = Date.now()
     currentConversation.value = {
@@ -1216,7 +1221,8 @@ function cancelReply() {
 async function restoreHistorySelection() {
   isOpeningHistory.value = false
   const deletedIds = consumeDeletedConversationIds()
-  if (currentConversation.value?.id && deletedIds.includes(currentConversation.value.id))
+  const deletedCurrentConversation = Boolean(currentConversation.value?.id && deletedIds.includes(currentConversation.value.id))
+  if (deletedCurrentConversation)
     startNewConversation()
 
   if (consumeNewConversationRequest()) {
@@ -1225,12 +1231,53 @@ async function restoreHistorySelection() {
   }
 
   const activeConversationId = consumeActiveHistoryConversation()
-  if (activeConversationId)
+  if (activeConversationId) {
     await restoreConversation(activeConversationId)
+    return
+  }
+  if (deletedCurrentConversation)
+    return
+
+  if (preferNewConversation || isRestoringHistory.value || isReplying.value || (currentConversation.value && !currentConversation.value.id))
+    return
+
+  const sequence = ++restoreSequence
+  const owner = currentUserId()
+  const token = tokenStore.validToken
+  isRestoringHistory.value = true
+  try {
+    const response = await listAgentChatSessions({ limit: 20 })
+    if (sequence !== restoreSequence || owner !== currentUserId() || token !== tokenStore.validToken)
+      return
+
+    const sessionId = latestTodayConversationId(response.items)
+    if (!sessionId) {
+      if (currentConversation.value) {
+        const draft = inputValue.value
+        resetConversationState(true)
+        inputValue.value = draft
+        void measureContentViewport()
+      }
+      return
+    }
+    if (currentConversation.value?.id !== sessionId)
+      await restoreConversation(sessionId)
+  }
+  catch (error) {
+    if (sequence !== restoreSequence || owner !== currentUserId() || token !== tokenStore.validToken)
+      return
+    if (!handleAsyncAuthLoss(error))
+      uni.showToast({ title: '最近会话加载失败，请稍后重试', icon: 'none' })
+  }
+  finally {
+    if (sequence === restoreSequence)
+      isRestoringHistory.value = false
+  }
 }
 
 async function restoreConversation(sessionId: string) {
   const sequence = ++restoreSequence
+  preferNewConversation = false
   resumePickerSequence += 1
   selectedResume.value = null
   pickerResume.value = null
@@ -2045,7 +2092,7 @@ onUnmounted(() => {
           :disabled="isReplying || isRestoringHistory || resumeUploading"
           :replying="isReplying"
           :chat-mode="Boolean(currentConversation)"
-          :placeholder="isAiAuthenticated ? '请输入内容' : '输入问题，发送时需登录'"
+          :placeholder="selectedResume ? '补充求职要求（可选）' : isAiAuthenticated ? '请输入内容' : '输入问题，发送时需登录'"
           :speech-state="speechState"
           :speech-state-text="speechStateText"
           :voice-mode="voiceMode"
@@ -2075,7 +2122,7 @@ onUnmounted(() => {
       @retry="loadResumePicker"
       @select="selectResume"
       @upload="chooseResumeForChat"
-      @send="sendSelectedResume"
+      @attach="attachSelectedResume"
     />
   </view>
 </template>

@@ -33,7 +33,7 @@ function mountPicker(overrides: Partial<InstanceType<typeof AiResumePicker>['$pr
 }
 
 describe('ai resume picker', () => {
-  it('keeps the sheet open when selecting and sends the selected resume', async () => {
+  it('keeps the sheet open when selecting and attaches the selected resume', async () => {
     const wrapper = mountPicker()
     await wrapper.get('[role="radio"]').trigger('tap')
     expect(wrapper.emitted('select')?.[0]).toEqual([resume])
@@ -41,8 +41,8 @@ describe('ai resume picker', () => {
 
     await wrapper.get('button[aria-label="关闭简历选择"]').trigger('tap')
     expect(wrapper.emitted('close')).toHaveLength(1)
-    await wrapper.findAll('button').find(button => button.text().includes('发送给 AI'))!.trigger('tap')
-    expect(wrapper.emitted('send')).toHaveLength(1)
+    await wrapper.findAll('button').find(button => button.text().includes('添加到输入框'))!.trigger('tap')
+    expect(wrapper.emitted('attach')).toHaveLength(1)
   })
 
   it('supports uploading and closing even while an upload is in progress', async () => {
@@ -53,7 +53,7 @@ describe('ai resume picker', () => {
     await wrapper.setProps({ uploading: true })
     await wrapper.findAll('button').find(button => button.text() === '取消')!.trigger('tap')
     expect(wrapper.emitted('close')).toHaveLength(1)
-    expect(wrapper.findAll('button').find(button => button.text().includes('发送给 AI'))!.attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('button').find(button => button.text().includes('添加到输入框'))!.attributes('disabled')).toBeDefined()
   })
 
   it('lets users retry a failed list and dismiss the backdrop', async () => {

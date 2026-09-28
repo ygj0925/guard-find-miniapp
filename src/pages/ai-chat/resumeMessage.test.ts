@@ -21,7 +21,8 @@ describe('createResumeChatRequest', () => {
     expect(request?.message).toContain('recruitment.recommend_positions')
     expect(request?.message).toContain(DEFAULT_RESUME_REQUEST)
     expect(request?.displayMessage).toContain('[简历：研发简历]')
-    expect(displayResumeChatMessage(request!.message)).toBe(`[简历：研发简历] ${DEFAULT_RESUME_REQUEST}`)
+    expect(request?.displayMessage).toBe('[简历：研发简历] 推荐适合的职位')
+    expect(displayResumeChatMessage(request!.message)).toBe(request?.displayMessage)
   })
 
   it('prioritizes the user question and rejects invalid ids', () => {
@@ -30,6 +31,7 @@ describe('createResumeChatRequest', () => {
     expect(displayResumeChatMessage('普通消息')).toBe('普通消息')
     expect(createResumeChatRequest({ ...resume, fileId: '' }, '')?.message).toContain(`resumeId: ${resume.id}`)
     expect(displayResumeChatMessage('【发送简历】我发送了账户中名为《旧简历》的简历（resumeId: 123）。请以本轮附件为准阅读简历，并用这份准确的 resumeId 调用需要简历的工具。我的需求：只看上海')).toBe('[简历：旧简历] 只看上海')
+    expect(displayResumeChatMessage(`【发送简历】我发送了账户中名为《旧简历》的简历（resumeId: 123）。请以本轮附件为准阅读简历，并用这份准确的 resumeId 调用需要简历的工具。我的需求：请先阅读这份简历，结合当前可招聘职位分析我的优势、适合的岗位方向与匹配理由，并推荐合适的职位；如果还缺少关键求职偏好，请先询问我。未经我确认不要直接投递。`)).toBe('[简历：旧简历] 推荐适合的职位')
   })
 
   it('rejects an invalid business resume id even when the attachment id exists', () => {

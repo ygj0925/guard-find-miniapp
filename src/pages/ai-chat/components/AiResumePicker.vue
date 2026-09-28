@@ -16,7 +16,7 @@ defineEmits<{
   retry: []
   select: [resume: ResumeItem]
   upload: []
-  send: []
+  attach: []
 }>()
 
 function resumeIcon(fileType?: string) {
@@ -121,10 +121,10 @@ function resumeIcon(fileType?: string) {
         <button
           class="plain-button h-12 min-w-0 flex flex-1 items-center justify-center border-0 rounded-xl bg-brand-blue px-4 text-sm text-white font-700 shadow-[0_8rpx_20rpx_rgba(45,111,230,0.2)] active:scale-[0.99] disabled:bg-[#9bb8e8] disabled:shadow-none"
           :disabled="!selectedResumeId || loading || uploading || selecting || error"
-          @tap="$emit('send')"
+          @tap="$emit('attach')"
         >
           <text class="mr-2 text-lg leading-none">↑</text>
-          <text>发送给 AI</text>
+          <text>添加到输入框</text>
         </button>
       </view>
     </view>

@@ -256,7 +256,7 @@ function showVoiceTip() {
         </view>
 
         <button
-          v-else-if="!voiceMode && speechState === 'idle' && !modelValue.trim()"
+          v-else-if="!voiceMode && speechState === 'idle' && !modelValue.trim() && !resumeName"
           class="resume-button"
           :disabled="disabled"
           aria-label="选择简历发送给 AI"
@@ -272,7 +272,7 @@ function showVoiceTip() {
         <view
           v-else-if="!voiceMode && speechState === 'idle'"
           class="send-button"
-          :class="{ disabled: disabled || !modelValue.trim() }"
+          :class="{ disabled: disabled || (!modelValue.trim() && !resumeName) }"
           @tap="send"
         >
           <view class="composer-icon send-icon i-carbon-arrow-up" />
