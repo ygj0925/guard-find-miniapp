@@ -43,7 +43,7 @@ import {
 } from './aiHistory'
 import { aiHeaderMetrics } from './aiLayout'
 import { latestTodayConversationId } from './recentConversation'
-import { canChooseReturnedResume, createResumeChatRequest, displayResumeChatMessage } from './resumeMessage'
+import { createResumeChatRequest, displayResumeChatMessage } from './resumeMessage'
 import AiBrandHeader from './components/AiBrandHeader.vue'
 import AiComposer from './components/AiComposer.vue'
 import AiFormCard from './components/AiFormCard.vue'
@@ -177,6 +177,9 @@ const splashHeroWidth = Math.min(
   scrollViewportWidth - 24,
   Math.round(splashHeroHeight * (590 / 714)),
 )
+const composerPlaceholder = computed(() => selectedResume.value
+  ? '请补充工作地点、岗位方向、薪资范围等（可选）'
+  : isAiAuthenticated.value ? '请输入内容' : '输入问题，发送时需登录')
 let messageSequence = 0
 let extensionSequence = 0
 let restoreSequence = 0
@@ -1205,12 +1208,12 @@ function finishReply() {
   void scrollToBottom(false, true)
 }
 
-function cancelReply() {
+function cancelReply(markAsStopped = true) {
   const stream = activeStream
   activeStream = null
   const messages = currentConversation.value?.messages || []
   const pendingMessage = [...messages].reverse().find(message => message.status === 'streaming')
-  if (pendingMessage) {
+  if (pendingMessage && markAsStopped) {
     if (!pendingMessage.content)
       pendingMessage.content = '已停止生成'
     pendingMessage.status = 'stopped'
@@ -1741,7 +1744,16 @@ function handlePageTouchStart(event: PageTouchEvent) {
     swipeStartPoint = null
     return
   }
-  swipeStartPoint = readPageTouchPoint(event)
+  const point = readPageTouchPoint(event)
+  if (!point) {
+    swipeStartPoint = null
+    return
+  }
+
+  // The composer owns taps, text input, and long-press recording gestures.
+  // Do not let a horizontal movement in this bottom area navigate the page.
+  const bottomGestureBoundary = scrollViewportHeight - Math.max(180, keyboardHeight.value + 120)
+  swipeStartPoint = point.y >= bottomGestureBoundary ? null : point
 }
 
 function handlePageTouchMove(event: PageTouchEvent) {
@@ -1856,7 +1868,7 @@ onUnmounted(() => {
   restoreSequence += 1
   resumePickerSequence += 1
   if (activeStream)
-    cancelReply()
+    cancelReply(false)
   speech.dispose()
   if (autoScrollTimer)
     clearTimeout(autoScrollTimer)
@@ -1869,8 +1881,8 @@ onUnmounted(() => {
     class="ai-page"
     @touchstart="handlePageTouchStart"
     @touchmove="handlePageTouchMove"
-    @touchend.capture="handlePageTouchEnd"
-    @touchcancel.capture="handlePageTouchCancel"
+    @touchend="handlePageTouchEnd"
+    @touchcancel="handlePageTouchCancel"
   >
     <view class="ai-header-fixed">
       <AiBrandHeader
@@ -2051,16 +2063,6 @@ onUnmounted(() => {
                 @rendered="handleRichTextRendered"
               />
 
-              <button
-                v-if="canChooseReturnedResume(message)"
-                class="resume-recommend-action"
-                :disabled="isReplying || isRestoringHistory"
-                @tap="openResumePicker"
-              >
-                <view class="i-carbon-document-add" />
-                <text>选择简历推荐职位</text>
-              </button>
-
               <view
                 v-if="shouldShowStreamingActivity(message)"
                 class="typing-content"
@@ -2100,7 +2102,7 @@ onUnmounted(() => {
           :disabled="isReplying || isRestoringHistory || resumeUploading"
           :replying="isReplying"
           :chat-mode="Boolean(currentConversation)"
-          :placeholder="selectedResume ? '补充求职要求（可选）' : isAiAuthenticated ? '请输入内容' : '输入问题，发送时需登录'"
+          :placeholder="composerPlaceholder"
           :speech-state="speechState"
           :speech-state-text="speechStateText"
           :voice-mode="voiceMode"
@@ -2586,30 +2588,6 @@ onUnmounted(() => {
 
 .assistant .message-bubble :deep(.ai-rich-text p:last-child) {
   margin-bottom: 0 !important;
-}
-
-.resume-recommend-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12rpx;
-  min-height: 72rpx;
-  margin: 18rpx 0 0;
-  padding: 0 20rpx;
-  border: 1rpx solid rgba(45, 111, 230, 0.25);
-  border-radius: 8rpx;
-  background: #edf4ff;
-  color: #2464ca;
-  font-size: 25rpx;
-  line-height: 1.4;
-}
-
-.resume-recommend-action::after {
-  border: 0;
-}
-
-.resume-recommend-action[disabled] {
-  opacity: 0.5;
 }
 
 .typing-bubble {

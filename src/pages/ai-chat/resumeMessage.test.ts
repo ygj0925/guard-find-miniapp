@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ResumeItem } from '@/api/resume'
-import type { AiChatMessage } from './aiHistory'
-import { canChooseReturnedResume, createResumeChatRequest, DEFAULT_RESUME_REQUEST, displayResumeChatMessage } from './resumeMessage'
+import { createResumeChatRequest, DEFAULT_RESUME_REQUEST, displayResumeChatMessage } from './resumeMessage'
 
 const resume: ResumeItem = {
   id: '1897293810343682049',
@@ -36,26 +35,5 @@ describe('createResumeChatRequest', () => {
 
   it('rejects an invalid business resume id even when the attachment id exists', () => {
     expect(createResumeChatRequest({ ...resume, id: '' }, '')).toBeNull()
-  })
-})
-
-describe('canChooseReturnedResume', () => {
-  const message: AiChatMessage = {
-    id: 'assistant-1',
-    role: 'assistant',
-    content: '已查询你的简历',
-    createdAt: 0,
-    status: 'complete',
-    extensions: [
-      { id: 'tool-1:tool_call', groupId: 'tool-1', type: 'tool_call', order: 1, state: 'success', toolName: 'recruitment.get_resume_status', data: {} },
-      { id: 'tool-1:tool_result', groupId: 'tool-1', type: 'tool_result', order: 2, state: 'success', data: { status: 'SUCCESS' } },
-    ],
-  }
-
-  it('offers selection only after the resume query succeeds', () => {
-    expect(canChooseReturnedResume(message)).toBe(true)
-    expect(canChooseReturnedResume({ ...message, status: 'streaming' })).toBe(false)
-    expect(canChooseReturnedResume({ ...message, extensions: [] })).toBe(false)
-    expect(canChooseReturnedResume({ ...message, extensions: [message.extensions[0], { ...message.extensions[1], data: { status: 'ERROR' } }] })).toBe(false)
   })
 })

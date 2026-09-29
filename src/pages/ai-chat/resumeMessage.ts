@@ -1,7 +1,6 @@
 import type { ResumeItem } from '@/api/resume'
-import type { AiChatMessage } from './aiHistory'
 
-export const DEFAULT_RESUME_REQUEST = '请根据这份简历和我的求职偏好推荐当前在招岗位，并说明每个岗位的匹配理由；如果还缺少关键求职偏好，请先询问我。未经我确认不要直接投递。'
+export const DEFAULT_RESUME_REQUEST = '请根据这份简历和我的求职偏好推荐当前在招岗位，并说明每个岗位的匹配理由；如果还缺少关键求职偏好（工作地点、岗位方向、薪资范围等），请先询问我。未经我确认不要直接投递。'
 const DEFAULT_RESUME_DISPLAY = '推荐适合的职位'
 const LEGACY_DEFAULT_RESUME_REQUEST = '请先阅读这份简历，结合当前可招聘职位分析我的优势、适合的岗位方向与匹配理由，并推荐合适的职位；如果还缺少关键求职偏好，请先询问我。未经我确认不要直接投递。'
 const RESUME_MESSAGE_PATTERN = /^【选择简历】我选择了账户中名为《(.+)》的简历（resumeId: \d+）。(?:请先调用 recruitment\.get_resume_status[\s\S]*?。)?我的需求：([\s\S]*)$/
@@ -10,16 +9,6 @@ const LEGACY_RESUME_MESSAGE_PATTERN = /^【发送简历】我发送了账户中�
 export interface ResumeChatRequest {
   message: string
   displayMessage: string
-}
-
-export function canChooseReturnedResume(message: AiChatMessage) {
-  if (message.role !== 'assistant' || message.status !== 'complete')
-    return false
-  return message.extensions.some(extension => extension.type === 'tool_call'
-    && extension.toolName?.includes('get_resume_status')
-    && message.extensions.some(result => result.type === 'tool_result'
-      && result.groupId === extension.groupId
-      && ['SUCCESS', 'SUCCEEDED', 'OK'].includes(String(result.data.status || '').toUpperCase())))
 }
 
 export function displayResumeChatMessage(message: string) {
