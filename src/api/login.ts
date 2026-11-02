@@ -1,199 +1,48 @@
-import type { BehaviorCaptcha, BehaviorCaptchaCheckResult, BehaviorCaptchaRequest, IAuthLoginRes, ICaptcha, InternalEmployeeVerifyRequest, IUpdateInfo, IUpdatePassword, IUserInfoRes, PhoneLoginForm, SocialAuthorizeResult, SocialLoginForm, SocialLoginSource, WechatMiniPhoneLoginConfig, WechatMiniPhoneLoginForm } from './types/login'
+/**
+ * 登录与用户接口(guard-find-server /app/auth)。
+ * 仅支持微信小程序一键登录:wx.login 的 code 换 token。
+ */
+import type { IAuthLoginRes, IUserInfoRes } from './types/login'
 import { http } from '@/http/http'
 
-/**
- * 登录表单
- */
+/** 微信小程序一键登录(authType=WECHAT,未注册自动建档) */
+export function wechatMiniappLogin(code: string) {
+  return http.post<IAuthLoginRes>(
+    '/app/auth/login',
+    { authType: 'WECHAT', code },
+    undefined,
+    undefined,
+    { skipAuth: true, hideErrorToast: true },
+  )
+}
+
+/** 当前登录用户信息 */
+export function getUserInfo() {
+  return http.get<IUserInfoRes>('/app/auth/me')
+}
+
+/** 账号密码登录(保留 token store 兼容;小程序主流程不走此接口) */
 export interface ILoginForm {
   username: string
   password: string
 }
 
-/**
- * 小程序换绑手机号
- */
-
-export interface IChangePhoneData {
-  code: string | number
-  msg: string
-  success: boolean
-  timestamp: string
-  data?: any
-}
-
-/**
- * 获取验证码
- * @returns ICaptcha 验证码
- */
-export function getCode() {
-  return http.get<ICaptcha>('/user/getCode')
-}
-
-/**
- * 用户登录
- * @param loginForm 登录表单
- */
-export function login(loginForm: ILoginForm) {
-  return http.post<IAuthLoginRes>('/auth/login', loginForm)
-}
-
-/**
- * 手机号验证码登录；传入 wxLoginCode 时，后端会在登录成功后关联微信身份。
- */
-export function phoneLogin(loginForm: PhoneLoginForm) {
+export function login(form: ILoginForm) {
   return http.post<IAuthLoginRes>(
-    '/auth/login',
-    loginForm,
+    '/app/auth/login',
+    { authType: 'ACCOUNT', ...form },
     undefined,
     undefined,
-    { hideErrorToast: true },
+    { skipAuth: true, hideErrorToast: true },
   )
 }
 
-/** 微信小程序手机号授权直接登录。 */
-export function wechatMiniPhoneLogin(loginForm: WechatMiniPhoneLoginForm) {
-  return http.post<IAuthLoginRes>(
-    '/auth/login',
-    loginForm,
-    undefined,
-    undefined,
-    { hideErrorToast: true, skipAuth: true },
-  )
+/** 服务端为单 token 模式,无刷新接口(仅为 token store 类型兼容保留) */
+export function refreshToken() {
+  return Promise.reject(new Error('单 token 模式不支持刷新'))
 }
 
-/** 获取微信手机号授权组件模式，接口失败时由页面回退到 FAST。 */
-export function getWechatMiniPhoneLoginConfig() {
-  return http.get<WechatMiniPhoneLoginConfig>(
-    '/auth/wechat-mini/phone-login-config',
-    undefined,
-    undefined,
-    { hideErrorToast: true, skipAuth: true },
-  )
-}
-
-export function getSocialAuthorizeUrl(source: SocialLoginSource) {
-  return http.get<SocialAuthorizeResult>(
-    `/auth/${encodeURIComponent(source)}`,
-    undefined,
-    undefined,
-    { hideErrorToast: true, skipAuth: true },
-  )
-}
-
-export function socialLogin(loginForm: SocialLoginForm) {
-  return http.post<IAuthLoginRes>(
-    '/auth/login',
-    loginForm,
-    undefined,
-    undefined,
-    { skipAuth: true },
-  )
-}
-
-export function getBehaviorCaptcha() {
-  return http.get<BehaviorCaptcha>('/captcha/behavior', { captchaType: 'blockPuzzle' })
-}
-
-export function checkBehaviorCaptcha(data: { captchaType: 'blockPuzzle', pointJson: string, token: string }) {
-  return http.post<BehaviorCaptchaCheckResult>('/captcha/behavior', data)
-}
-
-export function sendSmsCaptcha(phone: string, captcha?: BehaviorCaptchaRequest) {
-  return http.get<void>('/captcha/sms', { phone, ...captcha })
-}
-
-// 发送内部员工认证验证码
-export function innerEmployeeSend(email: string) {
-  return http.post<string>(
-    '/portal/internal-employee/send',
-    undefined,
-    { email },
-    undefined,
-    { hideErrorToast: true },
-  )
-}
-
-// 验证内部员工身份
-export function innerEmployeeVerify(data: InternalEmployeeVerifyRequest) {
-  return http.post<void>(
-    '/portal/internal-employee/verify',
-    data,
-    undefined,
-    undefined,
-    { hideErrorToast: true },
-  )
-}
-
-// 修改小程序个人信息 (gender： 1-男，2-女)
-export function changeInfoProfile(data: { nickname: string }) {
-  return http<IChangePhoneData>({
-    url: '/miniapp/profile',
-    method: 'PATCH' as any,
-    data,
-  })
-}
-
-// 小程序换绑手机号
-export function changeProfilePhone(data: { phone: string, captcha: string }) {
-  return http<IChangePhoneData>({
-    url: '/miniapp/profile/phone',
-    method: 'PATCH' as any,
-    data,
-  })
-}
-
-/**
- * 刷新token
- * @param refreshToken 刷新token
- */
-export function refreshToken(refreshToken: string) {
-  return Promise.reject(new Error('当前后端未提供 Token 刷新接口'))
-}
-
-/**
- * 获取用户信息
- */
-export function getUserInfo() {
-  return http.get<IUserInfoRes>('/auth/user/info')
-}
-
-/**
- * 退出登录
- */
+/** 退出登录 */
 export function logout() {
-  return http.post<void>('/auth/logout')
+  return http.post<void>('/app/auth/logout')
 }
-
-/**
- * 修改用户信息
- */
-export function updateInfo(data: IUpdateInfo) {
-  return http.post('/user/updateInfo', data)
-}
-
-/**
- * 修改用户密码
- */
-export function updateUserPassword(data: IUpdatePassword) {
-  return http.post('/user/updatePassword', data)
-}
-
-/**
- * 获取微信登录凭证
- * @returns Promise 包含微信登录凭证(code)
- */
-export function getWxCode() {
-  return new Promise<UniApp.LoginRes>((resolve, reject) => {
-    uni.login({
-      provider: 'weixin',
-      success: res => resolve(res),
-      fail: err => reject(new Error(err)),
-    })
-  })
-}
-
-/**
- * 微信登录
- * @param params 微信登录参数，包含code
- * @returns Promise 包含登录结果
- */
