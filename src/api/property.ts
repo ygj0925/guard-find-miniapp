@@ -150,3 +150,15 @@ export function changeBookingStatus(id: Booking['id'], status: number) {
     status,
   })
 }
+
+/** 行政区划节点(省 → 市 → 区县,国标编码) */
+export interface RegionNode {
+  code: number
+  name: string
+  children: RegionNode[]
+}
+
+/** 省市区树(公开接口,免登录,数据与用户侧服务同源) */
+export function fetchRegionTree() {
+  return http.get<RegionNode[]>('/miniapp/region/tree')
+}

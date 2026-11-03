@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PropertyInput } from '@/api/property'
-import { fetchPropertyDetail, saveProperty } from '@/api/property'
+import { fetchPropertyDetail, fetchRegionTree, saveProperty, type RegionNode } from '@/api/property'
 
 import { uploadPropertyImage } from '@/api/propertyImage'
 
@@ -52,8 +52,6 @@ const fields: {
     | 'orientation'
     | 'decoration'
     | 'community'
-    | 'city'
-    | 'district'
     | 'contactName'
     | 'contactPhone'
   label: string
@@ -64,13 +62,12 @@ const fields: {
   { key: 'orientation', label: '朝向', max: 20 },
   { key: 'decoration', label: '装修', max: 20 },
   { key: 'community', label: '小区', max: 100 },
-  { key: 'city', label: '城市', max: 50 },
-  { key: 'district', label: '区域', max: 50 },
   { key: 'contactName', label: '联系人', max: 50 },
   { key: 'contactPhone', label: '联系电话', max: 20 },
 ]
 onLoad(async (q) => {
   id.value = String(q?.id || '')
+  void loadRegionTree()
   if (!id.value) {
     ready.value = true
     return
@@ -80,12 +77,66 @@ onLoad(async (q) => {
     Object.assign(form, p)
     imageUrls.value = p.images.join('\n')
     facilities.value = p.facilities.join('，')
+    regionLabel.value = [p.city, p.district].filter(Boolean).join(' ')
     ready.value = true
   }
   catch {
     uni.showToast({ title: '房源加载失败，请返回重试', icon: 'none' })
   }
 })
+
+/** 省市区级联:数据来自 backend /miniapp/region/tree,与用户侧服务同源 */
+const regionTree = ref<RegionNode[]>([])
+const provinceIdx = ref(0)
+const cityIdx = ref(0)
+const districtIdx = ref(0)
+const regionLabel = ref('')
+const provinces = computed(() => regionTree.value.map(p => p.name))
+const cities = computed(() =>
+  regionTree.value[provinceIdx.value]?.children?.map(c => c.name) ?? [],
+)
+const districts = computed(() =>
+  regionTree.value[provinceIdx.value]?.children?.[cityIdx.value]?.children
+    ?.map(c => c.name) ?? [],
+)
+
+async function loadRegionTree() {
+  try {
+    regionTree.value = await fetchRegionTree()
+  }
+  catch {}
+}
+
+function onRegionColumnChange(e: { detail: { column: number, value: number } }) {
+  const { column, value } = e.detail
+  if (column === 0) {
+    provinceIdx.value = value
+    cityIdx.value = 0
+    districtIdx.value = 0
+  }
+  else if (column === 1) {
+    cityIdx.value = value
+    districtIdx.value = 0
+  }
+  else {
+    districtIdx.value = value
+  }
+}
+
+function onRegionConfirm(e: { detail: { value: number[] } }) {
+  const [p, c, d] = e.detail.value.map(Number)
+  provinceIdx.value = p
+  cityIdx.value = c
+  districtIdx.value = d
+  const province = regionTree.value[p]
+  const city = province?.children?.[c]
+  const district = city?.children?.[d]
+  form.city = city?.name ?? ''
+  form.district = district?.name ?? ''
+  regionLabel.value = [province?.name, city?.name, district?.name]
+    .filter(Boolean)
+    .join(' ')
+}
 const imageList = computed(() =>
   imageUrls.value
     .split(/\r?\n/)
@@ -253,6 +304,18 @@ async function submit(status: 1 | 2) {
           placeholder="选填"
         >
       </view>
+      <picker
+        mode="multiSelector"
+        :range="[provinces, cities, districts]"
+        :value="[provinceIdx, cityIdx, districtIdx]"
+        :disabled="!provinces.length"
+        @columnchange="onRegionColumnChange"
+        @change="onRegionConfirm"
+      >
+        <view class="py-3">
+          所在地区：{{ regionLabel || (provinces.length ? '请选择' : '区划加载中…') }} ›
+        </view>
+      </picker>
       <text class="block text-sm">详细地址 *</text><input
         v-model="form.address"
         :maxlength="200"
