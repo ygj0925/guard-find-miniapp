@@ -195,15 +195,20 @@ async function submit(status: 1 | 2) {
     .split(/\r?\n/)
     .map(s => s.trim())
     .filter(Boolean)
+  const availableFromInvalid = !!form.availableFrom
+    && !/^\d{4}-\d{2}-\d{2}$/.test(String(form.availableFrom))
   if (
     !form.title.trim()
     || !form.address.trim()
     || !(Number(form.price) >= 1)
+    || availableFromInvalid
     || images.length > 9
     || images.some(s => !/^https?:\/\/\S+$/.test(s) || s.length > 1000)
   ) {
     uni.showToast({
-      title: '请填写标题、地址、有效价格及图片链接',
+      title: availableFromInvalid
+        ? '可入住日期格式应为 2026-12-01'
+        : '请填写标题、地址、有效价格及图片链接',
       icon: 'none',
     })
     return

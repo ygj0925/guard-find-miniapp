@@ -5,6 +5,8 @@
  */
 import type { ImMessage } from '@/api/im'
 import { getUserInfo } from '@/api/login'
+import { useTokenStore } from '@/store/token'
+import { toLoginPage } from '@/utils/toLoginPage'
 import { mergeMessages } from '@/utils/messageCursor'
 import {
   fetchMessages,
@@ -29,10 +31,30 @@ const draft = ref('')
 const sending = ref(false)
 const myUserId = ref('')
 const lastId = ref<string | number>('')
+const peerId = ref('')
 let active = false
 let generation = 0
 let timer: ReturnType<typeof setTimeout> | undefined
 let boot: Promise<void> = Promise.resolve()
+
+function initSession() {
+  boot = (async () => {
+    const tokenStore = useTokenStore()
+    tokenStore.updateNowTime()
+    if (!tokenStore.hasLogin) {
+      // 未登录:去登录页,并停止本页轮询(避免 401 风暴);登录成功后由 watch 重试
+      toLoginPage()
+      active = false
+      return
+    }
+    const info = await getUserInfo()
+    myUserId.value = String(info.userId)
+    if (!isSupport.value && !convId.value && peerId.value)
+      convId.value = (await getOrCreateConversation(peerId.value)).id
+  })()
+  // Install a rejection handler immediately; start() reports initialization failures.
+  void boot.catch(() => {})
+}
 
 onLoad((query) => {
   isSupport.value = query?.mode === 'support'
@@ -42,16 +64,24 @@ onLoad((query) => {
       ? decodeURIComponent(query.peerName)
       : '对方'
   convId.value = isSupport.value ? 'support' : String(query?.convId || '')
+  peerId.value = String(query?.peerId || '')
   uni.setNavigationBarTitle({ title: peerName.value })
-  boot = (async () => {
-    const info = await getUserInfo()
-    myUserId.value = String(info.userId)
-    if (!isSupport.value && !convId.value && query?.peerId)
-      convId.value = (await getOrCreateConversation(String(query.peerId))).id
-  })()
-  // Install a rejection handler immediately; start() reports initialization failures.
-  void boot.catch(() => {})
+  initSession()
 })
+
+// 登录态恢复(登录页返回):重建会话并恢复轮询
+const tokenStore = useTokenStore()
+watch(
+  () => tokenStore.hasLogin,
+  (hasLogin) => {
+    if (hasLogin && !convId.value) {
+      initSession()
+      active = true
+      const current = ++generation
+      void start(current)
+    }
+  },
+)
 onShow(() => {
   active = true
   const current = ++generation
