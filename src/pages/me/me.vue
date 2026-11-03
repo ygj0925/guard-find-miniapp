@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 我的页面:用户信息 + 官方客服入口 + 退出登录。
+ * 我的页面:用户信息 + 公寓管家入口 + 退出登录。
  */
 import type { IUserInfoRes } from '@/api/types/login'
 import { getUserInfo, logout } from '@/api/login'
@@ -16,6 +16,7 @@ definePage({
 })
 
 const userStore = useUserStore()
+const appName = import.meta.env.VITE_APP_TITLE
 const tokenStore = useTokenStore()
 const profile = ref<IUserInfoRes | null>(null)
 let version = 0
@@ -59,7 +60,7 @@ function goSupport() {
   if (!requireLogin())
     return
   uni.navigateTo({
-    url: '/pages/message/chat?mode=support&peerName=%E5%AE%98%E6%96%B9%E5%AE%A2%E6%9C%8D',
+    url: '/pages/message/chat?mode=support',
   })
 }
 
@@ -139,7 +140,7 @@ function onLogout() {
         class="flex items-center border-b border-#F5F7FA border-solid p-4"
         @tap="goSupport"
       >
-        <text class="flex-1 text-15px text-#303133">联系客服</text>
+        <text class="flex-1 text-15px text-#303133">联系公寓管家</text>
         <text class="text-xs text-#C0C4CC">›</text>
       </view>
       <view v-if="profile" class="flex items-center p-4" @tap="onLogout">
@@ -148,7 +149,7 @@ function onLogout() {
     </view>
 
     <view class="mt-6 text-center text-xs text-#C0C4CC">
-      生生智家 · 房源管家
+      {{ appName }} · 管家服务
     </view>
   </view>
 </template>

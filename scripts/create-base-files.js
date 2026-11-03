@@ -18,7 +18,7 @@ const pages = {
       type: 'home',
       style: {
         navigationStyle: 'custom',
-        navigationBarTitleText: '首页',
+        navigationBarTitleText: '上海泊之湾公寓',
       },
     },
     {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 聊天页:气泡流 + 输入条 + 3 秒轮询。
- * 三种入口:convId(会话)、peerId(房源详情,进入即建会话)、mode=support(联系客服)。
+ * 三种入口:convId(会话)、peerId(房源详情,进入即建会话)、mode=support(联系公寓管家)。
  */
 import type { ImMessage } from '@/api/im'
 import { getUserInfo } from '@/api/login'
@@ -36,10 +36,10 @@ let boot: Promise<void> = Promise.resolve()
 
 onLoad((query) => {
   isSupport.value = query?.mode === 'support'
-  peerName.value = query?.peerName
-    ? decodeURIComponent(query.peerName)
-    : isSupport.value
-      ? '官方客服'
+  peerName.value = isSupport.value
+    ? '公寓管家'
+    : query?.peerName
+      ? decodeURIComponent(query.peerName)
       : '对方'
   convId.value = isSupport.value ? 'support' : String(query?.convId || '')
   uni.setNavigationBarTitle({ title: peerName.value })

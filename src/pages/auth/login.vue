@@ -11,12 +11,13 @@ definePage({
     navigationStyle: 'custom',
     navigationBarBackgroundColor: '#EDF6FF',
     navigationBarTextStyle: 'black',
-    navigationBarTitleText: '登录',
+    navigationBarTitleText: '上海泊之湾公寓',
     backgroundColor: '#EDF6FF',
   },
 })
 
 const tokenStore = useTokenStore()
+const appName = import.meta.env.VITE_APP_TITLE
 const loading = ref(false)
 
 async function onWxLogin() {
@@ -52,17 +53,17 @@ async function onWxLogin() {
 </script>
 
 <template>
-  <view class="flex min-h-full flex-col items-center bg-#EDF6FF px-8">
+  <view class="min-h-full flex flex-col items-center bg-#EDF6FF px-8">
     <view class="mt-32 flex flex-col items-center">
-      <view class="flex h-20 w-20 items-center justify-center rounded-3xl bg-#1677FF text-3xl text-white shadow-lg">
-        家
+      <view class="h-20 w-20 flex items-center justify-center rounded-3xl bg-#1677FF text-3xl text-white shadow-lg">
+        泊
       </view>
-      <text class="mt-4 text-xl font-bold text-#303133">生生智家</text>
-      <text class="mt-1 text-sm text-#909399">安心找房 · 实时沟通 · 管家服务</text>
+      <text class="mt-4 text-center text-xl text-#303133 font-bold">{{ appName }}</text>
+      <text class="mt-1 text-center text-sm text-#909399">公寓找房 · 看房预约 · 管家服务</text>
     </view>
 
     <button
-      class="mt-24 flex w-full items-center justify-center gap-2 rounded-full bg-#07C160 py-3 text-base text-white"
+      class="mt-24 w-full flex items-center justify-center gap-2 rounded-full bg-#07C160 py-3 text-base text-white"
       :disabled="loading"
       @tap="onWxLogin"
     >

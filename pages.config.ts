@@ -11,7 +11,7 @@ export default defineUniPages({
   lazyCodeLoading: 'requiredComponents',
   globalStyle: {
     navigationStyle: 'default',
-    navigationBarTitleText: '生生智家',
+    navigationBarTitleText: '上海泊之湾公寓',
     navigationBarBackgroundColor: '#EDF6FF',
     navigationBarTextStyle: 'black',
     backgroundColor: '#EDF6FF',

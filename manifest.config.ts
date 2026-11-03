@@ -24,7 +24,7 @@ const {
 export default defineManifestConfig({
   'name': VITE_APP_TITLE,
   'appid': VITE_UNI_APPID,
-  'description': '',
+  'description': '上海泊之湾公寓：房源浏览、看房预约与管家沟通',
   'versionName': '1.0.0',
   'versionCode': '100',
   'transformPx': false,

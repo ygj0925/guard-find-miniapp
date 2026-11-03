@@ -7,12 +7,13 @@ import { fetchProperties, PROPERTY_TYPE_LABEL } from '@/api/property'
 
 definePage({
   style: {
-    navigationBarTitleText: '房源广场',
+    navigationBarTitleText: '上海泊之湾公寓',
     backgroundColor: '#F7F8FA',
   },
 })
 
 const PAGE_SIZE = 10
+const appName = import.meta.env.VITE_APP_TITLE
 const city = ref('')
 const filterType = ref<'all' | PropertyType>('all')
 const filterPriceType = ref<'all' | 'rent' | 'sale'>('all')
@@ -104,6 +105,10 @@ onReachBottom(() => {
 
 <template>
   <view class="min-h-full bg-#F7F8FA pb-4">
+    <view class="bg-white px-4 pb-3 pt-4">
+      <text class="block text-lg text-#303133 font-bold">{{ appName }}</text>
+      <text class="mt-1 block text-xs text-#909399">浏览公寓房源，预约看房，与管家在线沟通</text>
+    </view>
     <view class="flex items-center gap-2 bg-white px-4 py-2">
       <input
         v-model="city"
