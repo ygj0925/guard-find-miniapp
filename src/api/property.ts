@@ -10,7 +10,7 @@ export type RentalMode = 'whole' | 'shared'
 
 export interface Property {
   id: string | number
-  userId: string | number
+  userId?: string | number | null
   ownerNickname: string | null
   ownerAvatar: string | null
   ownerIsManager: boolean | null
@@ -132,7 +132,7 @@ export interface Booking extends BookingInput {
   propertyId: string | number
   propertyTitle: string
   userId: string | number
-  ownerId: string | number
+  ownerId?: string | number | null
   status: number
 }
 export function createBooking(id: Property['id'], data: BookingInput) {

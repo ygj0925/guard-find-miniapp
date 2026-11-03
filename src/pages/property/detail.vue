@@ -78,7 +78,7 @@ function book() {
 function callOwner() {
   const phone = property.value?.contactPhone
   if (!phone) {
-    uni.showToast({ title: '房东未留电话,可发私信', icon: 'none' })
+    uni.showToast({ title: property.value?.userId ? '房东未留电话,可发私信' : '暂未填写电话，可联系公寓管家', icon: 'none' })
     return
   }
   uni.makePhoneCall({ phoneNumber: phone })
@@ -89,6 +89,10 @@ function chatWithOwner() {
   token.updateNowTime()
   if (!token.hasLogin) {
     toLoginPage()
+    return
+  }
+  if (!property.value?.userId) {
+    uni.navigateTo({ url: '/pages/message/chat?mode=support' })
     return
   }
   const name = encodeURIComponent(
@@ -249,7 +253,7 @@ function infoChips(item: Property) {
           class="m-0 flex-1 rounded-full bg-#1677FF text-sm text-white"
           @tap="chatWithOwner"
         >
-          发私信聊
+          {{ property.userId ? '发私信聊' : '联系管家' }}
         </button>
       </view>
     </template>
