@@ -1,5 +1,5 @@
 {
-  "name": "sss-recruitment",
+  "name": "guard-find-miniapp",
   "type": "module",
   "version": "1.0.0",
   "unibest": {
@@ -31,7 +31,7 @@
   },
   "license": "MIT",
   "homepage": "https://unibest.tech",
-  "repository": "https://github.com/feige996/unibest",
+  "repository": "https://github.com/ygj0925/guard-find-miniapp.git",
   "bugs": {
     "url": "https://github.com/feige996/unibest/issues",
     "url-old": "https://github.com/codercup/unibest/issues"
@@ -42,9 +42,9 @@
   },
   "scripts": {
     "openapi": "openapi-ts",
-    "init-husky": "git init && husky",
+    "init-husky": "husky",
     "init-baseFiles": "node ./scripts/create-base-files.js",
-    "prepare": "pnpm init-husky & pnpm init-baseFiles",
+    "prepare": "pnpm init-husky && pnpm init-baseFiles",
     "predev": "pnpm init-baseFiles",
     "predev:app": "pnpm init-baseFiles",
     "predev:mp": "pnpm init-baseFiles",
@@ -116,7 +116,10 @@
     "lint:fix": "eslint --fix",
     "audit:css": "node scripts/audit-classes.cjs",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "pretest:run": "node scripts/create-base-files.js",
+    "pretype-check": "node scripts/create-base-files.js",
+    "prebuild:mp": "node scripts/create-base-files.js"
   },
   "dependencies": {
     "@alova/adapter-uniapp": "^2.0.14",

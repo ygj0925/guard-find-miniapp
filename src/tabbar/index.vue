@@ -11,44 +11,18 @@ defineOptions({
 })
 // #endif
 
-const AI_PAGE_PATH = '/pages/ai-chat/index'
-const AI_ENTRY_PATH = '/pages/ai-chat/entry'
-const AI_CHAT_ENTRY_PATH = 'pages/ai-chat/entry'
-const AI_CHAT_OPEN_PATH = '/pages/ai-chat/index?fromEntry=1'
 const shouldShowTabbar = ref(true)
 
 function syncTabbarVisibility() {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1]
   const currentPath = normalizeRoutePath(currentPage?.route)
-  shouldShowTabbar.value = currentPath !== AI_PAGE_PATH
-    && currentPath !== AI_ENTRY_PATH
-    && isPageTabbar(currentPath)
+  shouldShowTabbar.value = isPageTabbar(currentPath)
 }
 
 function handleClickBulge(index: number) {
   const item = tabbarList.value[index]
   if (!item) {
-    return
-  }
-
-  if (item.pagePath === AI_CHAT_ENTRY_PATH) {
-    uni.navigateTo({
-      url: AI_CHAT_OPEN_PATH,
-      animationType: 'none',
-      animationDuration: 0,
-      success() {
-        tabbarStore.setCurIdx(index)
-      },
-      fail() {
-        uni.switchTab({
-          url: item.pagePath,
-          success() {
-            tabbarStore.setCurIdx(index)
-          },
-        })
-      },
-    })
     return
   }
 

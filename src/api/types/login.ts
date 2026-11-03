@@ -64,6 +64,7 @@ export interface BehaviorCaptchaRequest {
 
 // 单Token响应类型
 export interface ISingleTokenRes {
+  isNewUser?: boolean
   token: string
   /** 当前后端 LoginResp 不返回有效期；有值时才使用本地过期预判。 */
   expiresIn?: number
@@ -71,6 +72,7 @@ export interface ISingleTokenRes {
 
 // 双Token响应类型
 export interface IDoubleTokenRes {
+  isNewUser?: boolean
   accessToken: string
   refreshToken: string
   accessExpiresIn: number // 访问令牌有效期(秒)
@@ -88,7 +90,7 @@ export type IAuthLoginRes = ISingleTokenRes | IDoubleTokenRes
 export type UserRole = string
 
 export interface IUserInfoRes {
-  userId: number
+  userId: string | number
   username: string
   nickname: string
   avatar?: string

@@ -94,11 +94,15 @@ export default function openDevTools(options = {}) {
 
   // 首次构建标记
   let isFirstBuild = true
+  let shouldOpen = false
 
   return {
     name: 'uni-devtools',
+    configResolved(config) {
+      shouldOpen = config.command === 'serve' || Boolean(config.build.watch)
+    },
     writeBundle() {
-      if (isFirstBuild && process.env.UNI_PLATFORM?.includes('mp')) {
+      if (shouldOpen && isFirstBuild && process.env.UNI_PLATFORM?.includes('mp')) {
         isFirstBuild = false
         _openDevTools(env, { wechatDevtoolsCliPath })
       }

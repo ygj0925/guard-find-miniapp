@@ -24,15 +24,15 @@
       "miniprogram-api-typings",
       "z-paging/types",
       "vitest/globals",
-      "./src/typings.d.ts",
-      "@wot-ui/ui/global"
+      "./src/typings.d.ts"
     ],
     "allowJs": true,
     "noImplicitThis": true,
     "outDir": "dist",
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "target": "ES2020"
   },
   "vueCompilerOptions": {
     "plugins": [

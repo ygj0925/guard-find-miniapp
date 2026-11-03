@@ -87,7 +87,7 @@ describe('tabbarItem', () => {
     const item: CustomTabBarItem = {
       ...baseItem,
       text: '职位',
-      pagePath: 'pages/position/index',
+      pagePath: 'pages/index/index',
       icon: 'i-carbon-task',
     }
     storeState.backToTopPath = item.pagePath
