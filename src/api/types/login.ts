@@ -94,6 +94,8 @@ export interface IUserInfoRes {
   username: string
   nickname: string
   avatar?: string
+  /** 房源管家(运营方)身份,来源 /miniapp/auth/me:仅管家可发布与维护房源 */
+  isPropertyManager?: boolean
   /** 是否已完成内部员工认证。 */
   isInternalEmployee?: boolean
   /** 已认证或待认证的企业邮箱。 */

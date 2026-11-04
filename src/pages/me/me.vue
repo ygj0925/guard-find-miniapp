@@ -26,6 +26,21 @@ onHide(() => {
 onUnload(() => {
   version++
 })
+/**
+ * 房源是运营方(公寓管家)维护的内容:非管家不展示发布入口。
+ * 服务端 /miniapp/property 的写入也已按 is_property_manager 拦截,这里只是避免用户点进去才报错。
+ */
+const menuEntries = computed(() => [
+  ...(profile.value?.isPropertyManager
+    ? [{ label: '发布房源', url: '/pages/property/edit' }]
+    : []),
+  { label: '我的房源', url: '/pages/property/personal?kind=mine' },
+  { label: '我的收藏', url: '/pages/property/personal?kind=favorites' },
+  { label: '浏览记录', url: '/pages/property/personal?kind=history' },
+  { label: '看房预约', url: '/pages/property/bookings' },
+  { label: '业务通知', url: '/pages/message/notices' },
+])
+
 function go(url: string) {
   if (requireLogin())
     uni.navigateTo({ url })
@@ -122,14 +137,7 @@ function onLogout() {
     <!-- 菜单 -->
     <view class="mx-3 overflow-hidden rounded-2xl bg-white shadow-sm -mt-6">
       <view
-        v-for="entry in [
-          { label: '发布房源', url: '/pages/property/edit' },
-          { label: '我的房源', url: '/pages/property/personal?kind=mine' },
-          { label: '我的收藏', url: '/pages/property/personal?kind=favorites' },
-          { label: '浏览记录', url: '/pages/property/personal?kind=history' },
-          { label: '看房预约', url: '/pages/property/bookings' },
-          { label: '业务通知', url: '/pages/message/notices' },
-        ]"
+        v-for="entry in menuEntries"
         :key="entry.url"
         class="border-b border-#F5F7FA border-solid p-4"
         @tap="go(entry.url)"

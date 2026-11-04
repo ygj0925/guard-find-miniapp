@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { PropertyInput } from '@/api/property'
-import { fetchPropertyDetail, fetchRegionTree, saveProperty, type RegionNode } from '@/api/property'
+import type { PropertyInput, RegionNode } from '@/api/property'
 
+import { getUserInfo } from '@/api/login'
+import { fetchPropertyDetail, fetchRegionTree, saveProperty } from '@/api/property'
 import { uploadPropertyImage } from '@/api/propertyImage'
 
 definePage({ style: { navigationBarTitleText: '编辑房源' } })
@@ -15,6 +16,8 @@ onUnload(() => {
 })
 const imageUrls = ref('')
 const facilities = ref('')
+// onLoad 会回填已存房源的地区文案,声明必须在其之前
+const regionLabel = ref('')
 const form = reactive<PropertyInput>({
   title: '',
   description: '',
@@ -66,6 +69,19 @@ const fields: {
   { key: 'contactPhone', label: '联系电话', max: 20 },
 ]
 onLoad(async (q) => {
+  // 房源由公寓管家维护:深链/历史入口进来也要拦,不给非管家渲染可保存的表单。
+  // 只在明确拿到 false 时拦截;取用户信息失败时放行到表单,由服务端闸门兜底报错。
+  try {
+    const me = await getUserInfo()
+    if (me.isPropertyManager === false) {
+      uni.showToast({ title: '仅公寓管家可维护房源', icon: 'none' })
+      uni.navigateBack()
+      return
+    }
+  }
+  catch {
+    // 交由 http 层处理登录态;此处不阻断加载
+  }
   id.value = String(q?.id || '')
   void loadRegionTree()
   if (!id.value) {
@@ -90,7 +106,6 @@ const regionTree = ref<RegionNode[]>([])
 const provinceIdx = ref(0)
 const cityIdx = ref(0)
 const districtIdx = ref(0)
-const regionLabel = ref('')
 const provinces = computed(() => regionTree.value.map(p => p.name))
 const cities = computed(() =>
   regionTree.value[provinceIdx.value]?.children?.map(c => c.name) ?? [],
