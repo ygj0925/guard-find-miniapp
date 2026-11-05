@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
  * 消息沟通页:会话列表(未读角标)+ 公寓管家固定入口。
- * WebSocket 推送到达时刷新列表,无推送时仍靠 onShow/下拉刷新。
+ * WebSocket 推送触发单飞刷新，可见期间轮询兜底。
  */
 import type { ImConversation } from '@/api/im'
 import type { ImSocketEvent } from '@/utils/imSocket'
-import { fetchConversations } from '@/api/im'
+import { fetchConversations, fetchSupportUnread } from '@/api/im'
 import { useTokenStore } from '@/store/token'
 import { debounce } from '@/utils/debounce'
-import { subscribeImSocket } from '@/utils/imSocket'
+import { disconnectImSocket, isImSocketConnected, subscribeImSocket } from '@/utils/imSocket'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 definePage({
@@ -19,66 +19,106 @@ definePage({
 })
 
 const conversations = ref<ImConversation[]>([])
+const supportUnread = ref(0)
 const loading = ref(false)
-
 const tokenStore = useTokenStore()
+let visible = false
+let version = 0
+let sessionToken = ''
+let inFlight: Promise<void> | undefined
+let queued = false
+let timer: ReturnType<typeof setTimeout> | undefined
+let unsubscribeSocket: (() => void) | undefined
 
 function requireLogin(): boolean {
-  tokenStore.updateNowTime()
-  if (tokenStore.hasLogin)
+  if (tokenStore.updateNowTime().validToken)
     return true
   toLoginPage()
   return false
 }
 
-let version = 0
-let unsubscribeSocket: (() => void) | undefined
-const refreshSoon = debounce(() => {
-  if (tokenStore.updateNowTime().hasLogin)
-    void load()
-}, 400)
+const refreshSoon = debounce(() => void load(), 400)
 
 function onSocketEvent(event: ImSocketEvent) {
-  if (event.action === 'new_message' || event.action === 'admin_message')
+  if (visible && (event.action === 'new_message' || event.action === 'admin_message'))
     refreshSoon()
 }
 
-function bindSocket() {
-  unsubscribeSocket?.()
-  unsubscribeSocket = subscribeImSocket(onSocketEvent, tokenStore.updateNowTime().validToken)
-}
-
-function unbindSocket() {
+function stop() {
+  version++
+  clearTimeout(timer)
+  timer = undefined
+  queued = false
+  inFlight = undefined
+  loading.value = false
   refreshSoon.cancel()
   unsubscribeSocket?.()
   unsubscribeSocket = undefined
 }
 
-onHide(() => {
-  version++
-  unbindSocket()
-})
-onUnload(() => {
-  version++
-  unbindSocket()
-})
-async function load() {
-  const current = ++version
-  if (!requireLogin()) {
-    conversations.value = []
+function activate() {
+  stop()
+  if (!visible || !requireLogin())
     return
+  sessionToken = tokenStore.validToken
+  unsubscribeSocket = subscribeImSocket(onSocketEvent, sessionToken, () => void load())
+  void load()
+}
+
+watch(() => tokenStore.validToken, (token) => {
+  if (token === sessionToken)
+    return
+  stop()
+  if (!token)
+    disconnectImSocket()
+  sessionToken = token
+  conversations.value = []
+  supportUnread.value = 0
+  if (visible)
+    activate()
+}, { flush: 'sync' })
+
+function hide() {
+  visible = false
+  stop()
+}
+onHide(hide)
+onUnload(hide)
+
+function load(): Promise<void> {
+  if (!visible || !sessionToken || tokenStore.updateNowTime().validToken !== sessionToken)
+    return Promise.resolve()
+  if (inFlight) {
+    queued = true
+    return inFlight
   }
+  clearTimeout(timer)
+  timer = undefined
+  const current = version
+  const token = sessionToken
+  const isCurrent = () => visible && current === version && tokenStore.validToken === token
   loading.value = true
-  try {
-    const data = await fetchConversations()
-    if (current === version && tokenStore.updateNowTime().hasLogin)
-      conversations.value = data
-  }
-  catch {
-  }
-  finally {
-    loading.value = false
-  }
+  inFlight = (async () => {
+    try {
+      const [data, unread] = await Promise.all([fetchConversations(), fetchSupportUnread()])
+      if (isCurrent()) {
+        conversations.value = data
+        supportUnread.value = unread
+      }
+    }
+    catch {
+    }
+    finally {
+      if (isCurrent()) {
+        loading.value = false
+        inFlight = undefined
+        const delay = queued ? 0 : isImSocketConnected() ? 15000 : 3000
+        queued = false
+        timer = setTimeout(() => void load(), delay)
+      }
+    }
+  })()
+  return inFlight
 }
 
 function goChat(conv: ImConversation) {
@@ -97,8 +137,8 @@ function goSupport() {
 }
 
 onShow(() => {
-  void load()
-  bindSocket()
+  visible = true
+  activate()
 })
 onPullDownRefresh(() => {
   load().finally(() => uni.stopPullDownRefresh())
@@ -122,6 +162,9 @@ onPullDownRefresh(() => {
         <text class="mt-0.5 block text-xs text-#909399">
           房源咨询 · 看房预约 · 问题反馈
         </text>
+      </view>
+      <view v-if="supportUnread > 0" class="mr-2 min-w-20px rounded-full bg-#FA5151 px-1 text-center text-10px text-white">
+        {{ supportUnread > 99 ? '99+' : supportUnread }}
       </view>
       <text class="text-xs text-#C0C4CC">›</text>
     </view>

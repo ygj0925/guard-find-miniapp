@@ -46,6 +46,10 @@ export function fetchSupportMessages(afterId?: string | number) {
   return http.get<ImMessage[]>('/miniapp/im/support/messages', afterId ? { afterId } : undefined)
 }
 
+export function fetchSupportUnread() {
+  return http.get<number>('/miniapp/im/support/unread')
+}
+
 /** 联系客服:发送消息 */
 export function sendSupportMessage(content: string) {
   return http.post<ImMessage>('/miniapp/im/support/message', { content })

@@ -23,35 +23,24 @@ export type ImSocketEvent = ImSocketNewMessage | ImSocketAdminMessage
 export type ImSocketListener = (event: ImSocketEvent) => void
 
 const HEARTBEAT_MS = 25000
+const CONNECT_TIMEOUT_MS = 10000
+const PONG_TIMEOUT_MS = 10000
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 30000
 const DISCONNECT_GRACE_MS = 2000
 
-/** uni 的类型声明把 connectSocket 标成 Promise,运行时返回的仍是 SocketTask */
-interface ImSocketTask {
-  onOpen: (callback: () => void) => void
-  onMessage: (callback: (message: { data: unknown }) => void) => void
-  onClose: (callback: () => void) => void
-  onError: (callback: () => void) => void
-  send: (options: { data: string }) => void
-  close: (options?: Record<string, never>) => void
-}
-
-function isSocketTask(value: unknown): value is ImSocketTask {
-  const candidate = value as ImSocketTask | undefined
-  return !!candidate && typeof candidate.onOpen === 'function' && typeof candidate.send === 'function'
-}
-
-let task: ImSocketTask | null = null
-let unsupported = false
+let task: UniApp.SocketTask | null = null
 let status: 'idle' | 'open' = 'idle'
 let currentToken = ''
 let attemptId = 0
 let reconnectAttempt = 0
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined
 let disconnectTimer: ReturnType<typeof setTimeout> | undefined
+let connectTimer: ReturnType<typeof setTimeout> | undefined
+let pongTimer: ReturnType<typeof setTimeout> | undefined
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined
 const listeners = new Set<ImSocketListener>()
+const connectionListeners = new Map<ImSocketListener, () => void>()
 
 function normalizeToken(token: string) {
   return typeof token === 'string' ? token.trim().replace(/^Bearer\s+/i, '').trim() : ''
@@ -114,19 +103,19 @@ export function parseImSocketEvent(raw: unknown): ImSocketEvent | null {
 }
 
 function clearTimers() {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = undefined
-  }
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer)
-    heartbeatTimer = undefined
-  }
+  clearTimeout(reconnectTimer)
+  clearTimeout(disconnectTimer)
+  clearTimeout(connectTimer)
+  clearTimeout(pongTimer)
+  clearInterval(heartbeatTimer)
+  reconnectTimer = undefined
+  disconnectTimer = undefined
+  connectTimer = undefined
+  pongTimer = undefined
+  heartbeatTimer = undefined
 }
 
-function closeTask() {
-  const current = task
-  task = null
+function closeTask(current: UniApp.SocketTask | null) {
   if (!current)
     return
   try {
@@ -150,20 +139,22 @@ function scheduleReconnect() {
   }, delay)
 }
 
-function handleDrop() {
-  if (task === null)
+function handleDrop(id: number, socket: UniApp.SocketTask | null) {
+  if (id !== attemptId || task !== socket)
     return
+  attemptId += 1
   status = 'idle'
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer)
-    heartbeatTimer = undefined
-  }
-  closeTask()
-  scheduleReconnect()
+  task = null
+  clearTimers()
+  closeTask(socket)
+  if (listeners.size === 0)
+    disconnectImSocket()
+  else
+    scheduleReconnect()
 }
 
 function openSocket(token: string) {
-  if (unsupported || typeof uni === 'undefined' || typeof uni.connectSocket !== 'function')
+  if (typeof uni === 'undefined' || typeof uni.connectSocket !== 'function')
     return
   const url = buildImSocketUrl(getEnvWsUrl(), token)
   if (!url)
@@ -171,58 +162,70 @@ function openSocket(token: string) {
 
   attemptId += 1
   const id = attemptId
-  closeTask()
-  clearTimers()
-  currentToken = token
+  const previous = task
+  task = null
   status = 'idle'
+  clearTimers()
+  closeTask(previous)
+  currentToken = token
 
+  let socket: UniApp.SocketTask | null = null
   try {
-    const socket = uni.connectSocket({ url })
-    if (!isSocketTask(socket)) {
-      // 平台不返回 SocketTask 时无法接收推送,保持页面轮询兜底
-      unsupported = true
-      status = 'idle'
+    socket = uni.connectSocket({
+      url,
+      fail: () => handleDrop(id, socket),
+    })
+    if (id !== attemptId) {
+      closeTask(socket)
       return
     }
     task = socket
-    socket.onOpen(() => {
-      if (id !== attemptId)
+    const current = socket
+    const isCurrent = () => id === attemptId && task === current
+    const drop = () => handleDrop(id, current)
+    connectTimer = setTimeout(drop, CONNECT_TIMEOUT_MS)
+    current.onOpen(() => {
+      if (!isCurrent() || status === 'open')
         return
+      clearTimeout(connectTimer)
+      connectTimer = undefined
       status = 'open'
       reconnectAttempt = 0
       heartbeatTimer = setInterval(() => {
-        if (id !== attemptId || status !== 'open' || !task)
+        if (!isCurrent() || status !== 'open')
           return
+        pongTimer = setTimeout(drop, PONG_TIMEOUT_MS)
         try {
-          task.send({ data: '{"action":"ping"}' })
+          current.send({ data: '{"action":"ping"}', fail: drop })
         }
         catch {
-          handleDrop()
+          drop()
         }
       }, HEARTBEAT_MS)
+      connectionListeners.forEach(listener => listener())
     })
-    socket.onMessage((message) => {
-      if (id !== attemptId)
+    current.onMessage((message) => {
+      if (!isCurrent() || status !== 'open')
         return
+      try {
+        if (typeof message.data === 'string' && JSON.parse(message.data)?.action === 'pong') {
+          clearTimeout(pongTimer)
+          pongTimer = undefined
+          return
+        }
+      }
+      catch {
+        return
+      }
       const event = parseImSocketEvent(message.data)
       if (event)
         listeners.forEach(listener => listener(event))
     })
-    socket.onClose(() => {
-      if (id !== attemptId)
-        return
-      handleDrop()
-    })
-    socket.onError(() => {
-      if (id !== attemptId)
-        return
-      handleDrop()
-    })
+    current.onClose(drop)
+    current.onError(drop)
   }
   catch {
-    status = 'idle'
-    task = null
-    scheduleReconnect()
+    handleDrop(id, socket)
   }
 }
 
@@ -240,8 +243,10 @@ export function connectImSocket(token: string) {
  * 订阅实时推送:首个订阅者触发连接,最后一个取消后延迟断开,
  * 避免聊天页与列表页互相跳转时反复重连。
  */
-export function subscribeImSocket(listener: ImSocketListener, token: string) {
+export function subscribeImSocket(listener: ImSocketListener, token: string, onConnected?: () => void) {
   listeners.add(listener)
+  if (onConnected)
+    connectionListeners.set(listener, onConnected)
   if (disconnectTimer) {
     clearTimeout(disconnectTimer)
     disconnectTimer = undefined
@@ -250,6 +255,7 @@ export function subscribeImSocket(listener: ImSocketListener, token: string) {
 
   return () => {
     listeners.delete(listener)
+    connectionListeners.delete(listener)
     if (listeners.size > 0)
       return
     if (disconnectTimer)
@@ -265,14 +271,12 @@ export function subscribeImSocket(listener: ImSocketListener, token: string) {
 export function disconnectImSocket() {
   attemptId += 1
   clearTimers()
-  if (disconnectTimer) {
-    clearTimeout(disconnectTimer)
-    disconnectTimer = undefined
-  }
   status = 'idle'
   currentToken = ''
   reconnectAttempt = 0
-  closeTask()
+  const current = task
+  task = null
+  closeTask(current)
 }
 
 export function isImSocketConnected() {
