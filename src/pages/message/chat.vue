@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /**
- * 聊天页:气泡流 + 输入条 + 3 秒轮询。
+ * 聊天页:气泡流 + 输入条,WebSocket 实时推送 + 轮询兜底。
  * 三种入口:convId(会话)、peerId(房源详情,进入即建会话)、mode=support(联系公寓管家)。
  */
 import type { ImMessage } from '@/api/im'
+import type { ImSocketEvent } from '@/utils/imSocket'
 import { getUserInfo } from '@/api/login'
 import { useTokenStore } from '@/store/token'
+import { isImSocketConnected, subscribeImSocket } from '@/utils/imSocket'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { mergeMessages } from '@/utils/messageCursor'
 import {
@@ -36,6 +38,9 @@ let active = false
 let generation = 0
 let timer: ReturnType<typeof setTimeout> | undefined
 let boot: Promise<void> = Promise.resolve()
+let unsubscribeSocket: (() => void) | undefined
+let pollInFlight = false
+let refreshQueued = false
 
 function initSession() {
   boot = (async () => {
@@ -76,6 +81,7 @@ watch(
   (hasLogin) => {
     if (hasLogin && !convId.value) {
       initSession()
+      bindSocket()
       active = true
       const current = ++generation
       void start(current)
@@ -84,18 +90,50 @@ watch(
 )
 onShow(() => {
   active = true
+  bindSocket()
   const current = ++generation
   void start(current)
 })
 function stop() {
   active = false
   generation++
+  refreshQueued = false
   if (timer)
     clearTimeout(timer)
   timer = undefined
+  unsubscribeSocket?.()
+  unsubscribeSocket = undefined
 }
 onHide(stop)
 onUnload(stop)
+function bindSocket() {
+  unsubscribeSocket?.()
+  unsubscribeSocket = subscribeImSocket(onSocketEvent, tokenStore.updateNowTime().validToken)
+}
+function onSocketEvent(event: ImSocketEvent) {
+  if (!active)
+    return
+  if (isSupport.value) {
+    if (event.action === 'admin_message')
+      refreshNow()
+    return
+  }
+  if (event.action === 'new_message' && String(event.conversationId) === String(convId.value))
+    refreshNow()
+}
+/** 推送到达时立即补拉一次(服务端 REST 仍是消息的权威来源) */
+function refreshNow() {
+  if (!active || !convId.value)
+    return
+  if (pollInFlight) {
+    refreshQueued = true
+    return
+  }
+  if (timer)
+    clearTimeout(timer)
+  timer = undefined
+  void poll(generation)
+}
 async function start(current: number) {
   try {
     await boot
@@ -109,6 +147,9 @@ async function start(current: number) {
   }
 }
 async function poll(current: number) {
+  if (current !== generation || !active || !convId.value)
+    return
+  pollInFlight = true
   let count = 0
   try {
     const msgs = isSupport.value
@@ -126,8 +167,18 @@ async function poll(current: number) {
   catch {
   }
   finally {
-    if (current === generation && active)
-      timer = setTimeout(() => void poll(current), count === 100 ? 50 : 3000)
+    pollInFlight = false
+    if (current === generation && active) {
+      if (refreshQueued) {
+        refreshQueued = false
+        timer = setTimeout(() => void poll(generation), 0)
+      }
+      else {
+        // 推送在线时只做低频兜底;断线后回到 3 秒轮询
+        const delay = count === 100 ? 50 : isImSocketConnected() ? 15000 : 3000
+        timer = setTimeout(() => void poll(current), delay)
+      }
+    }
   }
 }
 async function onSend() {

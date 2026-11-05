@@ -1,10 +1,14 @@
 <script setup lang="ts">
 /**
  * 消息沟通页:会话列表(未读角标)+ 公寓管家固定入口。
+ * WebSocket 推送到达时刷新列表,无推送时仍靠 onShow/下拉刷新。
  */
 import type { ImConversation } from '@/api/im'
+import type { ImSocketEvent } from '@/utils/imSocket'
 import { fetchConversations } from '@/api/im'
 import { useTokenStore } from '@/store/token'
+import { debounce } from '@/utils/debounce'
+import { subscribeImSocket } from '@/utils/imSocket'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 definePage({
@@ -28,11 +32,35 @@ function requireLogin(): boolean {
 }
 
 let version = 0
+let unsubscribeSocket: (() => void) | undefined
+const refreshSoon = debounce(() => {
+  if (tokenStore.updateNowTime().hasLogin)
+    void load()
+}, 400)
+
+function onSocketEvent(event: ImSocketEvent) {
+  if (event.action === 'new_message' || event.action === 'admin_message')
+    refreshSoon()
+}
+
+function bindSocket() {
+  unsubscribeSocket?.()
+  unsubscribeSocket = subscribeImSocket(onSocketEvent, tokenStore.updateNowTime().validToken)
+}
+
+function unbindSocket() {
+  refreshSoon.cancel()
+  unsubscribeSocket?.()
+  unsubscribeSocket = undefined
+}
+
 onHide(() => {
   version++
+  unbindSocket()
 })
 onUnload(() => {
   version++
+  unbindSocket()
 })
 async function load() {
   const current = ++version
@@ -68,7 +96,10 @@ function goSupport() {
   })
 }
 
-onShow(() => load())
+onShow(() => {
+  void load()
+  bindSocket()
+})
 onPullDownRefresh(() => {
   load().finally(() => uni.stopPullDownRefresh())
 })

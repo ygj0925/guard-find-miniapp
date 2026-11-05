@@ -163,11 +163,11 @@ export function getEnvBaseUrl() {
 }
 
 /**
- * 站内消息 WebSocket 地址：显式配置 VITE_SERVER_WS_URL 时优先使用（可按渠道单独部署），
+ * 站内消息 WebSocket 服务根地址：显式配置 VITE_SERVER_WS_URL 时优先使用（可按渠道单独部署），
  * 否则从当前生效的 baseUrl 推导（只把 http/https 换成 ws/wss，其余原样保留），
  * 保证跟随 getEnvBaseUrl() 的渠道判断结果，不会体验版/正式版连到开发环境。
- * 后端 WS 端点由 Spring WebSocketConfigurer 注册在 /websocket，走 servlet context，
- * 因此必须保留 baseUrl 里的 context-path（如 /sss-recruitment），不能只取协议+host。
+ * 后端 IM 端点为 /miniapp/ws/im?token=...（握手校验 Sa-Token），由 utils/imSocket.ts 拼接；
+ * baseUrl 若带统一前缀（如 /api）必须保留，因此这里只做协议替换，不能只取协议+host。
  */
 export function getEnvWsUrl() {
   const configured = import.meta.env.VITE_SERVER_WS_URL
