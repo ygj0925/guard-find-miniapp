@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 我的页面:用户信息 + 公寓管家入口 + 退出登录。
+ * 我的页面:用户信息与常用服务,管家独立房源管理入口。
  */
 import type { IUserInfoRes } from '@/api/types/login'
 import { getUserInfo, logout } from '@/api/login'
@@ -19,6 +19,7 @@ const userStore = useUserStore()
 const appName = import.meta.env.VITE_APP_TITLE
 const tokenStore = useTokenStore()
 const profile = ref<IUserInfoRes | null>(null)
+const failedAvatar = ref('')
 let version = 0
 onHide(() => {
   version++
@@ -26,20 +27,11 @@ onHide(() => {
 onUnload(() => {
   version++
 })
-/**
- * 房源是运营方(公寓管家)维护的内容:非管家不展示发布入口。
- * 服务端 /miniapp/property 的写入也已按 is_property_manager 拦截,这里只是避免用户点进去才报错。
- */
-const menuEntries = computed(() => [
-  ...(profile.value?.isPropertyManager
-    ? [{ label: '发布房源', url: '/pages/property/edit' }]
-    : []),
-  { label: '我的房源', url: '/pages/property/personal?kind=mine' },
-  { label: '我的收藏', url: '/pages/property/personal?kind=favorites' },
-  { label: '浏览记录', url: '/pages/property/personal?kind=history' },
-  { label: '看房预约', url: '/pages/property/bookings' },
-  { label: '业务通知', url: '/pages/message/notices' },
-])
+const shortcuts = [
+  { label: '我的收藏', icon: 'i-carbon-star', url: '/pages/property/personal?kind=favorites' },
+  { label: '浏览记录', icon: 'i-carbon-time', url: '/pages/property/personal?kind=history' },
+  { label: '看房预约', icon: 'i-carbon-calendar', url: '/pages/property/bookings' },
+]
 
 function go(url: string) {
   if (requireLogin())
@@ -53,9 +45,10 @@ onShow(() => {
     profile.value = null
     return
   }
+  const accessToken = tokenStore.validToken
   getUserInfo()
     .then((info) => {
-      if (current !== version || !tokenStore.updateNowTime().hasLogin)
+      if (current !== version || !tokenStore.updateNowTime().hasLogin || accessToken !== tokenStore.validToken)
         return
       profile.value = info
       userStore.setUserInfo(info)
@@ -101,63 +94,111 @@ function onLogout() {
 </script>
 
 <template>
-  <view class="min-h-full bg-#F7F8FA pb-10">
-    <!-- 用户卡片 -->
-    <view class="from-#EDF6FF to-#F7F8FA bg-gradient-to-b px-6 pb-10 pt-10">
-      <view class="flex items-center gap-4" @tap="requireLogin">
-        <image
-          v-if="profile && profile.avatar"
-          :src="profile.avatar"
-          class="h-16 w-16 rounded-full bg-white"
-        />
-        <view
-          v-else
-          class="h-16 w-16 flex items-center justify-center rounded-full bg-white text-xl text-#1677FF"
+  <view class="app-tab-page bg-app-surface text-app-ink">
+    <view class="app-content pb-48rpx pt-40rpx">
+      <text class="mb-40rpx block text-64rpx font-bold leading-80rpx">我的</text>
+
+      <view class="app-panel overflow-hidden p-32rpx">
+        <view class="min-w-0 flex items-center gap-24rpx py-8rpx">
+          <image
+            v-if="tokenStore.hasLogin && profile?.avatar && profile.avatar !== failedAvatar"
+            :src="profile.avatar"
+            mode="aspectFill"
+            class="h-144rpx w-144rpx shrink-0 rounded-full bg-app-soft"
+            aria-hidden="true"
+            @error="failedAvatar = profile.avatar"
+          />
+          <view
+            v-else
+            class="h-144rpx w-144rpx flex shrink-0 items-center justify-center rounded-full bg-app-soft text-brand-blue"
+            aria-hidden="true"
+          >
+            <view class="i-carbon-user h-72rpx w-72rpx" />
+          </view>
+          <view class="min-w-0 flex-1">
+            <text class="block truncate text-40rpx font-bold leading-56rpx">
+              {{ tokenStore.hasLogin ? (profile?.nickname || '已登录用户') : '未登录' }}
+            </text>
+            <text class="mt-8rpx block text-28rpx text-app-ink-soft leading-40rpx">
+              {{ tokenStore.hasLogin ? (profile?.phone || '收藏房源，查看预约与消息') : '登录后使用收藏与消息服务' }}
+            </text>
+          </view>
+        </view>
+        <button
+          v-if="!tokenStore.hasLogin"
+          class="app-tap mt-24rpx app-primary-button w-full"
+          aria-label="登录账号"
+          @tap="requireLogin"
         >
-          人
-        </view>
-        <view>
-          <text class="block text-lg text-#303133 font-bold">
-            {{ profile && profile.nickname ? profile.nickname : "未登录" }}
-          </text>
-          <text class="mt-1 block text-xs text-#909399">
-            {{
-              profile && profile.phone
-                ? profile.phone
-                : "点击登录后使用私信与收藏"
-            }}
-          </text>
-        </view>
-      </view>
-    </view>
+          登录账号
+        </button>
 
-    <view v-if="profile" class="px-6 pb-8 text-xs text-gray">
-      我的用户 ID：{{ profile.userId }}
-    </view>
-    <!-- 菜单 -->
-    <view class="mx-3 overflow-hidden rounded-2xl bg-white shadow-sm -mt-6">
-      <view
-        v-for="entry in menuEntries"
-        :key="entry.url"
-        class="border-b border-#F5F7FA border-solid p-4"
-        @tap="go(entry.url)"
-      >
-        {{ entry.label }} ›
+        <view class="mt-32rpx flex border-0 border-t border-app-border border-solid pt-16rpx">
+          <button
+            v-for="entry in shortcuts"
+            :key="entry.url"
+            class="app-tap min-h-144rpx min-w-0 flex flex-1 flex-col items-center justify-center gap-16rpx border-0 border-r border-app-border border-solid bg-white px-8rpx py-24rpx text-center leading-normal last:border-r-0"
+            :aria-label="entry.label"
+            @tap="go(entry.url)"
+          >
+            <view :class="entry.icon" class="h-56rpx w-56rpx text-brand-blue" aria-hidden="true" />
+            <text class="block text-28rpx text-app-ink leading-40rpx">{{ entry.label }}</text>
+          </button>
+        </view>
       </view>
-      <view
-        class="flex items-center border-b border-#F5F7FA border-solid p-4"
-        @tap="goSupport"
-      >
-        <text class="flex-1 text-15px text-#303133">联系公寓管家</text>
-        <text class="text-xs text-#C0C4CC">›</text>
-      </view>
-      <view v-if="profile" class="flex items-center p-4" @tap="onLogout">
-        <text class="flex-1 text-15px text-#FA5151">退出登录</text>
-      </view>
-    </view>
 
-    <view class="mt-6 text-center text-xs text-#C0C4CC">
-      {{ appName }} · 管家服务
+      <view class="mt-40rpx">
+        <text class="block app-section-title">我的服务</text>
+        <view class="mt-20rpx app-panel overflow-hidden">
+          <button
+            class="app-tap min-h-136rpx w-full flex items-center gap-24rpx border-0 border-b border-app-border border-solid bg-white p-32rpx text-left leading-normal"
+            aria-label="查看业务通知"
+            @tap="go('/pages/message/notices')"
+          >
+            <view class="i-carbon-notification h-48rpx w-48rpx shrink-0 text-brand-blue" aria-hidden="true" />
+            <text class="min-w-0 flex-1 text-32rpx text-app-ink leading-44rpx">业务通知</text>
+            <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
+          </button>
+          <button
+            class="app-tap min-h-136rpx w-full flex items-center gap-24rpx bg-white p-32rpx text-left leading-normal"
+            aria-label="联系公寓管家"
+            @tap="goSupport"
+          >
+            <view class="i-carbon-headset h-48rpx w-48rpx shrink-0 text-brand-blue" aria-hidden="true" />
+            <text class="min-w-0 flex-1 text-32rpx text-app-ink leading-44rpx">联系公寓管家</text>
+            <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
+          </button>
+        </view>
+      </view>
+
+      <!-- 仅管家可见,发布与维护沿用现有房源列表能力 -->
+      <view v-if="tokenStore.hasLogin && profile?.isPropertyManager" class="mt-24rpx app-panel overflow-hidden">
+        <button
+          class="app-tap min-h-152rpx w-full flex items-center gap-24rpx bg-white p-32rpx text-left leading-normal"
+          aria-label="房源管理，发布与维护房源"
+          @tap="go('/pages/property/personal?kind=mine')"
+        >
+          <view class="i-carbon-building h-48rpx w-48rpx shrink-0 text-brand-blue" aria-hidden="true" />
+          <view class="min-w-0 flex-1">
+            <text class="block text-32rpx text-app-ink font-semibold leading-44rpx">房源管理</text>
+            <text class="mt-8rpx block text-28rpx text-app-muted leading-40rpx">发布与维护房源</text>
+          </view>
+          <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
+        </button>
+      </view>
+
+      <button
+        v-if="tokenStore.hasLogin"
+        class="app-tap mt-32rpx min-h-44px w-full flex items-center justify-center gap-16rpx bg-transparent py-24rpx text-28rpx text-app-muted leading-40rpx"
+        aria-label="退出当前账号登录"
+        @tap="onLogout"
+      >
+        <view class="i-carbon-logout h-36rpx w-36rpx shrink-0" aria-hidden="true" />
+        <text>退出登录</text>
+      </button>
+      <view class="mt-40rpx text-center text-24rpx text-app-muted leading-36rpx">
+        {{ appName }} · 管家服务
+      </view>
     </view>
   </view>
 </template>

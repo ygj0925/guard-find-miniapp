@@ -12,9 +12,9 @@ export default defineUniPages({
   globalStyle: {
     navigationStyle: 'default',
     navigationBarTitleText: '上海泊之湾公寓',
-    navigationBarBackgroundColor: '#EDF6FF',
+    navigationBarBackgroundColor: '#F7F8FA',
     navigationBarTextStyle: 'black',
-    backgroundColor: '#EDF6FF',
+    backgroundColor: '#F7F8FA',
   },
   easycom: {
     autoscan: true,

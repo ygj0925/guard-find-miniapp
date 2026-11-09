@@ -81,8 +81,8 @@ onMounted(() => {
 })
 // #endif
 
-const activeColor = 'var(--wot-color-theme, #1890ff)'
-const inactiveColor = '#666'
+const activeColor = 'var(--app-brand-blue)'
+const inactiveColor = 'var(--app-muted)'
 
 function getColorByIndex(index: number) {
   return tabbarStore.curIdx === index ? activeColor : inactiveColor
@@ -99,13 +99,15 @@ onMounted(syncTabbarVisibility)
 
 <template>
   <view v-if="customTabbarEnable && shouldShowTabbar">
-    <view class="fixed inset-x-0 bottom-0 z-1000 box-border border-t-1px border-t-[#eee] border-t-solid bg-white" @touchmove.stop.prevent>
-      <view class="h-50px flex items-center">
-        <view
+    <view class="fixed inset-x-0 bottom-0 z-1000 box-border border-t-1rpx border-app-border border-t-solid bg-white" @touchmove.stop.prevent>
+      <view class="mx-auto h-54px max-w-860px flex items-center">
+        <button
           v-for="(item, index) in tabbarList"
           :key="index"
-          class="flex flex-1 flex-col items-center justify-center"
+          class="app-tap h-full flex flex-1 flex-col items-center justify-center rounded-none bg-white p-0"
           :style="{ color: getColorByIndex(index) }"
+          :aria-label="item.text"
+          :aria-selected="tabbarStore.curIdx === index"
           @click="handleClick(index)"
         >
           <view v-if="item.isBulge" class="relative">
@@ -114,7 +116,7 @@ onMounted(syncTabbarVisibility)
             </view>
           </view>
           <TabbarItem v-else :item="item" :index="index" class="relative px-3 text-center" />
-        </view>
+        </button>
       </view>
 
       <view class="pb-safe" />

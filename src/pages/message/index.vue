@@ -15,12 +15,15 @@ definePage({
   style: {
     navigationBarTitleText: '消息',
     backgroundColor: '#F7F8FA',
+    enablePullDownRefresh: true,
   },
 })
 
 const conversations = ref<ImConversation[]>([])
 const supportUnread = ref(0)
+const failedAvatars = ref<string[]>([])
 const loading = ref(false)
+const error = ref(false)
 const tokenStore = useTokenStore()
 let visible = false
 let version = 0
@@ -98,6 +101,7 @@ function load(): Promise<void> {
   const token = sessionToken
   const isCurrent = () => visible && current === version && tokenStore.validToken === token
   loading.value = true
+  error.value = false
   inFlight = (async () => {
     try {
       const [data, unread] = await Promise.all([fetchConversations(), fetchSupportUnread()])
@@ -107,6 +111,8 @@ function load(): Promise<void> {
       }
     }
     catch {
+      if (isCurrent())
+        error.value = true
     }
     finally {
       if (isCurrent()) {
@@ -136,6 +142,25 @@ function goSupport() {
   })
 }
 
+function goNotices() {
+  if (!requireLogin())
+    return
+  uni.navigateTo({ url: '/pages/message/notices' })
+}
+
+function conversationTime(value: ImConversation['lastTime']): string {
+  if (!value)
+    return ''
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+  if (!match)
+    return value
+  const [, year, month, day, hour, minute] = match
+  const now = new Date()
+  if (Number(year) === now.getFullYear() && Number(month) === now.getMonth() + 1 && Number(day) === now.getDate())
+    return `${hour}:${minute}`
+  return Number(year) === now.getFullYear() ? `${month}-${day} ${hour}:${minute}` : `${year}-${month}-${day}`
+}
+
 onShow(() => {
   visible = true
   activate()
@@ -146,82 +171,137 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <view class="min-h-full bg-#F7F8FA pb-4">
-    <!-- 公寓管家 -->
-    <view
-      class="mx-3 mt-3 flex items-center rounded-2xl bg-white p-4 shadow-sm"
-      @tap="goSupport"
-    >
-      <view
-        class="h-12 w-12 flex items-center justify-center rounded-full bg-#1677FF text-lg text-white"
-      >
-        泊
-      </view>
-      <view class="ml-3 flex-1">
-        <text class="block text-15px text-#303133 font-semibold">公寓管家</text>
-        <text class="mt-0.5 block text-xs text-#909399">
-          房源咨询 · 看房预约 · 问题反馈
+  <view class="app-tab-page bg-app-surface text-app-ink">
+    <view class="app-content pb-48rpx pt-40rpx">
+      <view class="mb-40rpx">
+        <text class="block text-64rpx font-bold leading-80rpx">消息</text>
+        <text class="mt-12rpx block text-28rpx text-app-ink-soft leading-40rpx">
+          房源咨询与看房动态
         </text>
       </view>
-      <view v-if="supportUnread > 0" class="mr-2 min-w-20px rounded-full bg-#FA5151 px-1 text-center text-10px text-white">
-        {{ supportUnread > 99 ? '99+' : supportUnread }}
-      </view>
-      <text class="text-xs text-#C0C4CC">›</text>
-    </view>
 
-    <!-- 会话列表 -->
-    <view
-      v-if="conversations.length"
-      class="mx-3 mt-3 overflow-hidden rounded-2xl bg-white shadow-sm"
-    >
-      <view
-        v-for="conv in conversations"
-        :key="conv.id"
-        class="flex items-center border-b border-#F5F7FA border-solid p-4 last:border-b-0"
-        @tap="goChat(conv)"
-      >
-        <view class="relative">
-          <image
-            v-if="conv.peerAvatar"
-            :src="conv.peerAvatar"
-            class="h-12 w-12 rounded-full bg-#EDF6FF"
-          />
-          <view
-            v-else
-            class="h-12 w-12 flex items-center justify-center rounded-full bg-#EDF6FF text-base text-#1677FF"
-          >
-            {{ (conv.peerNickname || "用").slice(0, 1) }}
+      <!-- 固定服务入口不随会话状态变化 -->
+      <view class="app-panel overflow-hidden">
+        <button
+          class="app-tap min-h-160rpx w-full flex items-center gap-24rpx bg-white p-32rpx text-left leading-normal"
+          :aria-label="supportUnread > 0 ? `联系公寓管家，${supportUnread}条未读消息` : '联系公寓管家'"
+          @tap="goSupport"
+        >
+          <view class="h-80rpx w-80rpx flex shrink-0 items-center justify-center text-brand-blue" aria-hidden="true">
+            <view class="i-carbon-headset h-64rpx w-64rpx" />
           </view>
-          <view
-            v-if="conv.unreadCount > 0"
-            class="absolute h-5 min-w-20px flex items-center justify-center rounded-full bg-#FA5151 px-1 -right-1 -top-1"
-          >
-            <text class="text-10px text-white">
-              {{
-                conv.unreadCount > 99 ? "99+" : conv.unreadCount
-              }}
+          <view class="min-w-0 flex-1">
+            <text class="block text-36rpx text-app-ink font-semibold leading-48rpx">公寓管家</text>
+            <text class="mt-8rpx block text-28rpx text-app-ink-soft leading-40rpx">
+              房源咨询 · 看房预约
             </text>
           </view>
+          <view v-if="supportUnread > 0" class="h-40rpx min-w-40rpx shrink-0 rounded-full bg-current px-8rpx text-center text-app-danger">
+            <text class="block text-22rpx text-white leading-40rpx">
+              {{ supportUnread > 99 ? '99+' : supportUnread }}
+            </text>
+          </view>
+          <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
+        </button>
+      </view>
+      <view class="mt-16rpx app-panel overflow-hidden">
+        <button
+          class="app-tap min-h-160rpx w-full flex items-center gap-24rpx bg-white p-32rpx text-left leading-normal"
+          aria-label="查看业务通知"
+          @tap="goNotices"
+        >
+          <view class="h-80rpx w-80rpx flex shrink-0 items-center justify-center text-brand-blue" aria-hidden="true">
+            <view class="i-carbon-notification h-64rpx w-64rpx" />
+          </view>
+          <view class="min-w-0 flex-1">
+            <text class="block text-36rpx text-app-ink font-semibold leading-48rpx">业务通知</text>
+            <text class="mt-8rpx block text-28rpx text-app-ink-soft leading-40rpx">
+              预约确认等服务通知
+            </text>
+          </view>
+          <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
+        </button>
+      </view>
+
+      <view class="mt-40rpx">
+        <text class="block app-section-title">会话</text>
+        <view v-if="conversations.length" class="mt-20rpx app-panel overflow-hidden">
+          <button
+            v-for="conv in conversations"
+            :key="conv.id"
+            class="app-tap min-h-160rpx w-full flex items-center gap-24rpx border-0 border-b border-app-border border-solid bg-white p-32rpx text-left leading-normal last:border-b-0"
+            :aria-label="`与${conv.peerNickname || '用户'}的会话${conv.unreadCount > 0 ? `，${conv.unreadCount}条未读消息` : ''}`"
+            @tap="goChat(conv)"
+          >
+            <image
+              v-if="conv.peerAvatar && !failedAvatars.includes(conv.peerAvatar)"
+              :src="conv.peerAvatar"
+              mode="aspectFill"
+              class="h-104rpx w-104rpx shrink-0 rounded-full bg-app-soft"
+              aria-hidden="true"
+              @error="failedAvatars.push(conv.peerAvatar)"
+            />
+            <view
+              v-else
+              class="h-104rpx w-104rpx flex shrink-0 items-center justify-center rounded-full bg-app-soft text-brand-blue"
+              aria-hidden="true"
+            >
+              <text v-if="conv.peerNickname" class="text-40rpx font-semibold">
+                {{ conv.peerNickname.slice(0, 1) }}
+              </text>
+              <view v-else class="i-carbon-user h-48rpx w-48rpx" />
+            </view>
+            <view class="min-w-0 flex-1">
+              <view class="min-w-0 flex items-center gap-16rpx">
+                <text class="min-w-0 flex-1 truncate text-32rpx text-app-ink font-semibold leading-44rpx">
+                  {{ conv.peerNickname || '用户' }}
+                </text>
+                <text
+                  v-if="conv.lastTime"
+                  class="max-w-220rpx shrink-0 truncate text-24rpx text-app-muted leading-36rpx"
+                  :aria-label="`最后消息时间：${conv.lastTime}`"
+                >
+                  {{ conversationTime(conv.lastTime) }}
+                </text>
+              </view>
+              <view class="mt-8rpx min-w-0 flex items-center gap-16rpx">
+                <text class="min-w-0 flex-1 truncate text-28rpx text-app-ink-soft leading-40rpx">
+                  {{ conv.lastMessage || '开始对话…' }}
+                </text>
+                <view v-if="conv.unreadCount > 0" class="h-36rpx min-w-36rpx shrink-0 rounded-full bg-current px-8rpx text-center text-app-danger">
+                  <text class="block text-20rpx text-white leading-36rpx">
+                    {{ conv.unreadCount > 99 ? '99+' : conv.unreadCount }}
+                  </text>
+                </view>
+              </view>
+            </view>
+          </button>
+          <view v-if="error" class="app-state !py-24rpx">
+            <text>刷新失败，已保留现有会话</text>
+            <button class="app-secondary-button" @tap="load()">
+              重新加载
+            </button>
+          </view>
         </view>
-        <view class="ml-3 flex-1">
-          <text class="block text-15px text-#303133 font-semibold">
-            {{
-              conv.peerNickname || "用户"
-            }}
-          </text>
-          <text class="mt-0.5 block truncate text-xs text-#909399">
-            {{
-              conv.lastMessage || "开始对话…"
-            }}
+        <view v-else-if="loading" class="app-state text-28rpx text-app-muted">
+          <text>正在加载会话…</text>
+        </view>
+        <view v-else-if="error" class="app-state">
+          <text>会话加载失败，请重试</text>
+          <button class="app-secondary-button" @tap="load()">
+            重新加载
+          </button>
+        </view>
+        <view v-else class="app-state">
+          <view class="mx-auto h-112rpx w-112rpx flex items-center justify-center rounded-full bg-app-soft text-brand-blue" aria-hidden="true">
+            <view class="i-carbon-chat h-56rpx w-56rpx" />
+          </view>
+          <text class="mt-24rpx block text-32rpx text-app-ink font-semibold">还没有会话</text>
+          <text class="mt-12rpx block text-28rpx text-app-muted leading-44rpx">
+            从房源详情发起沟通，或联系公寓管家
           </text>
         </view>
       </view>
-    </view>
-    <view v-else-if="loading" class="py-20 text-center text-sm text-#909399">
-      加载中…
-    </view>
-    <view v-else class="py-20 text-center text-sm text-#909399">
-      还没有会话,从房源详情发起沟通吧
     </view>
   </view>
 </template>

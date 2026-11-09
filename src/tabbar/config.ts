@@ -29,8 +29,8 @@ export const customTabbarList: CustomTabBarItem[] = [
     text: '首页',
     pagePath: 'pages/index/index',
     iconType: 'unocss',
-    icon: 'i-my-icons-home',
-    iconActive: 'i-my-icons-home-filled',
+    icon: 'i-carbon-home',
+    iconActive: 'i-carbon-home',
   },
   {
     text: '消息',
@@ -44,7 +44,7 @@ export const customTabbarList: CustomTabBarItem[] = [
     pagePath: 'pages/me/me',
     iconType: 'unocss',
     icon: 'i-carbon-user',
-    iconActive: 'i-carbon-user-filled',
+    iconActive: 'i-carbon-user',
   },
 ]
 
@@ -62,11 +62,11 @@ export const isNativeTabbar = selectedTabbarStrategy === TABBAR_STRATEGY_MAP.NAT
 
 const _tabbar: TabBar = {
   custom: selectedTabbarStrategy === TABBAR_STRATEGY_MAP.CUSTOM_TABBAR,
-  color: '#999999',
-  selectedColor: '#018D71',
-  backgroundColor: '#F8F8F8',
-  borderStyle: 'black',
-  height: '50px',
+  color: '#657086',
+  selectedColor: '#2D6FE6',
+  backgroundColor: '#FFFFFF',
+  borderStyle: 'white',
+  height: '54px',
   fontSize: '10px',
   iconWidth: '24px',
   spacing: '3px',

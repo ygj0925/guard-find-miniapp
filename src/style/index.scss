@@ -2,17 +2,17 @@
 page {
   --wot-color-theme: #2d6fe6;
   --wot-button-primary-bg-color: #2d6fe6;
-  --app-tabbar-height: 108rpx;
+  --app-tabbar-height: 54px;
   --app-viewport-height: 100vh;
-  --app-page-background: #edf6ff;
+  --app-page-background: #f7f8fa;
   --app-page-bottom-safe: calc(var(--app-tabbar-height) + env(safe-area-inset-bottom));
   --app-ink: #121c39;
   --app-ink-soft: #33415f;
-  --app-muted: #7c8799;
-  --app-placeholder: #8f9cb1;
-  --app-surface: rgba(255, 255, 255, 0.94);
-  --app-surface-soft: rgba(255, 255, 255, 0.74);
-  --app-border: rgba(107, 139, 204, 0.22);
+  --app-muted: #657086;
+  --app-placeholder: #657086;
+  --app-surface: #ffffff;
+  --app-surface-soft: #edf3fc;
+  --app-border: #e4e8ef;
   --app-brand-sky: #13b8ed;
   --app-brand-blue: #2d6fe6;
   --app-brand-violet: #4d7df2;
@@ -46,6 +46,55 @@ navigator {
   -webkit-tap-highlight-color: transparent;
 }
 
+.app-tap,
+.app-primary-button,
+.app-secondary-button {
+  box-sizing: border-box;
+  margin: 0;
+  line-height: 1.5;
+  transition: opacity var(--app-motion-duration-fast) var(--app-motion-easing-standard);
+}
+
+.app-tap::after,
+.app-primary-button::after,
+.app-secondary-button::after {
+  border: none;
+}
+
+.app-tap:active,
+.app-primary-button:active,
+.app-secondary-button:active {
+  opacity: 0.76;
+}
+
+.app-tap[disabled],
+.app-primary-button[disabled],
+.app-secondary-button[disabled] {
+  opacity: 0.55;
+}
+
+/* #ifdef H5 */
+.app-tap:focus-visible,
+.app-primary-button:focus-visible,
+.app-secondary-button:focus-visible {
+  outline: 2px solid var(--app-brand-blue);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-tap,
+  .app-primary-button,
+  .app-secondary-button {
+    transition: none;
+  }
+
+  .app-page .animate-spin,
+  .app-tab-page .animate-pulse {
+    animation: none;
+  }
+}
+/* #endif */
+
 /* #ifdef H5 */
 @supports (height: 100dvh) {
   :root,
@@ -71,7 +120,7 @@ button,
 a,
 input,
 textarea,
-[role="button"] {
+[role='button'] {
   -webkit-tap-highlight-color: transparent;
 }
 /* #endif */
