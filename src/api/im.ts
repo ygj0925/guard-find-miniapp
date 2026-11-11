@@ -2,6 +2,7 @@
  * IM 私信与官方客服(guard-find-backend /miniapp/im)。
  * 轮询方案:3 秒拉一次新消息;客服消息 senderId 为 0。
  */
+import type { CustomRequestOptions } from '@/http/types'
 import { http } from '@/http/http'
 
 export interface ImConversation {
@@ -22,8 +23,8 @@ export interface ImMessage {
 }
 
 /** 我的会话列表(按最后消息时间倒序,含未读数) */
-export function fetchConversations() {
-  return http.get<ImConversation[]>('/miniapp/im/conversations')
+export function fetchConversations(options?: Partial<CustomRequestOptions>) {
+  return http.get<ImConversation[]>('/miniapp/im/conversations', undefined, undefined, options)
 }
 
 /** 拉取会话消息(afterId 增量;自动标已读) */
@@ -41,13 +42,18 @@ export function getOrCreateConversation(targetUserId: number | string) {
   return http.post<ImConversation>(`/miniapp/im/conversation/${targetUserId}`)
 }
 
+/** 删除会话(仅对自己隐藏,对方新消息到达时会重新出现) */
+export function deleteConversation(conversationId: number | string) {
+  return http.delete<void>(`/miniapp/im/conversation/${conversationId}`)
+}
+
 /** 联系客服:拉取消息 */
 export function fetchSupportMessages(afterId?: string | number) {
   return http.get<ImMessage[]>('/miniapp/im/support/messages', afterId ? { afterId } : undefined)
 }
 
-export function fetchSupportUnread() {
-  return http.get<number>('/miniapp/im/support/unread')
+export function fetchSupportUnread(options?: Partial<CustomRequestOptions>) {
+  return http.get<number>('/miniapp/im/support/unread', undefined, undefined, options)
 }
 
 /** 联系客服:发送消息 */

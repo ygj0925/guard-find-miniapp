@@ -5,10 +5,11 @@
  */
 import type { ImConversation } from '@/api/im'
 import type { ImSocketEvent } from '@/utils/imSocket'
-import { fetchConversations, fetchSupportUnread } from '@/api/im'
+import { deleteConversation, fetchConversations, fetchSupportUnread } from '@/api/im'
 import { useTokenStore } from '@/store/token'
 import { debounce } from '@/utils/debounce'
 import { disconnectImSocket, isImSocketConnected, subscribeImSocket } from '@/utils/imSocket'
+import { countUnread, setMessageBadge } from '@/utils/messageBadge'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 definePage({
@@ -77,6 +78,7 @@ watch(() => tokenStore.validToken, (token) => {
   sessionToken = token
   conversations.value = []
   supportUnread.value = 0
+  setMessageBadge(0)
   if (visible)
     activate()
 }, { flush: 'sync' })
@@ -108,6 +110,7 @@ function load(): Promise<void> {
       if (isCurrent()) {
         conversations.value = data
         supportUnread.value = unread
+        setMessageBadge(countUnread(data, unread))
       }
     }
     catch {
@@ -132,6 +135,31 @@ function goChat(conv: ImConversation) {
   uni.navigateTo({
     url: `/pages/message/chat?convId=${conv.id}&peerId=${conv.peerUserId}&peerName=${name}`,
   })
+}
+
+async function removeConversation(conv: ImConversation) {
+  const token = sessionToken
+  const action = await uni.showActionSheet({ itemList: ['删除会话'] }).catch(() => undefined)
+  if (action?.tapIndex !== 0)
+    return
+  const { confirm } = await uni.showModal({
+    title: '删除会话',
+    content: '会话将从列表移除，对方再次发消息时会重新出现。',
+    confirmText: '删除',
+    confirmColor: '#D93025',
+  })
+  if (!confirm || tokenStore.validToken !== token)
+    return
+  try {
+    await deleteConversation(conv.id)
+    if (tokenStore.validToken !== token)
+      return
+    conversations.value = conversations.value.filter(item => item.id !== conv.id)
+    setMessageBadge(countUnread(conversations.value, supportUnread.value))
+    uni.showToast({ icon: 'none', title: '已删除' })
+    void load()
+  }
+  catch {}
 }
 
 function goSupport() {
@@ -224,14 +252,18 @@ onPullDownRefresh(() => {
       </view>
 
       <view class="mt-40rpx">
-        <text class="block app-section-title">会话</text>
+        <view class="flex items-baseline justify-between gap-16rpx">
+          <text class="app-section-title">会话</text>
+          <text v-if="conversations.length" class="text-24rpx text-app-muted">长按会话可删除</text>
+        </view>
         <view v-if="conversations.length" class="mt-20rpx app-panel overflow-hidden">
           <button
             v-for="conv in conversations"
             :key="conv.id"
             class="app-tap min-h-160rpx w-full flex items-center gap-24rpx border-0 border-b border-app-border border-solid bg-white p-32rpx text-left leading-normal last:border-b-0"
-            :aria-label="`与${conv.peerNickname || '用户'}的会话${conv.unreadCount > 0 ? `，${conv.unreadCount}条未读消息` : ''}`"
+            :aria-label="`与${conv.peerNickname || '用户'}的会话${conv.unreadCount > 0 ? `，${conv.unreadCount}条未读消息` : ''}，长按可删除`"
             @tap="goChat(conv)"
+            @longpress="removeConversation(conv)"
           >
             <image
               v-if="conv.peerAvatar && !failedAvatars.includes(conv.peerAvatar)"

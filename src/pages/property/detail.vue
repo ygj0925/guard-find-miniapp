@@ -82,6 +82,24 @@ onUnload(() => {
   requestVersion++
 })
 
+function shareTitle() {
+  const item = property.value
+  if (!item)
+    return import.meta.env.VITE_APP_TITLE
+  const price = item.price == null ? '' : ` ¥${item.price}${item.priceType === 'rent' ? '/月' : ''}`
+  return `${item.title}${price}`
+}
+onShareAppMessage(() => ({
+  title: shareTitle(),
+  path: `/pages/property/detail?id=${encodeURIComponent(id.value)}`,
+  imageUrl: images.value[0],
+}))
+onShareTimeline(() => ({
+  title: shareTitle(),
+  query: `id=${encodeURIComponent(id.value)}`,
+  imageUrl: images.value[0],
+}))
+
 async function load() {
   const version = ++requestVersion
   loading.value = true
@@ -129,6 +147,11 @@ function imageFailed(src: string) {
 function retryImage(src: string) {
   loadedImages.value = loadedImages.value.filter(item => item !== src)
   failedImages.value = failedImages.value.filter(item => item !== src)
+}
+function previewImage(src: string) {
+  const urls = images.value.filter(item => !failedImages.value.includes(item))
+  if (urls.includes(src))
+    uni.previewImage({ urls, current: src })
 }
 function requireLogin() {
   if (useTokenStore().updateNowTime().hasLogin)
@@ -248,6 +271,7 @@ function returnToProperties() {
                   :src="src"
                   mode="aspectFill"
                   class="h-full w-full"
+                  @tap="previewImage(src)"
                   @load="imageLoaded(src)"
                   @error="imageFailed(src)"
                 />

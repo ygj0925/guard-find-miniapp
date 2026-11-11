@@ -4,25 +4,49 @@ import {
   changePropertyStatus,
   deleteProperty,
   fetchPersonalProperties,
+  PROPERTY_TYPE_LABEL,
+  toggleFavorite,
 } from '@/api/property'
 
-definePage({ style: { navigationBarTitleText: '我的房源' } })
-const kind = ref<'mine' | 'favorites' | 'history'>('mine')
+definePage({ style: { navigationBarTitleText: '我的房源', backgroundColor: '#F7F8FA' } })
+
+type Kind = 'mine' | 'favorites' | 'history'
+const TITLES: Record<Kind, string> = { mine: '我的房源', favorites: '我的收藏', history: '浏览记录' }
+const EMPTY: Record<Kind, { icon: string, title: string, hint: string }> = {
+  mine: { icon: 'i-carbon-building', title: '还没有发布房源', hint: '发布后可在这里编辑、上下架或删除。' },
+  favorites: { icon: 'i-carbon-star', title: '还没有收藏房源', hint: '在房源详情点击收藏，方便之后对比查看。' },
+  history: { icon: 'i-carbon-time', title: '还没有浏览记录', hint: '看过的房源会按时间显示在这里。' },
+}
+const STATUS: Record<number, { label: string, cls: string }> = {
+  1: { label: '草稿', cls: 'text-app-muted' },
+  2: { label: '已上架', cls: 'text-app-success' },
+  3: { label: '已下架', cls: 'text-app-warning' },
+}
+
+const kind = ref<Kind>('mine')
 const items = ref<Property[]>([])
 const total = ref(0)
 const page = ref(0)
 const loading = ref(false)
 const error = ref(false)
+const busyId = ref<Property['id'] | null>(null)
+const failedImages = ref<Property['id'][]>([])
 let generation = 0
+
 onLoad((q) => {
   if (q?.kind === 'favorites' || q?.kind === 'history')
     kind.value = q.kind
-  uni.setNavigationBarTitle({
-    title: { mine: '我的房源', favorites: '我的收藏', history: '浏览记录' }[
-      kind.value
-    ],
-  })
+  uni.setNavigationBarTitle({ title: TITLES[kind.value] })
 })
+onShow(() => load())
+onUnload(() => {
+  generation++
+})
+onReachBottom(() => {
+  if (!error.value && items.value.length < total.value)
+    void load(true)
+})
+
 async function load(more = false) {
   if (more && loading.value)
     return
@@ -37,6 +61,8 @@ async function load(more = false) {
     items.value = more ? [...items.value, ...res.list] : res.list
     total.value = res.total
     page.value = next
+    if (!more)
+      failedImages.value = []
   }
   catch {
     if (current === generation)
@@ -47,79 +73,180 @@ async function load(more = false) {
       loading.value = false
   }
 }
-onShow(() => load())
-onUnload(() => {
-  generation++
-})
-onReachBottom(() => {
-  if (items.value.length < total.value)
-    void load(true)
-})
+
+function location(item: Property) {
+  return [item.city, item.community || item.district || item.address].filter(Boolean).join(' · ')
+}
 function detail(item: Property) {
   uni.navigateTo({ url: `/pages/property/detail?id=${item.id}` })
 }
 function edit(id = '') {
   uni.navigateTo({ url: `/pages/property/edit?id=${id}` })
 }
-async function status(item: Property) {
-  await changePropertyStatus(item.id, item.status === 2 ? 3 : 2)
-  await load()
+function goHome() {
+  uni.switchTab({ url: '/pages/index/index' })
 }
+
+async function runBusy(item: Property, task: () => Promise<void>) {
+  if (busyId.value != null)
+    return
+  busyId.value = item.id
+  try {
+    await task()
+  }
+  catch {}
+  finally {
+    busyId.value = null
+  }
+}
+
+function toggleStatus(item: Property) {
+  const next = item.status === 2 ? 3 : 2
+  void runBusy(item, async () => {
+    await changePropertyStatus(item.id, next)
+    uni.showToast({ icon: 'none', title: next === 2 ? '已上架' : '已下架' })
+    await load()
+  })
+}
+
 function remove(item: Property) {
   uni.showModal({
     title: '删除房源',
     content: '有进行中的预约时需先处理预约，确定删除？',
-    success: async (r) => {
-      if (r.confirm) {
+    confirmText: '删除',
+    confirmColor: '#D93025',
+    success: (r) => {
+      if (!r.confirm)
+        return
+      void runBusy(item, async () => {
         await deleteProperty(item.id)
+        uni.showToast({ icon: 'none', title: '已删除' })
         await load()
-      }
+      })
     },
+  })
+}
+
+function unfavorite(item: Property) {
+  void runBusy(item, async () => {
+    const { favorited } = await toggleFavorite(item.id)
+    if (favorited) {
+      await load()
+      return
+    }
+    items.value = items.value.filter(entry => entry.id !== item.id)
+    total.value = Math.max(0, total.value - 1)
+    uni.showToast({ icon: 'none', title: '已取消收藏' })
   })
 }
 </script>
 
 <template>
-  <view class="min-h-full bg-#F7F8FA p-4">
-    <button
-      v-if="kind === 'mine'"
-      class="mb-4 bg-#1677FF text-white"
-      @tap="edit()"
-    >
-      发布房源
-    </button>
-    <view
-      v-for="item in items"
-      :key="item.id"
-      class="mb-3 rounded-xl bg-white p-4"
-    >
-      <view @tap="detail(item)">
-        <text class="block font-bold">{{ item.title }}</text><text class="mt-2 block text-sm">
-          ¥{{ item.price }}{{ item.priceType === "rent" ? "/月" : "" }} ·
-          {{ item.address }}
-        </text>
+  <view class="personal-page app-page">
+    <view class="app-content py-4">
+      <view class="mb-4 flex items-end justify-between gap-3">
+        <text class="text-24px text-app-ink font-bold">{{ TITLES[kind] }}</text>
+        <button v-if="kind === 'mine'" class="app-primary-button shrink-0 !min-h-11 !px-4 !text-sm" @tap="edit()">
+          发布房源
+        </button>
+        <text v-else-if="total" class="text-xs text-app-muted">共 {{ total }} 套</text>
       </view>
-      <view v-if="kind === 'mine'" class="mt-3 flex flex-wrap gap-2">
-        <text class="text-sm text-gray">
-          {{
-            { 1: "草稿", 2: "已上架", 3: "已下架" }[item.status]
-          }}
-        </text>
-        <button size="mini" @tap="edit(String(item.id))">
-          编辑
-        </button><button size="mini" @tap="status(item)">
-          {{ item.status === 2 ? "下架" : "上架" }}
-        </button><button size="mini" @tap="remove(item)">
-          删除
+
+      <view v-for="item in items" :key="item.id" class="mb-3 app-panel overflow-hidden">
+        <view class="flex items-stretch">
+          <button
+            class="app-tap min-w-0 flex flex-1 items-center gap-3 bg-white p-3 text-left leading-normal"
+            :aria-label="`查看房源：${item.title}`"
+            @tap="detail(item)"
+          >
+            <image
+              v-if="item.images?.length && !failedImages.includes(item.id)"
+              :src="item.images[0]"
+              mode="aspectFill"
+              class="h-22 w-22 shrink-0 rounded-lg bg-app-soft"
+              aria-hidden="true"
+              @error="failedImages.push(item.id)"
+            />
+            <view v-else class="h-22 w-22 flex shrink-0 items-center justify-center rounded-lg bg-app-soft text-app-muted" aria-hidden="true">
+              <view class="i-carbon-image h-6 w-6" />
+            </view>
+            <view class="min-w-0 flex-1">
+              <view class="flex items-start gap-2">
+                <text class="line-clamp-2 min-w-0 flex-1 break-words text-base text-app-ink font-semibold leading-6">{{ item.title }}</text>
+                <text
+                  v-if="kind === 'mine'"
+                  class="shrink-0 rounded-md bg-app-soft px-2 py-0.5 text-xs leading-5"
+                  :class="STATUS[item.status]?.cls || 'text-app-muted'"
+                >
+                  {{ STATUS[item.status]?.label || '未知' }}
+                </text>
+              </view>
+              <text class="mt-1 block truncate text-xs text-app-muted leading-5">
+                {{ [PROPERTY_TYPE_LABEL[item.propertyType], location(item)].filter(Boolean).join(' · ') }}
+              </text>
+              <view v-if="item.price != null" class="mt-1 flex items-baseline gap-1 text-brand-blue">
+                <text class="text-18px font-bold">¥{{ item.price }}</text>
+                <text class="text-xs">{{ item.priceType === 'rent' ? '/月' : '元' }}</text>
+              </view>
+            </view>
+          </button>
+          <button
+            v-if="kind === 'favorites'"
+            class="app-tap w-14 flex shrink-0 items-center justify-center bg-white p-0 text-app-warning"
+            :disabled="busyId != null"
+            aria-label="取消收藏"
+            @tap="unfavorite(item)"
+          >
+            <view class="i-carbon-star-filled h-6 w-6" :class="busyId === item.id ? 'animate-pulse' : ''" />
+          </button>
+        </view>
+        <view v-if="kind === 'mine'" class="grid grid-cols-3 gap-2 border-0 border-t border-app-border border-solid p-3">
+          <button class="app-secondary-button w-full !min-h-10 !text-sm" :disabled="busyId != null" @tap="edit(String(item.id))">
+            编辑
+          </button>
+          <button
+            class="app-secondary-button w-full !min-h-10 !text-sm"
+            :disabled="busyId != null"
+            :loading="busyId === item.id"
+            @tap="toggleStatus(item)"
+          >
+            {{ item.status === 2 ? '下架' : '上架' }}
+          </button>
+          <button class="app-secondary-button w-full !min-h-10 !text-sm !text-app-danger" :disabled="busyId != null" @tap="remove(item)">
+            删除
+          </button>
+        </view>
+      </view>
+
+      <view v-if="loading" class="app-state gap-3 py-10">
+        <view class="i-carbon-circle-dash h-7 w-7 animate-spin text-brand-blue" />
+        <text class="text-sm text-app-muted">{{ items.length ? '正在加载更多' : '正在加载' }}</text>
+      </view>
+      <view v-else-if="error" class="app-state gap-3 py-10">
+        <view class="i-carbon-warning-alt h-8 w-8 text-app-warning" />
+        <text class="text-sm text-app-muted">{{ items.length ? '更多记录加载失败，已有记录已保留' : '加载失败，请检查网络后重试' }}</text>
+        <button class="mt-2 app-secondary-button max-w-60 w-full" @tap="load(items.length > 0)">
+          重新加载
         </button>
       </view>
-    </view>
-    <view v-if="loading" class="p-5 text-center">
-      加载中…
-    </view><button v-else-if="error" @tap="load()">
-      加载失败，点击重试
-    </button><view v-else-if="!items.length" class="p-10 text-center text-gray">
-      暂无记录
+      <view v-else-if="!items.length" class="min-h-70 app-state gap-3 py-12">
+        <view class="h-10 w-10 text-app-muted" :class="EMPTY[kind].icon" />
+        <text class="text-base text-app-ink font-semibold">{{ EMPTY[kind].title }}</text>
+        <text class="text-center text-sm text-app-muted leading-6">{{ EMPTY[kind].hint }}</text>
+        <button v-if="kind === 'mine'" class="mt-2 app-primary-button max-w-60 w-full" @tap="edit()">
+          发布房源
+        </button>
+        <button v-else class="mt-2 app-secondary-button max-w-60 w-full" @tap="goHome">
+          去看看房源
+        </button>
+      </view>
+      <text v-else-if="items.length >= total" class="block py-6 text-center text-xs text-app-muted">已显示全部</text>
     </view>
   </view>
 </template>
+
+<style scoped>
+.personal-page {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+</style>

@@ -19,9 +19,28 @@ definePage({
 const tokenStore = useTokenStore()
 const appName = import.meta.env.VITE_APP_TITLE
 const loading = ref(false)
+const agreed = ref(false)
+
+function openAgreement(type: 'user' | 'privacy') {
+  uni.navigateTo({ url: `/pages/agreement/index?type=${type}` })
+}
+
+async function ensureAgreed(): Promise<boolean> {
+  if (agreed.value)
+    return true
+  const { confirm } = await uni.showModal({
+    title: '用户协议与隐私政策',
+    content: '登录前请阅读并同意《用户协议》和《隐私政策》。',
+    confirmText: '同意并登录',
+    cancelText: '暂不登录',
+  })
+  if (confirm)
+    agreed.value = true
+  return confirm
+}
 
 async function onWxLogin() {
-  if (loading.value)
+  if (loading.value || !(await ensureAgreed()))
     return
   loading.value = true
   try {
@@ -70,7 +89,28 @@ async function onWxLogin() {
       {{ loading ? '登录中…' : '微信一键登录' }}
     </button>
 
-    <text class="mt-6 text-center text-xs text-#A8ABB2">
+    <view class="mt-4 flex items-start justify-center text-xs text-#909399 leading-5">
+      <view
+        class="shrink-0 p-3"
+        role="checkbox"
+        :aria-checked="agreed"
+        aria-label="我已阅读并同意用户协议和隐私政策"
+        @tap="agreed = !agreed"
+      >
+        <view
+          class="h-5 w-5"
+          :class="agreed ? 'i-carbon-checkbox-checked-filled text-#1677FF' : 'i-carbon-checkbox text-#A8ABB2'"
+        />
+      </view>
+      <view class="min-w-0 py-3">
+        <text @tap="agreed = !agreed">我已阅读并同意</text>
+        <text class="text-#1677FF" @tap="openAgreement('user')">《用户协议》</text>
+        <text>和</text>
+        <text class="text-#1677FF" @tap="openAgreement('privacy')">《隐私政策》</text>
+      </view>
+    </view>
+
+    <text class="mt-3 text-center text-xs text-#A8ABB2">
       未注册的微信将自动创建账号
     </text>
   </view>

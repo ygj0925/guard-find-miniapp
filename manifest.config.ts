@@ -134,7 +134,7 @@ export default defineManifestConfig({
     mergeVirtualHostAttributes: true,
     // styleIsolation: 'shared',
     usingComponents: true,
-    // __usePrivacyCheck__: true,
+    __usePrivacyCheck__: true,
   },
   'mp-alipay': {
     usingComponents: true,

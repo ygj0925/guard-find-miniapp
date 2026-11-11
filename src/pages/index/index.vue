@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Property, PropertyType } from '@/api/property'
 import { fetchProperties, PROPERTY_TYPE_LABEL } from '@/api/property'
+import { refreshMessageBadge } from '@/utils/messageBadge'
 
 definePage({
   style: {
@@ -47,6 +48,8 @@ let generation = 0
 onUnload(() => {
   generation++
 })
+onShareAppMessage(() => ({ title: `${import.meta.env.VITE_APP_TITLE} · 精选房源`, path: '/pages/index/index' }))
+onShareTimeline(() => ({ title: `${import.meta.env.VITE_APP_TITLE} · 精选房源` }))
 async function load(targetPage: number, mode: 'initial' | 'more' = 'initial') {
   if (mode === 'more' && (loading.value || loadingMore.value))
     return
@@ -111,6 +114,7 @@ function goDetail(item: Property) {
 }
 
 onLoad(() => load(1))
+onShow(() => void refreshMessageBadge())
 onPullDownRefresh(() => {
   load(1).finally(() => uni.stopPullDownRefresh())
 })

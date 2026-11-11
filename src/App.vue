@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onHide, onLaunch, onShow } from '@dcloudio/uni-app'
+import { onHide, onLaunch } from '@dcloudio/uni-app'
 import { getCurrentInstance, onMounted, onUnmounted } from 'vue'
 import { navigateToInterceptor } from '@/router/interceptor'
 import { permission } from '@/router/permission'
@@ -9,8 +9,30 @@ const router = proxy?.$router
 
 router && permission.install(router)
 
+// #ifdef MP-WEIXIN
+function watchMiniappUpdate() {
+  if (!uni.canIUse('getUpdateManager'))
+    return
+  const manager = uni.getUpdateManager()
+  manager.onUpdateReady(() => {
+    uni.showModal({
+      title: '发现新版本',
+      content: '新版本已准备好，是否立即重启使用？',
+      confirmText: '立即重启',
+      cancelText: '稍后',
+      success: (res) => {
+        if (res.confirm)
+          manager.applyUpdate()
+      },
+    })
+  })
+}
+// #endif
+
 onLaunch((options) => {
-  console.log('App.vue onLaunch', options)
+  // #ifdef MP-WEIXIN
+  watchMiniappUpdate()
+  // #endif
   // 处理直接进入页面路由的情况：如微信小程序分享后进入等
   // https://github.com/unibest-tech/unibest/issues/192
   if (options?.path) {

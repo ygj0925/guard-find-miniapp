@@ -6,6 +6,7 @@ import type { IUserInfoRes } from '@/api/types/login'
 import { getUserInfo, logout } from '@/api/login'
 import { useTokenStore } from '@/store/token'
 import { useUserStore } from '@/store/user'
+import { refreshMessageBadge, setMessageBadge } from '@/utils/messageBadge'
 import { toLoginPage } from '@/utils/toLoginPage'
 
 definePage({
@@ -32,6 +33,14 @@ const shortcuts = [
   { label: '浏览记录', icon: 'i-carbon-time', url: '/pages/property/personal?kind=history' },
   { label: '看房预约', icon: 'i-carbon-calendar', url: '/pages/property/bookings' },
 ]
+const agreements = [
+  { type: 'user', label: '用户协议', icon: 'i-carbon-document' },
+  { type: 'privacy', label: '隐私政策', icon: 'i-carbon-security' },
+] as const
+
+function openAgreement(type: 'user' | 'privacy') {
+  uni.navigateTo({ url: `/pages/agreement/index?type=${type}` })
+}
 
 function go(url: string) {
   if (requireLogin())
@@ -41,6 +50,7 @@ function go(url: string) {
 onShow(() => {
   const current = ++version
   tokenStore.updateNowTime()
+  void refreshMessageBadge()
   if (!tokenStore.hasLogin) {
     profile.value = null
     return
@@ -87,6 +97,7 @@ function onLogout() {
       tokenStore.clearLoginState()
       userStore.clearUserInfo()
       profile.value = null
+      setMessageBadge(0)
       uni.showToast({ title: '已退出', icon: 'none' })
     },
   })
@@ -183,6 +194,21 @@ function onLogout() {
             <text class="block text-32rpx text-app-ink font-semibold leading-44rpx">房源管理</text>
             <text class="mt-8rpx block text-28rpx text-app-muted leading-40rpx">发布与维护房源</text>
           </view>
+          <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
+        </button>
+      </view>
+
+      <view class="mt-24rpx app-panel overflow-hidden">
+        <button
+          v-for="(doc, index) in agreements"
+          :key="doc.type"
+          class="app-tap min-h-120rpx w-full flex items-center gap-24rpx border-0 border-app-border border-solid bg-white px-32rpx text-left leading-normal"
+          :class="index < agreements.length - 1 ? 'border-b' : ''"
+          :aria-label="`查看${doc.label}`"
+          @tap="openAgreement(doc.type)"
+        >
+          <view :class="doc.icon" class="h-44rpx w-44rpx shrink-0 text-app-muted" aria-hidden="true" />
+          <text class="min-w-0 flex-1 text-30rpx text-app-ink-soft leading-44rpx">{{ doc.label }}</text>
           <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
         </button>
       </view>
