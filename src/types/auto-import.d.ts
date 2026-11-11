@@ -82,11 +82,8 @@ declare global {
   const useCssVars: typeof import('vue')['useCssVars']
   const useId: typeof import('vue')['useId']
   const useModel: typeof import('vue')['useModel']
-  const useRequest: typeof import('../hooks/useRequest')['default']
-  const useScroll: typeof import('../hooks/useScroll')['useScroll']
   const useSlots: typeof import('vue')['useSlots']
   const useTemplateRef: typeof import('vue')['useTemplateRef']
-  const useUpload: typeof import('../hooks/useUpload')['default']
   const watch: typeof import('vue')['watch']
   const watchEffect: typeof import('vue')['watchEffect']
   const watchPostEffect: typeof import('vue')['watchPostEffect']
@@ -180,11 +177,8 @@ declare module 'vue' {
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
     readonly useId: UnwrapRef<typeof import('vue')['useId']>
     readonly useModel: UnwrapRef<typeof import('vue')['useModel']>
-    readonly useRequest: UnwrapRef<typeof import('../hooks/useRequest')['default']>
-    readonly useScroll: UnwrapRef<typeof import('../hooks/useScroll')['useScroll']>
     readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>
     readonly useTemplateRef: UnwrapRef<typeof import('vue')['useTemplateRef']>
-    readonly useUpload: UnwrapRef<typeof import('../hooks/useUpload')['default']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchEffect: UnwrapRef<typeof import('vue')['watchEffect']>
     readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>

@@ -1,6 +1,5 @@
 import type { CustomTabBarItem, CustomTabBarItemBadge } from './types'
 import { computed, reactive } from 'vue'
-import { useUserStore } from '@/store/user'
 
 import { tabbarList as _tabbarList, selectedTabbarStrategy, TABBAR_STRATEGY_MAP } from './config'
 
@@ -10,25 +9,7 @@ const baseTabbarList = reactive<CustomTabBarItem[]>(_tabbarList.map(item => ({
   pagePath: item.pagePath.startsWith('/') ? item.pagePath : `/${item.pagePath}`, // 统一成 '/' 开头的路径
 })))
 
-const userRoles = computed(() => {
-  const userStore = useUserStore()
-  const userInfo = userStore.userInfo.value
-  if (Array.isArray(userInfo?.roles) && userInfo.roles.length > 0) {
-    return userInfo.roles
-  }
-  if (userInfo?.role) {
-    return [userInfo.role]
-  }
-  return []
-})
-
-const tabbarList = computed(() => {
-  const roles = userRoles.value
-  if (roles.length === 0) {
-    return baseTabbarList.filter(item => !item.roles || item.roles.length === 0)
-  }
-  return baseTabbarList.filter(item => !item.roles || item.roles.length === 0 || item.roles.some(role => roles.includes(role)))
-})
+const tabbarList = computed(() => baseTabbarList)
 
 export function isPageTabbar(path: string) {
   if (selectedTabbarStrategy === TABBAR_STRATEGY_MAP.NO_TABBAR) {

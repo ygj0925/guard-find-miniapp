@@ -120,7 +120,7 @@ function onLogout() {
               {{ tokenStore.hasLogin ? (profile?.nickname || '已登录用户') : '未登录' }}
             </text>
             <text class="mt-8rpx block text-28rpx text-app-ink-soft leading-40rpx">
-              {{ tokenStore.hasLogin ? (profile?.phone || '收藏房源，查看预约与消息') : '登录后使用收藏与消息服务' }}
+              {{ tokenStore.hasLogin ? '收藏房源，查看预约与消息' : '登录后使用收藏与消息服务' }}
             </text>
           </view>
         </view>

@@ -1,33 +1,14 @@
 # 请求库
 
-目前 unibest 支持 3 种请求方式：
-
-- 简单版 `http`：路径 `src/http/http.ts`，适合大多数简单项目。
-- `alova`：路径 `src/http/alova.ts`。
-- `vue-query`：路径 `src/http/vue-query.ts`，主要用于自动生成接口，详情见 https://unibest.tech/base/17-generate 。
-
-## 如何选择
-
-如果您以前用过 `alova` 或 `vue-query`，可以优先使用熟悉的方案。
-
-如果项目接口不复杂，简单版 `http` 就够了，也不会增加额外包体积。
+统一使用 `src/http/http.ts`，接口均由 guard-find-backend 的 `/miniapp/**` 提供。
 
 ## 关于 http 使用
 
 ```ts
 import { http } from '@/http/http'
 
-interface IUserInfoRes {
-  id: number
-  nickname: string
-}
-
 export function getUserInfo() {
-  return http.get<IUserInfoRes>('/user/info')
-}
-
-export function updateUserInfo(data: Partial<IUserInfoRes>) {
-  return http.post('/user/update', data)
+  return http.get<IUserInfoRes>('/miniapp/auth/me')
 }
 ```
 
@@ -49,11 +30,9 @@ catch (error) {
 如果调用方需要自行处理错误提示，可以传入 `hideErrorToast: true`：
 
 ```ts
-http.get<IUserInfoRes>('/user/info', undefined, undefined, {
+http.get<IUserInfoRes>('/miniapp/auth/me', undefined, undefined, {
   hideErrorToast: true,
 })
 ```
 
-## roadmap
-
-菲鸽最近在优化脚手架，后续可以选择是否使用第三方请求库，以及选择具体请求库。
+服务端为单 token（Sa-Token `miniapp` 登录域，有效期 7 天），没有刷新接口；收到 401 时清理当前登录态并跳转登录页。

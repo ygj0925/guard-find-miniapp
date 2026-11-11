@@ -21,27 +21,6 @@ export function getUserInfo() {
   return http.get<IUserInfoRes>('/miniapp/auth/me')
 }
 
-/** 账号密码登录(保留 token store 兼容;小程序主流程不走此接口) */
-export interface ILoginForm {
-  username: string
-  password: string
-}
-
-export function login(form: ILoginForm) {
-  return http.post<IAuthLoginRes>(
-    '/miniapp/auth/login',
-    { authType: 'ACCOUNT', ...form },
-    undefined,
-    undefined,
-    { skipAuth: true, hideErrorToast: true },
-  )
-}
-
-/** 服务端为单 token 模式,无刷新接口(仅为 token store 类型兼容保留) */
-export function refreshToken(_refreshToken?: string) {
-  return Promise.reject(new Error('单 token 模式不支持刷新'))
-}
-
 /** 退出登录 */
 export function logout() {
   return http.post<void>('/miniapp/auth/logout')

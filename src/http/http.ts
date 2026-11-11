@@ -1,14 +1,7 @@
-import type { IDoubleTokenRes } from '@/api/types/login'
 import type { CustomRequestOptions, HttpError, IResponse } from '@/http/types'
-import { nextTick } from 'vue'
-import { AUTH_TOKEN_STORAGE_KEY, isAuthSessionOperationActive, useTokenStore } from '@/store/token'
-import { isDoubleTokenMode } from '@/utils'
+import { AUTH_TOKEN_STORAGE_KEY, useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { createHttpError, getResponseMessage, HttpErrorType, isSuccessResultCode, ResultEnum, ShowMessage } from './tools/enum'
-
-// 刷新 token 状态管理
-let refreshing = false // 防止重复刷新 token 标识
-let taskQueue: (() => void)[] = [] // 刷新 token 请求队列
 
 function normalizeAccessToken(value: unknown) {
   return typeof value === 'string' ? value.replace(/^Bearer\s+/i, '').trim() : ''
@@ -75,84 +68,8 @@ export function http<T>(options: CustomRequestOptions) {
         }
 
         if (isTokenExpired) {
-          const tokenStore = useTokenStore()
-          if (!isDoubleTokenMode || isAuthSessionOperationActive()) {
-            // 会话提交锁内不得递归刷新；先结束请求，让外层提交安全回滚后再条件清理。
-            reject(createHttpError({
-              type: HttpErrorType.Auth,
-              code,
-              statusCode: res.statusCode,
-              message: getResponseMessage(responseData, '登录已过期，请重新登录'),
-              data: responseData?.data,
-              raw: res,
-            }))
-            if (await tokenStore.clearLoginState(requestAccessToken))
-              toLoginPage()
-            return
-          }
-
-          /* -------- 无感刷新 token ----------- */
-          const { refreshToken } = tokenStore.tokenInfo as IDoubleTokenRes || {}
-          // token 失效的，且有刷新 token 的，才放到请求队列里
-          if (refreshToken) {
-            taskQueue.push(() => {
-              resolve(http<T>(options))
-            })
-          }
-
-          // 如果有 refreshToken 且未在刷新中，发起刷新 token 请求
-          if (refreshToken && !refreshing) {
-            refreshing = true
-            try {
-              // 发起刷新 token 请求（使用 store 的 refreshToken 方法）
-              await tokenStore.refreshToken()
-              // 刷新 token 成功
-              refreshing = false
-              nextTick(() => {
-                // 关闭其他弹窗
-                uni.hideToast()
-                uni.showToast({
-                  title: 'token 刷新成功',
-                  icon: 'none',
-                })
-              })
-              // 将任务队列的所有任务重新请求
-              taskQueue.forEach(task => task())
-            }
-            catch (refreshErr) {
-              console.error('刷新 token 失败:', refreshErr)
-              refreshing = false
-              // 先结束请求，避免锁内登录资料请求等待公开清理再次获取同一把锁。
-              reject(createHttpError({
-                type: HttpErrorType.Auth,
-                code,
-                statusCode: res.statusCode,
-                message: getResponseMessage(responseData, '登录已过期，请重新登录'),
-                data: responseData?.data,
-                raw: res,
-              }))
-              // 仅当失败请求的 token 仍属于当前会话时才跳转，避免迟到失败退出新账号。
-              if (await tokenStore.clearLoginState(requestAccessToken)) {
-                nextTick(() => {
-                  uni.hideToast()
-                  uni.showToast({
-                    title: '登录已过期，请重新登录',
-                    icon: 'none',
-                  })
-                })
-                setTimeout(() => {
-                  toLoginPage()
-                }, 2000)
-              }
-              return
-            }
-            finally {
-              // 不管刷新 token 成功与否，都清空任务队列
-              taskQueue = []
-            }
-          }
-
-          return reject(createHttpError({
+          // 先结束请求，再按发起请求时的 token 条件清理，避免迟到的 401 退出新账号。
+          reject(createHttpError({
             type: HttpErrorType.Auth,
             code,
             statusCode: res.statusCode,
@@ -160,6 +77,9 @@ export function http<T>(options: CustomRequestOptions) {
             data: responseData?.data,
             raw: res,
           }))
+          if (await useTokenStore().clearLoginState(requestAccessToken))
+            toLoginPage()
+          return
         }
 
         // 处理其他成功状态（HTTP状态码200-299）
@@ -291,9 +211,3 @@ http.get = httpGet
 http.post = httpPost
 http.put = httpPut
 http.delete = httpDelete
-
-// 支持与 alovaJS 类似的API调用
-http.Get = httpGet
-http.Post = httpPost
-http.Put = httpPut
-http.Delete = httpDelete

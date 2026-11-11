@@ -102,7 +102,6 @@ export default defineConfig(({ command, mode }) => {
       AutoImport({
         imports: ['vue', 'uni-app'],
         dts: 'src/types/auto-import.d.ts',
-        dirs: ['src/hooks'], // 自动导入 hooks
         vueTemplate: true, // default false
       }),
       ViteRestart({

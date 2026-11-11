@@ -129,23 +129,11 @@ export const navigateToInterceptor = {
   },
 }
 
-// 针对 chooseLocation 的特殊处理
-export const chooseLocationInterceptor = {
-  invoke(options: any) {
-    // 直接放行 chooseLocation 调用
-    FG_LOG_ENABLE && console.log('chooseLocation 调用，直接放行:', options)
-    return true
-  },
-}
-
 export const routeInterceptor = {
   install() {
     uni.addInterceptor('navigateTo', navigateToInterceptor)
     uni.addInterceptor('reLaunch', navigateToInterceptor)
     uni.addInterceptor('redirectTo', navigateToInterceptor)
     uni.addInterceptor('switchTab', navigateToInterceptor)
-
-    // 添加 chooseLocation 的拦截器，确保直接放行
-    uni.addInterceptor('chooseLocation', chooseLocationInterceptor)
   },
 }

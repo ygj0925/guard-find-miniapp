@@ -9,14 +9,6 @@ export type CustomRequestOptions = UniApp.RequestOptions & {
   skipAuth?: boolean
 } & IUniUploadFileOptions // 添加uni.uploadFile参数类型
 
-/** 主要提供给 openapi-ts-request 生成的代码使用 */
-export type CustomRequestOptions_ = Omit<CustomRequestOptions, 'url'>
-
-export interface HttpRequestResult<T> {
-  promise: Promise<T>
-  requestTask: UniApp.RequestTask
-}
-
 export interface HttpError<T = any> {
   type: 'business' | 'auth' | 'http' | 'network'
   code?: number | string
@@ -37,19 +29,4 @@ export type IResponse<T = any> = {
   data: T
   msg: string
   [key: string]: any // 允许额外属性
-}
-
-// 分页请求参数
-export interface PageParams {
-  page: number
-  pageSize: number
-  [key: string]: any
-}
-
-// 分页响应数据
-export interface PageResult<T> {
-  list: T[]
-  total: number
-  page: number
-  pageSize: number
 }

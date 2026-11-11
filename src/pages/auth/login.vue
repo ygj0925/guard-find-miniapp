@@ -34,8 +34,8 @@ async function onWxLogin() {
       })
     })
     const resp = await wechatMiniappLogin(code)
-    await tokenStore.setTokenInfo(resp)
-    uni.showToast({ title: resp.isNewUser ? '登录成功,欢迎加入' : '登录成功', icon: 'success' })
+    tokenStore.setTokenInfo(resp)
+    uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 600)
     // #endif
     // #ifndef MP-WEIXIN

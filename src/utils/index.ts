@@ -102,32 +102,6 @@ export function getAllPages(key?: string) {
   return result
 }
 
-export function getCurrentPageI18nKey() {
-  const routeObj = currRoute()
-
-  let currPage = (pages as PageMetaDatum[]).find(page => `/${page.path}` === routeObj.path)
-  if (!currPage) {
-    // 在主包中找不到对应的页面，则在分包中找
-    const allSubPages: PageMetaDatum[] = []
-    subPackages?.forEach((config) => {
-      config.pages?.forEach((cur) => {
-        allSubPages.push({
-          ...cur,
-          path: `/${config.root}/${cur.path}`,
-        })
-      })
-    })
-    currPage = allSubPages.find(page => page.path === routeObj.path)
-    if (!currPage) {
-      console.warn('路由不正确')
-      return ''
-    }
-  }
-  console.log(currPage)
-  console.log(currPage.style.navigationBarTitleText)
-  return currPage.style?.navigationBarTitleText || ''
-}
-
 export function isCurrentPageTabbar() {
   const { path } = currRoute()
   return isPageTabbar(path)
@@ -180,31 +154,6 @@ export function getEnvWsUrl() {
 
   return baseUrl.replace(/^http(s?):\/\//i, (_, s) => `ws${s ? 's' : ''}://`).replace(/\/+$/, '')
 }
-
-/**
- * 将业务接口路径解析为当前平台可访问的请求地址。
- * H5 开发环境启用代理时保留同源前缀，其他场景使用配置的服务端地址。
- */
-export function getApiUrl(path: string) {
-  if (/^https?:\/\//i.test(path))
-    return path
-
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  // #ifdef H5
-  if (import.meta.env.VITE_APP_PROXY_ENABLE === 'true') {
-    const proxyPrefix = String(import.meta.env.VITE_APP_PROXY_PREFIX || '').replace(/\/$/, '')
-    return `${proxyPrefix}${normalizedPath}`
-  }
-  // #endif
-
-  const baseUrl = String(getEnvBaseUrl() || '').replace(/\/$/, '')
-  return `${baseUrl}${normalizedPath}`
-}
-
-/**
- * 是否是双token模式
- */
-export const isDoubleTokenMode = import.meta.env.VITE_AUTH_MODE === 'double'
 
 /**
  * 首页路径，通过 page.json 里面的 type 为 home 的页面获取，如果没有，则默认是第一个页面
