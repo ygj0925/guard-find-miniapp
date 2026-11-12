@@ -144,6 +144,15 @@ function onLogout() {
           登录账号
         </button>
 
+        <button
+          v-else
+          class="app-tap mt-24rpx app-secondary-button w-full"
+          aria-label="编辑昵称和头像"
+          @tap="go('/pages/me/profile')"
+        >
+          编辑资料
+        </button>
+
         <view class="mt-32rpx flex border-0 border-t border-app-border border-solid pt-16rpx">
           <button
             v-for="entry in shortcuts"

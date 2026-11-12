@@ -8,6 +8,7 @@ type _LocationUrl =
   "/pages/agreement/index" |
   "/pages/auth/login" |
   "/pages/me/me" |
+  "/pages/me/profile" |
   "/pages/message/chat" |
   "/pages/message/index" |
   "/pages/message/notices" |

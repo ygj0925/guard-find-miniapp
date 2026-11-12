@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { Property, PropertyType } from '@/api/property'
+import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow, onUnload } from '@dcloudio/uni-app'
+import { computed, reactive, ref } from 'vue'
 import { fetchProperties, PROPERTY_TYPE_LABEL } from '@/api/property'
 import { refreshMessageBadge } from '@/utils/messageBadge'
+import { buildPropertyFilters, defaultPropertyFilters } from '@/utils/propertyFilters'
 
 definePage({
   style: {
@@ -12,10 +15,10 @@ definePage({
 })
 
 const PAGE_SIZE = 10
-const city = ref('')
-const filterType = ref<'all' | PropertyType>('all')
-const filterPriceType = ref<'all' | 'rent' | 'sale'>('all')
-const filterRentalMode = ref<'all' | 'whole' | 'shared'>('all')
+const draft = reactive(defaultPropertyFilters())
+const applied = ref(buildPropertyFilters(draft))
+const filterOpen = ref(false)
+const filterError = ref('')
 const items = ref<Property[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -40,9 +43,15 @@ const MODE_TABS = [
   { key: 'whole' as const, label: '整租' },
   { key: 'shared' as const, label: '合租' },
 ]
-const priceIndex = computed(() => PRICE_TABS.findIndex(t => t.key === filterPriceType.value))
-const modeIndex = computed(() => MODE_TABS.findIndex(t => t.key === filterRentalMode.value))
-const hasFilters = computed(() => Boolean(city.value.trim()) || filterType.value !== 'all' || filterPriceType.value !== 'all')
+const SORT_TABS = [
+  { key: 'newest' as const, label: '最新发布' },
+  { key: 'priceAsc' as const, label: '价格从低到高' },
+  { key: 'priceDesc' as const, label: '价格从高到低' },
+]
+const priceIndex = computed(() => PRICE_TABS.findIndex(t => t.key === draft.priceType))
+const modeIndex = computed(() => MODE_TABS.findIndex(t => t.key === draft.rentalMode))
+const sortIndex = computed(() => SORT_TABS.findIndex(t => t.key === draft.sort))
+const hasFilters = computed(() => Object.entries(applied.value).some(([key, value]) => key === 'sort' ? value !== 'newest' : value !== undefined))
 
 let generation = 0
 onUnload(() => {
@@ -61,14 +70,7 @@ async function load(targetPage: number, mode: 'initial' | 'more' = 'initial') {
     total.value = 0
   }
   try {
-    const resp = await fetchProperties({
-      page: targetPage,
-      size: PAGE_SIZE,
-      city: city.value.trim() || undefined,
-      propertyType: filterType.value !== 'all' ? filterType.value : undefined,
-      priceType: filterPriceType.value !== 'all' ? filterPriceType.value : undefined,
-      rentalMode: filterPriceType.value === 'rent' && filterRentalMode.value !== 'all' ? filterRentalMode.value : undefined,
-    })
+    const resp = await fetchProperties({ page: targetPage, size: PAGE_SIZE, ...applied.value })
     if (current !== generation)
       return
     items.value = mode === 'more' ? [...items.value, ...resp.list] : resp.list
@@ -89,25 +91,37 @@ async function load(targetPage: number, mode: 'initial' | 'more' = 'initial') {
   }
 }
 
+function applyFilters() {
+  try {
+    applied.value = buildPropertyFilters(draft)
+    filterError.value = ''
+    void load(1)
+  }
+  catch (err) {
+    filterError.value = err instanceof Error ? err.message : '筛选条件无效'
+    filterOpen.value = true
+  }
+}
 function selectType(key: 'all' | PropertyType) {
-  filterType.value = key
-  void load(1)
+  draft.propertyType = key
+  applyFilters()
 }
 function selectPrice(event: { detail: { value: string | number } }) {
-  filterPriceType.value = PRICE_TABS[Number(event.detail.value)].key
-  filterRentalMode.value = 'all'
-  void load(1)
+  draft.priceType = PRICE_TABS[Number(event.detail.value)].key
+  draft.rentalMode = 'all'
+  applyFilters()
 }
 function selectMode(event: { detail: { value: string | number } }) {
-  filterRentalMode.value = MODE_TABS[Number(event.detail.value)].key
-  void load(1)
+  draft.rentalMode = MODE_TABS[Number(event.detail.value)].key
+  applyFilters()
+}
+function selectSort(event: { detail: { value: string | number } }) {
+  draft.sort = SORT_TABS[Number(event.detail.value)].key
+  applyFilters()
 }
 function clearFilters() {
-  city.value = ''
-  filterType.value = 'all'
-  filterPriceType.value = 'all'
-  filterRentalMode.value = 'all'
-  void load(1)
+  Object.assign(draft, defaultPropertyFilters())
+  applyFilters()
 }
 function goDetail(item: Property) {
   uni.navigateTo({ url: `/pages/property/detail?id=${item.id}` })
@@ -119,7 +133,7 @@ onPullDownRefresh(() => {
   load(1).finally(() => uni.stopPullDownRefresh())
 })
 onReachBottom(() => {
-  if (items.value.length < total.value && !loadingMore.value)
+  if (!error.value && items.value.length < total.value && !loadingMore.value)
     void load(page.value + 1, 'more')
 })
 </script>
@@ -137,32 +151,72 @@ onReachBottom(() => {
       </view>
       <view class="relative mx-16rpx app-panel flex items-center gap-16rpx px-20rpx py-16rpx -mt-40rpx">
         <view class="i-carbon-search shrink-0 text-40rpx text-app-ink" aria-hidden="true" />
-        <input v-model="city" class="h-88rpx min-w-0 flex-1 text-28rpx" placeholder="输入城市筛选" placeholder-class="text-app-placeholder" aria-label="城市筛选" confirm-type="search" @confirm="load(1)">
-        <button class="app-primary-button shrink-0 !min-h-88rpx" :loading="loading" @tap="load(1)">
+        <input v-model="draft.keyword" class="h-88rpx min-w-0 flex-1 text-28rpx" placeholder="搜索标题、小区、地址" placeholder-class="text-app-placeholder" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
+        <button class="app-primary-button shrink-0 !min-h-88rpx" :loading="loading" @tap="applyFilters">
           搜索
         </button>
       </view>
       <view class="mt-24rpx flex gap-8rpx">
-        <button v-for="tab in TYPE_TABS" :key="tab.key" class="app-tap min-h-88rpx min-w-0 flex flex-1 items-center justify-center rounded-16rpx px-4rpx text-28rpx" :class="filterType === tab.key ? 'bg-brand-blue text-white font-600' : 'bg-transparent text-app-ink-soft'" :aria-pressed="filterType === tab.key" @tap="selectType(tab.key)">
+        <button v-for="tab in TYPE_TABS" :key="tab.key" class="app-tap min-h-88rpx min-w-0 flex flex-1 items-center justify-center rounded-16rpx px-4rpx text-28rpx" :class="draft.propertyType === tab.key ? 'bg-brand-blue text-white font-600' : 'bg-transparent text-app-ink-soft'" :aria-pressed="draft.propertyType === tab.key" @tap="selectType(tab.key)">
           {{ tab.label }}
         </button>
       </view>
-      <view class="mt-16rpx flex gap-24rpx">
-        <picker class="min-w-0 flex-1" :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
-          <view class="app-tap app-panel min-h-88rpx flex items-center justify-between gap-16rpx px-24rpx" role="button" aria-label="选择租售类型">
-            <text class="text-28rpx">{{ PRICE_TABS[priceIndex].label }}</text>
+      <view class="grid grid-cols-2 mt-16rpx gap-16rpx">
+        <picker class="min-w-0" :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
+          <view class="app-tap app-panel min-h-88rpx flex items-center justify-between gap-12rpx px-24rpx" role="button" aria-label="选择租售类型">
+            <text class="min-w-0 truncate text-28rpx">{{ PRICE_TABS[priceIndex].label }}</text>
             <view class="i-carbon-chevron-down shrink-0 text-28rpx" aria-hidden="true" />
           </view>
         </picker>
-        <picker v-if="filterPriceType === 'rent'" class="min-w-0 flex-1" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
+        <picker class="min-w-0" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
+          <view class="app-tap app-panel min-h-88rpx flex items-center justify-between gap-12rpx px-24rpx" role="button" aria-label="选择房源排序">
+            <text class="min-w-0 truncate text-28rpx">{{ SORT_TABS[sortIndex].label }}</text>
+            <view class="i-carbon-chevron-down shrink-0 text-28rpx" aria-hidden="true" />
+          </view>
+        </picker>
+        <picker v-if="draft.priceType === 'rent'" class="min-w-0" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
           <view class="app-tap app-panel min-h-88rpx flex items-center justify-between gap-12rpx px-24rpx" role="button" aria-label="选择租赁方式">
-            <text class="text-28rpx">{{ MODE_TABS[modeIndex].label }}</text>
+            <text class="min-w-0 truncate text-28rpx">{{ MODE_TABS[modeIndex].label }}</text>
             <view class="i-carbon-chevron-down shrink-0 text-28rpx" aria-hidden="true" />
           </view>
         </picker>
+        <button class="app-tap app-panel min-h-88rpx min-w-0 flex items-center justify-between gap-12rpx px-24rpx text-28rpx" :class="draft.priceType !== 'rent' ? 'col-span-2' : ''" :aria-expanded="filterOpen" @tap="filterOpen = !filterOpen">
+          <text>城市 · 价格区间</text>
+          <view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="shrink-0 text-28rpx" aria-hidden="true" />
+        </button>
+      </view>
+      <view v-if="filterOpen" class="mt-16rpx app-panel p-24rpx">
+        <text class="block text-28rpx font-600">城市</text>
+        <input v-model="draft.city" class="mt-8rpx box-border h-88rpx w-full rounded-12rpx bg-app-soft px-16rpx text-28rpx" placeholder="不限城市，如上海" placeholder-class="text-app-placeholder" aria-label="城市筛选" :maxlength="50" confirm-type="search" @confirm="applyFilters">
+        <text class="mt-24rpx block text-28rpx font-600">价格区间（元）</text>
+        <text class="mt-8rpx block text-24rpx text-app-ink-soft">出租为每月租金，出售为房源总价</text>
+        <view class="grid grid-cols-2 mt-12rpx gap-16rpx">
+          <view class="min-w-0">
+            <text class="text-24rpx text-app-ink-soft">最低价格</text>
+            <input v-model="draft.minPrice" type="digit" class="mt-8rpx box-border h-88rpx w-full rounded-12rpx bg-app-soft px-16rpx text-28rpx" placeholder="不限" placeholder-class="text-app-placeholder" aria-label="最低价格" :maxlength="13">
+          </view>
+          <view class="min-w-0">
+            <text class="text-24rpx text-app-ink-soft">最高价格</text>
+            <input v-model="draft.maxPrice" type="digit" class="mt-8rpx box-border h-88rpx w-full rounded-12rpx bg-app-soft px-16rpx text-28rpx" placeholder="不限" placeholder-class="text-app-placeholder" aria-label="最高价格" :maxlength="13">
+          </view>
+        </view>
+        <text v-if="filterError" class="mt-16rpx block text-26rpx text-red-700" role="alert">{{ filterError }}</text>
+        <view class="mt-24rpx flex gap-16rpx">
+          <button class="app-secondary-button min-w-0 flex-1" @tap="clearFilters">
+            重置
+          </button>
+          <button class="app-primary-button min-w-0 flex-1" :loading="loading" @tap="applyFilters">
+            应用筛选
+          </button>
+        </view>
       </view>
       <view class="mb-24rpx mt-48rpx flex items-center justify-between gap-16rpx">
-        <text class="app-section-title">{{ filterType === 'all' ? '精选房源' : `${PROPERTY_TYPE_LABEL[filterType]}房源` }}</text>
+        <view class="min-w-0">
+          <text class="app-section-title">{{ !applied.propertyType ? '精选房源' : `${PROPERTY_TYPE_LABEL[applied.propertyType]}房源` }}</text>
+          <text v-if="applied.keyword || applied.city || applied.minPrice !== undefined || applied.maxPrice !== undefined" class="mt-8rpx block break-words text-24rpx text-app-ink-soft">
+            {{ [applied.keyword && `关键词：${applied.keyword}`, applied.city, (applied.minPrice !== undefined || applied.maxPrice !== undefined) && `${applied.minPrice ?? 0}—${applied.maxPrice ?? '不限'}元`].filter(Boolean).join(' · ') }}
+          </text>
+        </view>
         <button v-if="hasFilters" class="app-tap min-h-88rpx shrink-0 bg-transparent px-8rpx text-24rpx text-brand-blue" @tap="clearFilters">
           重置筛选
         </button>

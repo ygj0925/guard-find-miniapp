@@ -7,6 +7,7 @@ export type PropertyStatus = 1 | 2 | 3
 export type PropertyType = 'house' | 'apartment' | 'villa' | 'shop'
 export type PriceType = 'rent' | 'sale'
 export type RentalMode = 'whole' | 'shared'
+export type PropertySort = 'newest' | 'priceAsc' | 'priceDesc'
 
 export interface Property {
   id: string | number
@@ -52,7 +53,7 @@ export const PROPERTY_TYPE_LABEL: Record<string, string> = {
   shop: '商铺',
 }
 
-/** 房源广场:已上架房源,支持类型/租售/租赁方式筛选 */
+/** 房源广场:已上架房源 */
 export function fetchProperties(params: {
   page: number
   size: number
@@ -60,6 +61,10 @@ export function fetchProperties(params: {
   propertyType?: string
   priceType?: string
   rentalMode?: string
+  keyword?: string
+  minPrice?: number
+  maxPrice?: number
+  sort?: PropertySort
 }) {
   return http.get<PageResult<Property>>('/miniapp/property/list', params)
 }
