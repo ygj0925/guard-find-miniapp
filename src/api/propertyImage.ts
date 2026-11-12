@@ -11,27 +11,36 @@ export function uploadPropertyImage(filePath: string): Promise<string> {
       name: 'file',
       filePath,
       timeout: 60000,
-      success(res) {
+      async success(res) {
         try {
-          const data = JSON.parse(res.data) as {
+          let data: {
             code: string | number
             msg?: string
             data?: { url?: string }
+          } | null = null
+          try {
+            data = JSON.parse(res.data)
           }
-          if (
-            String(data.code) === '401'
-            && store.updateNowTime().validToken === token
-          ) {
-            store.clearLoginState()
-            toLoginPage()
+          catch (error) {
+            if (res.statusCode !== 401)
+              throw error
+          }
+          if (res.statusCode === 401 || String(data?.code) === '401') {
+            reject(new Error(data?.msg || '登录已过期，请重新登录'))
+            if (await store.clearLoginState(token))
+              toLoginPage()
+            return
           }
           if (
             res.statusCode < 200
             || res.statusCode >= 300
-            || !isSuccessResultCode(Number(data.code))
-            || !data.data?.url
+            || (typeof data?.code !== 'number' && typeof data?.code !== 'string')
+            || String(data?.code).trim() === ''
+            || !isSuccessResultCode(Number(data?.code))
+            || typeof data?.data?.url !== 'string'
+            || !/^https?:\/\/\S+$/.test(data.data.url)
           ) {
-            throw new Error(data.msg || '图片上传失败')
+            throw new Error(data?.msg || '图片上传失败')
           }
           resolve(data.data.url)
         }

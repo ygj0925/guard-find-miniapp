@@ -43,6 +43,8 @@
   "scripts": {
     "init-husky": "husky",
     "init-baseFiles": "node ./scripts/create-base-files.js",
+    "check:release": "node ./scripts/check-release.js",
+    "test:release": "vitest run src/utils/releaseConfig.test.ts",
     "prepare": "pnpm init-husky && pnpm init-baseFiles",
     "predev": "pnpm init-baseFiles",
     "predev:app": "pnpm init-baseFiles",

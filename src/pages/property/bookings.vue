@@ -166,8 +166,8 @@ async function submit() {
     return
   if (!requireLogin())
     return
-  const bookingTime = `${date.value}T${time.value}:00`
-  const timestamp = new Date(bookingTime).getTime()
+  const bookingTime = `${date.value} ${time.value}:00`
+  const timestamp = new Date(`${date.value}T${time.value}:00`).getTime()
   if (
     !date.value
     || !time.value
