@@ -81,8 +81,8 @@ onMounted(() => {
 })
 // #endif
 
-const activeColor = 'var(--app-brand-blue)'
-const inactiveColor = 'var(--app-muted)'
+const activeColor = '#5360FF'
+const inactiveColor = '#7A869F'
 
 function getColorByIndex(index: number) {
   return tabbarStore.curIdx === index ? activeColor : inactiveColor

@@ -60,6 +60,7 @@ const statusClasses: Record<number, string> = {
 
 onLoad((query) => {
   propertyId.value = String(query?.propertyId || '')
+  role.value = query?.role === 'owner' ? 'owner' : 'guest'
   if (propertyId.value) {
     uni.setNavigationBarTitle({ title: '预约看房' })
     void loadProperty()

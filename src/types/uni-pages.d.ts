@@ -12,9 +12,12 @@ type _LocationUrl =
   "/pages/message/chat" |
   "/pages/message/index" |
   "/pages/message/notices" |
+  "/pages/message/support" |
+  "/pages/property/activities" |
   "/pages/property/bookings" |
   "/pages/property/detail" |
   "/pages/property/edit" |
+  "/pages/property/manager" |
   "/pages/property/personal";
 
 interface NavigateToOptions {
@@ -23,7 +26,7 @@ interface NavigateToOptions {
 interface RedirectToOptions extends NavigateToOptions {}
 
 interface SwitchTabOptions {
-  url: "/pages/index/index" | "/pages/message/index" | "/pages/me/me"
+  url: "/pages/index/index" | "/pages/message/index" | "/pages/property/manager" | "/pages/me/me"
 }
 
 type ReLaunchOptions = NavigateToOptions | SwitchTabOptions;

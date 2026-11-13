@@ -5,6 +5,9 @@ import IndexPage from './index.vue'
 
 const state = vi.hoisted(() => ({
   fetch: vi.fn(),
+  home: vi.fn(),
+  favorite: vi.fn(),
+  token: '',
   load: undefined as undefined | (() => void),
   more: undefined as undefined | (() => void),
   unload: undefined as undefined | (() => void),
@@ -18,19 +21,22 @@ vi.mock('@dcloudio/uni-app', () => ({
   onShareAppMessage: vi.fn(),
   onShareTimeline: vi.fn(),
 }))
-vi.mock('@/api/property', () => ({ fetchProperties: state.fetch, PROPERTY_TYPE_LABEL: { house: '住宅', apartment: '公寓' } }))
+vi.mock('@/api/property', async original => ({ ...await original<typeof import('@/api/property')>(), fetchProperties: state.fetch, fetchRegionTree: vi.fn().mockResolvedValue([]), toggleFavorite: state.favorite }))
+vi.mock('@/api/propertyHome', () => ({ fetchPropertyHome: state.home }))
+vi.mock('@/store/token', () => ({ useTokenStore: () => ({ updateNowTime: () => ({ hasLogin: !!state.token, validToken: state.token }) }) }))
+vi.mock('@/utils/toLoginPage', () => ({ toLoginPage: vi.fn() }))
 vi.mock('@/utils/messageBadge', () => ({ refreshMessageBadge: vi.fn() }))
 
 function property(id: string): Property {
   return { id, title: `房源${id}`, price: 2000, priceType: 'rent', propertyType: 'apartment', images: [] } as unknown as Property
 }
 function button(wrapper: ReturnType<typeof mount>, text: string) {
-  return wrapper.findAll('button').find(item => item.text() === text)!
+  return wrapper.findAll('button').find(item => item.text().replace('HOT', '').trim() === text)!
 }
 async function render() {
   const wrapper = mount(IndexPage, {
     global: {
-      stubs: { picker: { template: '<div class="picker-stub"><slot /></div>' } },
+      stubs: { 'picker': { template: '<div class="picker-stub"><slot /></div>' }, 'swiper': { template: '<div><slot /></div>' }, 'swiper-item': { template: '<div><slot /></div>' } },
     },
   })
   state.load?.()
@@ -40,7 +46,11 @@ async function render() {
 
 beforeEach(() => {
   vi.stubGlobal('definePage', vi.fn())
+  vi.stubGlobal('uni', { pageScrollTo: vi.fn(), navigateTo: vi.fn(), showModal: vi.fn(), showToast: vi.fn(), makePhoneCall: vi.fn() })
   state.fetch.mockReset().mockResolvedValue({ list: [property('1')], total: 3 })
+  state.home.mockReset().mockResolvedValue({ supportPhone: null, serviceHours: null, banners: [], activities: [] })
+  state.favorite.mockReset().mockResolvedValue({ favorited: true })
+  state.token = ''
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -119,6 +129,51 @@ describe('首页搜索与分页', () => {
     await button(wrapper, '查看全部房源').trigger('tap')
     await flushPromises()
     expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: undefined }))
+    wrapper.unmount()
+  })
+
+  it('单间和短租使用独立筛选并清除旧价格区间', async () => {
+    const wrapper = await render()
+    await button(wrapper, '城市 · 价格区间').trigger('tap')
+    await wrapper.get('input[aria-label="最低价格"]').setValue('5000')
+    await button(wrapper, '民宿短租').trigger('tap')
+    await flushPromises()
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ rentalMode: 'short', priceUnit: 'day', priceType: 'rent', minPrice: undefined }))
+    await button(wrapper, '单间').trigger('tap')
+    await flushPromises()
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ rentalMode: 'room', priceUnit: 'month' }))
+    wrapper.unmount()
+  })
+
+  it('房源推荐请求真实推荐筛选，活动和客服可导航', async () => {
+    const wrapper = await render()
+    await button(wrapper, '房源推荐').trigger('tap')
+    await flushPromises()
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ recommended: true }))
+    await button(wrapper, '优惠活动').trigger('tap')
+    expect(uni.navigateTo).toHaveBeenLastCalledWith({ url: '/pages/property/activities' })
+    await button(wrapper, '客服中心').trigger('tap')
+    expect(uni.navigateTo).toHaveBeenLastCalledWith({ url: '/pages/message/support' })
+    wrapper.unmount()
+  })
+
+  it('未配置电话不给出假号码，运营加载失败可重试', async () => {
+    state.home.mockRejectedValueOnce(new Error('network'))
+    const wrapper = await render()
+    expect(wrapper.text()).toContain('运营信息加载失败')
+    await button(wrapper, '重试').trigger('tap')
+    await flushPromises()
+    await button(wrapper, '电话咨询').trigger('tap')
+    expect(uni.showModal).toHaveBeenCalledWith(expect.objectContaining({ title: '电话暂未配置' }))
+    expect(uni.makePhoneCall).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('横幅按后台配置跳转活动详情', async () => {
+    state.home.mockResolvedValueOnce({ supportPhone: null, serviceHours: null, activities: [], banners: [{ id: 'spring', title: '测试活动', subtitle: null, imageUrl: null, enabled: true, targetType: 'activity', targetId: 'spring' }] })
+    const wrapper = await render()
+    await wrapper.get('button[aria-label="测试活动"]').trigger('tap')
+    expect(uni.navigateTo).toHaveBeenLastCalledWith({ url: '/pages/property/activities?id=spring' })
     wrapper.unmount()
   })
 })

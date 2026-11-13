@@ -22,7 +22,7 @@ function getIconByIndex(index: number, item: CustomTabBarItem) {
 </script>
 
 <template>
-  <view class="relative flex flex-col items-center justify-center">
+  <view class="tabbar-item relative flex flex-col items-center justify-center" :class="tabbarStore.curIdx === index ? 'tabbar-item-active' : ''">
     <template v-if="item.iconType === 'uiLib'" />
 
     <template v-if="item.iconType === 'unocss' || item.iconType === 'iconfont'">
@@ -48,3 +48,24 @@ function getIconByIndex(index: number, item: CustomTabBarItem) {
     </view>
   </view>
 </template>
+
+<style scoped>
+.tabbar-item {
+  min-width: 64px;
+  min-height: 44px;
+  border-radius: 18px;
+}
+.tabbar-item-active {
+  background: #f0f2ff;
+}
+.tabbar-item-active::after {
+  position: absolute;
+  bottom: -3px;
+  left: 36%;
+  right: 36%;
+  height: 3px;
+  border-radius: 3px;
+  background: #5968ff;
+  content: '';
+}
+</style>

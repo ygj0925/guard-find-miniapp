@@ -6,13 +6,14 @@ import BookingsPage from './bookings.vue'
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   detail: vi.fn(),
+  bookings: vi.fn(),
   login: vi.fn(),
   hasLogin: true,
 }))
 vi.mock('@/api/property', () => ({
   createBooking: mocks.create,
   fetchPropertyDetail: mocks.detail,
-  fetchBookings: vi.fn(),
+  fetchBookings: mocks.bookings,
   changeBookingStatus: vi.fn(),
 }))
 vi.mock('@/store/token', () => ({
@@ -21,7 +22,7 @@ vi.mock('@/store/token', () => ({
 vi.mock('@/utils/toLoginPage', () => ({ toLoginPage: mocks.login }))
 
 let wrapper: ReturnType<typeof mount> | undefined
-let load: ((query: { propertyId: string }) => void) | undefined
+let load: ((query: { propertyId?: string, role?: string }) => void) | undefined
 let show: (() => void) | undefined
 const valid = {
   date: '2026-11-05',
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 10, 5, 10, 30, 0))
   mocks.create.mockReset().mockResolvedValue('booking-1')
   mocks.detail.mockReset().mockResolvedValue({ id: 'property-1', title: '测试房源', images: [] })
+  mocks.bookings.mockReset().mockResolvedValue({ list: [], total: 0 })
   mocks.login.mockReset()
   mocks.hasLogin = true
   load = undefined
@@ -188,6 +190,20 @@ describe('预约提交时间契约', () => {
 })
 
 describe('预约提交状态与导航', () => {
+  it.each([
+    ['owner', 'owner'],
+    ['guest', 'guest'],
+    ['invalid', 'guest'],
+    [undefined, 'guest'],
+  ])('预约列表入口 role=%s 选择正确角色', async (queryRole, expectedRole) => {
+    wrapper = mount(BookingsPage, { global: { stubs: { picker: true } } })
+    load?.({ role: queryRole })
+    show?.()
+    await flushPromises()
+    expect(mocks.bookings).toHaveBeenCalledExactlyOnceWith(expectedRole, 1)
+    expect(mocks.detail).not.toHaveBeenCalled()
+  })
+
   it('提交未完成时重复 tap 不重复调用 API，表单和按钮禁用，完成后恢复', async () => {
     let complete!: (value: string) => void
     mocks.create.mockReturnValueOnce(new Promise<string>((resolve) => {

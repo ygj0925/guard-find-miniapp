@@ -4,6 +4,8 @@ import type { HttpError } from '@/http/types'
 import {
   fetchPropertyDetail,
   PROPERTY_TYPE_LABEL,
+  propertyPriceSuffix,
+  RENTAL_MODE_LABEL,
   toggleFavorite,
 } from '@/api/property'
 import { useTokenStore } from '@/store/token'
@@ -45,7 +47,7 @@ const metadata = computed(() => {
   return [
     { label: '房源类型', value: PROPERTY_TYPE_LABEL[item.propertyType] },
     { label: '交易方式', value: item.priceType === 'rent' ? '出租' : item.priceType === 'sale' ? '出售' : null },
-    { label: '租赁方式', value: item.rentalMode === 'whole' ? '整租' : item.rentalMode === 'shared' ? '合租' : null },
+    { label: '租赁方式', value: item.priceType === 'rent' && item.rentalMode ? RENTAL_MODE_LABEL[item.rentalMode] : null },
     { label: '楼层', value: item.floorInfo ? `${item.floorInfo}层` : null },
     { label: '装修', value: item.decoration },
     { label: '可入住日期', value: item.availableFrom ? String(item.availableFrom).slice(0, 10) : null },
@@ -86,7 +88,7 @@ function shareTitle() {
   const item = property.value
   if (!item)
     return import.meta.env.VITE_APP_TITLE
-  const price = item.price == null ? '' : ` ¥${item.price}${item.priceType === 'rent' ? '/月' : ''}`
+  const price = item.price == null ? '' : ` ¥${item.price}${propertyPriceSuffix(item)}`
   return `${item.title}${price}`
 }
 onShareAppMessage(() => ({
@@ -311,7 +313,7 @@ function returnToProperties() {
           </view>
           <view v-if="property.price != null" class="mt-2 flex items-baseline gap-1 text-brand-blue">
             <text class="text-28px font-bold">¥{{ property.price }}</text>
-            <text v-if="property.priceType === 'rent'" class="text-sm">/月</text>
+            <text class="text-sm">{{ propertyPriceSuffix(property) }}</text>
           </view>
           <view v-if="highlights.length" class="grid grid-cols-3 mt-4 gap-3 border-0 border-t border-app-border border-solid pt-4 text-center">
             <view v-for="field in highlights" :key="field.label" class="min-w-0">

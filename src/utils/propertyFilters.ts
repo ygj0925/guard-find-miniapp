@@ -9,10 +9,13 @@ export interface PropertyFilterDraft {
   minPrice: string
   maxPrice: string
   sort: PropertySort
+  priceUnit: 'all' | 'month' | 'day'
+  recommended: boolean
+  activityId: string
 }
 
 export function defaultPropertyFilters(): PropertyFilterDraft {
-  return { keyword: '', city: '', propertyType: 'all', priceType: 'all', rentalMode: 'all', minPrice: '', maxPrice: '', sort: 'newest' }
+  return { keyword: '', city: '', propertyType: 'all', priceType: 'all', rentalMode: 'all', minPrice: '', maxPrice: '', sort: 'newest', priceUnit: 'all', recommended: false, activityId: '' }
 }
 
 function parsePrice(value: string): number | undefined {
@@ -41,6 +44,9 @@ export function buildPropertyFilters(draft: PropertyFilterDraft) {
     propertyType: draft.propertyType === 'all' ? undefined : draft.propertyType,
     priceType: draft.priceType === 'all' ? undefined : draft.priceType,
     rentalMode: draft.priceType === 'rent' && draft.rentalMode !== 'all' ? draft.rentalMode : undefined,
+    priceUnit: draft.priceType === 'rent' && draft.priceUnit !== 'all' ? draft.priceUnit : undefined,
+    recommended: draft.recommended || undefined,
+    activityId: draft.activityId || undefined,
     minPrice,
     maxPrice,
     sort: draft.sort,

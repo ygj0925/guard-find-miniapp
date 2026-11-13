@@ -6,8 +6,20 @@ import { http } from '@/http/http'
 export type PropertyStatus = 1 | 2 | 3
 export type PropertyType = 'house' | 'apartment' | 'villa' | 'shop'
 export type PriceType = 'rent' | 'sale'
-export type RentalMode = 'whole' | 'shared'
+export type RentalMode = 'whole' | 'shared' | 'room' | 'short'
+export type PriceUnit = 'month' | 'day'
 export type PropertySort = 'newest' | 'priceAsc' | 'priceDesc'
+
+export const RENTAL_MODE_LABEL: Record<RentalMode, string> = {
+  whole: '整租',
+  shared: '合租',
+  room: '单间',
+  short: '民宿短租',
+}
+
+export function propertyPriceSuffix(item: Pick<Property, 'priceType' | 'priceUnit'>) {
+  return item.priceType === 'rent' ? (item.priceUnit === 'day' ? '/天' : '/月') : '元'
+}
 
 export interface Property {
   id: string | number
@@ -25,6 +37,8 @@ export interface Property {
   decoration: string | null
   price: number
   priceType: PriceType
+  priceUnit: PriceUnit | null
+  recommended: boolean
   community: string | null
   availableFrom: string | null
   rentalMode: RentalMode | null
@@ -61,6 +75,9 @@ export function fetchProperties(params: {
   propertyType?: string
   priceType?: string
   rentalMode?: string
+  priceUnit?: PriceUnit
+  recommended?: boolean
+  activityId?: string
   keyword?: string
   minPrice?: number
   maxPrice?: number
@@ -86,6 +103,7 @@ export type PropertyInput = Pick<
   | 'decoration'
   | 'price'
   | 'priceType'
+  | 'priceUnit'
   | 'community'
   | 'availableFrom'
   | 'rentalMode'

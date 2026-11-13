@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import type { Property, PropertyType } from '@/api/property'
+import type { HomeBanner, PropertyHome } from '@/api/propertyHome'
 import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow, onUnload } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
-import { fetchProperties, PROPERTY_TYPE_LABEL } from '@/api/property'
+import { fetchProperties, fetchRegionTree, PROPERTY_TYPE_LABEL } from '@/api/property'
+import { fetchPropertyHome } from '@/api/propertyHome'
+import PropertyCard from '@/components/PropertyCard.vue'
+import { useTokenStore } from '@/store/token'
 import { refreshMessageBadge } from '@/utils/messageBadge'
 import { buildPropertyFilters, defaultPropertyFilters } from '@/utils/propertyFilters'
+import { toLoginPage } from '@/utils/toLoginPage'
+import HomeBanners from '@/components/HomeBanners.vue'
+import HomeShortcuts from '@/components/HomeShortcuts.vue'
 
-definePage({
-  style: {
-    navigationBarTitleText: '上海泊之湾公寓',
-    backgroundColor: '#F7F8FA',
-    enablePullDownRefresh: true,
-  },
-})
-
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '上海泊之湾公寓', backgroundColor: '#F5F7FF', enablePullDownRefresh: true } })
 const PAGE_SIZE = 10
 const draft = reactive(defaultPropertyFilters())
 const applied = ref(buildPropertyFilters(draft))
@@ -25,7 +25,9 @@ const page = ref(1)
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref(false)
-const failedImages = ref<(string | number)[]>([])
+const home = ref<PropertyHome>({ supportPhone: null, serviceHours: null, banners: [], activities: [] })
+const homeError = ref(false)
+const cities = ref<string[]>(['不限城市'])
 const TYPE_TABS: { key: 'all' | PropertyType, label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'house', label: '住宅' },
@@ -33,38 +35,40 @@ const TYPE_TABS: { key: 'all' | PropertyType, label: string }[] = [
   { key: 'villa', label: '别墅' },
   { key: 'shop', label: '商铺' },
 ]
-const PRICE_TABS = [
-  { key: 'all' as const, label: '全部租售' },
-  { key: 'rent' as const, label: '出租' },
-  { key: 'sale' as const, label: '出售' },
-]
+const PRICE_TABS = [{ key: 'all' as const, label: '全部租售' }, { key: 'rent' as const, label: '出租' }, { key: 'sale' as const, label: '出售' }]
 const MODE_TABS = [
   { key: 'all' as const, label: '全部租赁方式' },
   { key: 'whole' as const, label: '整租' },
   { key: 'shared' as const, label: '合租' },
+  { key: 'room' as const, label: '单间' },
+  { key: 'short' as const, label: '民宿短租' },
 ]
-const SORT_TABS = [
-  { key: 'newest' as const, label: '最新发布' },
-  { key: 'priceAsc' as const, label: '价格从低到高' },
-  { key: 'priceDesc' as const, label: '价格从高到低' },
-]
+const UNIT_TABS = [{ key: 'all' as const, label: '全部计价' }, { key: 'month' as const, label: '月租' }, { key: 'day' as const, label: '日租' }]
+const SORT_TABS = [{ key: 'newest' as const, label: '最新发布' }, { key: 'priceAsc' as const, label: '价格从低到高' }, { key: 'priceDesc' as const, label: '价格从高到低' }]
 const priceIndex = computed(() => PRICE_TABS.findIndex(t => t.key === draft.priceType))
 const modeIndex = computed(() => MODE_TABS.findIndex(t => t.key === draft.rentalMode))
+const unitIndex = computed(() => UNIT_TABS.findIndex(t => t.key === draft.priceUnit))
 const sortIndex = computed(() => SORT_TABS.findIndex(t => t.key === draft.sort))
 const hasFilters = computed(() => Object.entries(applied.value).some(([key, value]) => key === 'sort' ? value !== 'newest' : value !== undefined))
-
 let generation = 0
+let homeVersion = 0
+let disposed = false
+let firstShow = true
 onUnload(() => {
+  disposed = true
   generation++
+  homeVersion++
 })
 onShareAppMessage(() => ({ title: `${import.meta.env.VITE_APP_TITLE} · 精选房源`, path: '/pages/index/index' }))
 onShareTimeline(() => ({ title: `${import.meta.env.VITE_APP_TITLE} · 精选房源` }))
+
 async function load(targetPage: number, mode: 'initial' | 'more' = 'initial') {
   if (mode === 'more' && (loading.value || loadingMore.value))
     return
   const current = ++generation
   error.value = false
-  mode === 'initial' ? (loading.value = true) : (loadingMore.value = true)
+  loadingMore.value = mode === 'more'
+  loading.value = mode === 'initial'
   if (mode === 'initial') {
     items.value = []
     total.value = 0
@@ -76,8 +80,6 @@ async function load(targetPage: number, mode: 'initial' | 'more' = 'initial') {
     items.value = mode === 'more' ? [...items.value, ...resp.list] : resp.list
     total.value = resp.total
     page.value = targetPage
-    if (mode === 'initial')
-      failedImages.value = []
   }
   catch {
     if (current === generation)
@@ -90,7 +92,28 @@ async function load(targetPage: number, mode: 'initial' | 'more' = 'initial') {
     }
   }
 }
-
+async function loadHome() {
+  const current = ++homeVersion
+  homeError.value = false
+  try {
+    const result = await fetchPropertyHome()
+    if (current === homeVersion)
+      home.value = result
+  }
+  catch {
+    if (current === homeVersion)
+      homeError.value = true
+  }
+}
+async function loadCities() {
+  try {
+    const tree = await fetchRegionTree()
+    const names = tree.flatMap(p => ['北京市', '上海市', '天津市', '重庆市'].includes(p.name) ? [p.name] : p.children.map(c => c.name))
+    if (!disposed)
+      cities.value = ['不限城市', ...new Set(names)]
+  }
+  catch {}
+}
 function applyFilters() {
   try {
     applied.value = buildPropertyFilters(draft)
@@ -109,28 +132,122 @@ function selectType(key: 'all' | PropertyType) {
 function selectPrice(event: { detail: { value: string | number } }) {
   draft.priceType = PRICE_TABS[Number(event.detail.value)].key
   draft.rentalMode = 'all'
+  draft.priceUnit = 'all'
+  draft.minPrice = ''
+  draft.maxPrice = ''
   applyFilters()
 }
 function selectMode(event: { detail: { value: string | number } }) {
   draft.rentalMode = MODE_TABS[Number(event.detail.value)].key
+  draft.priceUnit = draft.rentalMode === 'short' ? 'day' : draft.rentalMode === 'all' ? 'all' : 'month'
+  draft.minPrice = ''
+  draft.maxPrice = ''
+  applyFilters()
+}
+function selectUnit(event: { detail: { value: string | number } }) {
+  draft.priceUnit = UNIT_TABS[Number(event.detail.value)].key
+  draft.rentalMode = 'all'
+  draft.minPrice = ''
+  draft.maxPrice = ''
   applyFilters()
 }
 function selectSort(event: { detail: { value: string | number } }) {
   draft.sort = SORT_TABS[Number(event.detail.value)].key
   applyFilters()
 }
+function selectCity(event: { detail: { value: string | number } }) {
+  draft.city = Number(event.detail.value) === 0 ? '' : cities.value[Number(event.detail.value)]
+  applyFilters()
+}
 function clearFilters() {
   Object.assign(draft, defaultPropertyFilters())
   applyFilters()
 }
-function goDetail(item: Property) {
-  uni.navigateTo({ url: `/pages/property/detail?id=${item.id}` })
+function scrollToProperties() {
+  uni.pageScrollTo({ selector: '#property-results', duration: 300 })
 }
-
-onLoad(() => load(1))
-onShow(() => void refreshMessageBadge())
+function openChat() {
+  if (!useTokenStore().updateNowTime().hasLogin) {
+    toLoginPage()
+    return
+  }
+  uni.navigateTo({ url: '/pages/message/chat?mode=support' })
+}
+function phone() {
+  if (homeError.value) {
+    uni.showToast({ title: '咨询信息加载失败，请重试', icon: 'none' })
+    void loadHome()
+    return
+  }
+  if (home.value.supportPhone) {
+    uni.makePhoneCall({ phoneNumber: home.value.supportPhone })
+    return
+  }
+  uni.showModal({ title: '电话暂未配置', content: '可以通过在线咨询联系公寓管家。', confirmText: '在线咨询', success: (r) => {
+    if (r.confirm)
+      openChat()
+  } })
+}
+function shortcut(key: string) {
+  if (key === 'phone') {
+    phone()
+    return
+  }
+  if (key === 'chat') {
+    openChat()
+    return
+  }
+  if (key === 'support') {
+    uni.navigateTo({ url: '/pages/message/support' })
+    return
+  }
+  if (key === 'activities') {
+    uni.navigateTo({ url: '/pages/property/activities' })
+    return
+  }
+  const city = draft.city
+  Object.assign(draft, defaultPropertyFilters(), { city })
+  if (key === 'recommended') {
+    draft.recommended = true
+  }
+  else if (key === 'apartment') {
+    draft.propertyType = 'apartment'
+    draft.priceType = 'rent'
+  }
+  else if (key === 'whole' || key === 'room' || key === 'short') {
+    draft.priceType = 'rent'
+    draft.rentalMode = key
+    draft.priceUnit = key === 'short' ? 'day' : 'month'
+  }
+  applyFilters()
+  scrollToProperties()
+}
+function bannerTarget(banner: HomeBanner) {
+  if (banner.targetType === 'property' && banner.targetId)
+    uni.navigateTo({ url: `/pages/property/detail?id=${encodeURIComponent(banner.targetId)}` })
+  else if (banner.targetType === 'activity' && banner.targetId)
+    uni.navigateTo({ url: `/pages/property/activities?id=${encodeURIComponent(banner.targetId)}` })
+  else shortcut(banner.targetType)
+}
+function favoriteChanged(id: Property['id'], favorited: boolean) {
+  items.value = items.value.map(item => item.id === id ? { ...item, isFavorited: favorited } : item)
+}
+onLoad(() => {
+  void load(1)
+  void loadHome()
+  void loadCities()
+})
+onShow(() => {
+  void refreshMessageBadge()
+  if (firstShow) {
+    firstShow = false
+    return
+  }
+  void load(1)
+  void loadHome()
+})
 onPullDownRefresh(() => {
-  load(1).finally(() => uni.stopPullDownRefresh())
+  Promise.all([load(1), loadHome()]).finally(() => uni.stopPullDownRefresh())
 })
 onReachBottom(() => {
   if (!error.value && items.value.length < total.value && !loadingMore.value)
@@ -139,145 +256,356 @@ onReachBottom(() => {
 </script>
 
 <template>
-  <view class="app-tab-page">
-    <view class="app-content pt-24rpx">
-      <view class="relative h-380rpx overflow-hidden rounded-32rpx bg-app-soft">
-        <image src="/static/images/apartment-atmosphere.jpg" mode="aspectFill" class="h-full w-full" aria-hidden="true" />
-        <view class="absolute left-28rpx top-28rpx rounded-16rpx bg-white/90 px-24rpx py-16rpx">
-          <text class="block text-52rpx font-700 leading-tight">泊之湾</text>
-          <text class="mt-8rpx block text-28rpx text-app-ink-soft">找一处，安心住下。</text>
+  <view class="home-page app-tab-page">
+    <view class="home-content">
+      <view class="home-heading">
+        <view><text class="brand-name">泊之湾</text><text class="brand-slogan">找一处，安心住下。</text></view>
+        <view class="heading-actions">
+          <picker :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCity">
+            <view class="city-button" role="button" aria-label="选择城市">
+              <view class="i-carbon-location text-5" /><text>{{ draft.city || '全国' }}</text><view class="i-carbon-chevron-down text-3" />
+            </view>
+          </picker>
+          <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
+            <view class="i-carbon-chat text-7" />
+          </button>
         </view>
-        <text class="absolute bottom-56rpx right-16rpx rounded-8rpx bg-white/90 px-12rpx py-4rpx text-24rpx text-app-ink-soft">品牌氛围示意图</text>
       </view>
-      <view class="relative mx-16rpx app-panel flex items-center gap-16rpx px-20rpx py-16rpx -mt-40rpx">
-        <view class="i-carbon-search shrink-0 text-40rpx text-app-ink" aria-hidden="true" />
-        <input v-model="draft.keyword" class="h-88rpx min-w-0 flex-1 text-28rpx" placeholder="搜索标题、小区、地址" placeholder-class="text-app-placeholder" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
-        <button class="app-primary-button shrink-0 !min-h-88rpx" :loading="loading" @tap="applyFilters">
+      <view class="search-box">
+        <view class="i-carbon-search shrink-0 text-7 text-#6454ff" aria-hidden="true" />
+        <input v-model="draft.keyword" class="min-w-0 flex-1" placeholder="搜索标题、小区、地址" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
+        <button class="search-button app-tap" :loading="loading" @tap="applyFilters">
           搜索
         </button>
       </view>
-      <view class="mt-24rpx flex gap-8rpx">
-        <button v-for="tab in TYPE_TABS" :key="tab.key" class="app-tap min-h-88rpx min-w-0 flex flex-1 items-center justify-center rounded-16rpx px-4rpx text-28rpx" :class="draft.propertyType === tab.key ? 'bg-brand-blue text-white font-600' : 'bg-transparent text-app-ink-soft'" :aria-pressed="draft.propertyType === tab.key" @tap="selectType(tab.key)">
+      <HomeShortcuts @select="shortcut" />
+      <HomeBanners :banners="home.banners" @select="bannerTarget" />
+      <view v-if="homeError" class="home-error">
+        <text>运营信息加载失败，不影响浏览房源</text><button class="app-tap" @tap="loadHome">
+          重试
+        </button>
+      </view>
+      <view id="property-results" class="type-tabs">
+        <button v-for="tab in TYPE_TABS" :key="tab.key" class="type-tab app-tap" :class="draft.propertyType === tab.key ? 'type-active' : ''" :aria-pressed="draft.propertyType === tab.key" @tap="selectType(tab.key)">
           {{ tab.label }}
         </button>
       </view>
-      <view class="grid grid-cols-2 mt-16rpx gap-16rpx">
-        <picker class="min-w-0" :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
-          <view class="app-tap app-panel min-h-88rpx flex items-center justify-between gap-12rpx px-24rpx" role="button" aria-label="选择租售类型">
-            <text class="min-w-0 truncate text-28rpx">{{ PRICE_TABS[priceIndex].label }}</text>
-            <view class="i-carbon-chevron-down shrink-0 text-28rpx" aria-hidden="true" />
-          </view>
-        </picker>
-        <picker class="min-w-0" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
-          <view class="app-tap app-panel min-h-88rpx flex items-center justify-between gap-12rpx px-24rpx" role="button" aria-label="选择房源排序">
-            <text class="min-w-0 truncate text-28rpx">{{ SORT_TABS[sortIndex].label }}</text>
-            <view class="i-carbon-chevron-down shrink-0 text-28rpx" aria-hidden="true" />
-          </view>
-        </picker>
-        <picker v-if="draft.priceType === 'rent'" class="min-w-0" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
-          <view class="app-tap app-panel min-h-88rpx flex items-center justify-between gap-12rpx px-24rpx" role="button" aria-label="选择租赁方式">
-            <text class="min-w-0 truncate text-28rpx">{{ MODE_TABS[modeIndex].label }}</text>
-            <view class="i-carbon-chevron-down shrink-0 text-28rpx" aria-hidden="true" />
-          </view>
-        </picker>
-        <button class="app-tap app-panel min-h-88rpx min-w-0 flex items-center justify-between gap-12rpx px-24rpx text-28rpx" :class="draft.priceType !== 'rent' ? 'col-span-2' : ''" :aria-expanded="filterOpen" @tap="filterOpen = !filterOpen">
-          <text>城市 · 价格区间</text>
-          <view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="shrink-0 text-28rpx" aria-hidden="true" />
+      <view class="filter-row">
+        <button class="filter-button app-tap" :aria-expanded="filterOpen" @tap="filterOpen = !filterOpen">
+          <view class="i-carbon-location text-5" aria-hidden="true" /><text>城市 · 价格区间</text><view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="ml-auto shrink-0 text-4" />
         </button>
+        <picker class="min-w-0 flex-1" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
+          <view class="filter-button" role="button" aria-label="选择房源排序">
+            <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ SORT_TABS[sortIndex].label }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
+          </view>
+        </picker>
       </view>
-      <view v-if="filterOpen" class="mt-16rpx app-panel p-24rpx">
-        <text class="block text-28rpx font-600">城市</text>
-        <input v-model="draft.city" class="mt-8rpx box-border h-88rpx w-full rounded-12rpx bg-app-soft px-16rpx text-28rpx" placeholder="不限城市，如上海" placeholder-class="text-app-placeholder" aria-label="城市筛选" :maxlength="50" confirm-type="search" @confirm="applyFilters">
-        <text class="mt-24rpx block text-28rpx font-600">价格区间（元）</text>
-        <text class="mt-8rpx block text-24rpx text-app-ink-soft">出租为每月租金，出售为房源总价</text>
-        <view class="grid grid-cols-2 mt-12rpx gap-16rpx">
+      <view v-if="filterOpen" class="filter-panel app-panel p-4">
+        <view class="grid grid-cols-2 gap-3">
+          <picker :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
+            <view class="panel-picker" role="button" aria-label="选择租售类型">
+              {{ PRICE_TABS[priceIndex].label }}<view class="i-carbon-chevron-down" />
+            </view>
+          </picker>
+          <picker v-if="draft.priceType === 'rent'" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
+            <view class="panel-picker" role="button" aria-label="选择租赁方式">
+              {{ MODE_TABS[modeIndex].label }}<view class="i-carbon-chevron-down" />
+            </view>
+          </picker>
+          <picker v-if="draft.priceType === 'rent'" :range="UNIT_TABS" range-key="label" :value="unitIndex" @change="selectUnit">
+            <view class="panel-picker" role="button" aria-label="选择计价单位">
+              {{ UNIT_TABS[unitIndex].label }}<view class="i-carbon-chevron-down" />
+            </view>
+          </picker>
+        </view>
+        <text class="mt-3 block text-sm font-600">城市</text><input v-model="draft.city" class="panel-input" placeholder="不限城市，如上海市" aria-label="城市筛选" :maxlength="50" confirm-type="search" @confirm="applyFilters">
+        <text class="mt-4 block text-sm font-600">价格区间（元）</text><text class="mt-1 block text-xs text-app-muted">按房源标价筛选，可先选择月租或日租；出售为总价。</text>
+        <view class="grid grid-cols-2 mt-3 gap-3">
           <view class="min-w-0">
-            <text class="text-24rpx text-app-ink-soft">最低价格</text>
-            <input v-model="draft.minPrice" type="digit" class="mt-8rpx box-border h-88rpx w-full rounded-12rpx bg-app-soft px-16rpx text-28rpx" placeholder="不限" placeholder-class="text-app-placeholder" aria-label="最低价格" :maxlength="13">
+            <text class="text-xs text-app-muted">最低价格</text><input v-model="draft.minPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最低价格" :maxlength="13">
           </view>
           <view class="min-w-0">
-            <text class="text-24rpx text-app-ink-soft">最高价格</text>
-            <input v-model="draft.maxPrice" type="digit" class="mt-8rpx box-border h-88rpx w-full rounded-12rpx bg-app-soft px-16rpx text-28rpx" placeholder="不限" placeholder-class="text-app-placeholder" aria-label="最高价格" :maxlength="13">
+            <text class="text-xs text-app-muted">最高价格</text><input v-model="draft.maxPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最高价格" :maxlength="13">
           </view>
         </view>
-        <text v-if="filterError" class="mt-16rpx block text-26rpx text-red-700" role="alert">{{ filterError }}</text>
-        <view class="mt-24rpx flex gap-16rpx">
+        <text v-if="filterError" class="mt-3 block text-sm text-app-danger" role="alert">{{ filterError }}</text>
+        <view class="mt-4 flex gap-3">
           <button class="app-secondary-button min-w-0 flex-1" @tap="clearFilters">
             重置
-          </button>
-          <button class="app-primary-button min-w-0 flex-1" :loading="loading" @tap="applyFilters">
+          </button><button class="app-primary-button min-w-0 flex-1" :loading="loading" @tap="applyFilters">
             应用筛选
           </button>
         </view>
       </view>
-      <view class="mb-24rpx mt-48rpx flex items-center justify-between gap-16rpx">
-        <view class="min-w-0">
-          <text class="app-section-title">{{ !applied.propertyType ? '精选房源' : `${PROPERTY_TYPE_LABEL[applied.propertyType]}房源` }}</text>
-          <text v-if="applied.keyword || applied.city || applied.minPrice !== undefined || applied.maxPrice !== undefined" class="mt-8rpx block break-words text-24rpx text-app-ink-soft">
-            {{ [applied.keyword && `关键词：${applied.keyword}`, applied.city, (applied.minPrice !== undefined || applied.maxPrice !== undefined) && `${applied.minPrice ?? 0}—${applied.maxPrice ?? '不限'}元`].filter(Boolean).join(' · ') }}
-          </text>
-        </view>
-        <button v-if="hasFilters" class="app-tap min-h-88rpx shrink-0 bg-transparent px-8rpx text-24rpx text-brand-blue" @tap="clearFilters">
+      <view v-if="hasFilters" class="active-filters">
+        <text class="min-w-0 flex-1 break-words">{{ [applied.recommended && '运营推荐', applied.propertyType && PROPERTY_TYPE_LABEL[applied.propertyType], applied.city, applied.keyword, applied.priceUnit === 'day' && '日租', applied.priceUnit === 'month' && '月租'].filter(Boolean).join(' · ') || '已筛选房源' }}</text>
+        <button class="app-tap" @tap="clearFilters">
           重置筛选
         </button>
       </view>
-      <view v-if="loading" class="grid grid-cols-1 gap-24rpx md:grid-cols-2" aria-label="正在加载房源">
-        <view v-for="n in 2" :key="n" class="app-panel overflow-hidden">
-          <view class="h-320rpx bg-app-soft" />
-          <view class="flex flex-col gap-16rpx p-24rpx">
-            <view class="h-32rpx w-3/4 rounded-8rpx bg-app-soft" /><view class="h-24rpx w-1/2 rounded-8rpx bg-app-soft" />
+      <view v-if="loading" class="property-list" aria-label="正在加载房源">
+        <view v-for="n in 2" :key="n" class="skeleton-card">
+          <view class="skeleton-image" /><view class="min-w-0 flex-1">
+            <view class="skeleton-line w-4/5" /><view class="skeleton-line mt-4 w-3/5" /><view class="skeleton-line mt-4 w-1/2" />
           </view>
         </view>
       </view>
       <view v-else-if="error && !items.length" class="app-state">
-        <view class="i-carbon-cloud-offline text-64rpx" aria-hidden="true" />
-        <text>房源加载失败，请稍后重试</text>
-        <button class="app-secondary-button" @tap="load(1)">
+        <view class="i-carbon-cloud-offline text-8" /><text>房源加载失败，请稍后重试</text><button class="app-secondary-button" @tap="load(1)">
           重新加载
         </button>
       </view>
       <template v-else>
-        <view v-if="items.length" class="grid grid-cols-1 gap-24rpx md:grid-cols-2">
-          <view v-for="item in items" :key="item.id" class="app-tap app-panel min-w-0 overflow-hidden" role="button" :aria-label="`查看房源：${item.title}`" tabindex="0" @tap="goDetail(item)" @keydown.enter="goDetail(item)">
-            <image v-if="item.images?.length && !failedImages.includes(item.id)" :src="item.images[0]" mode="aspectFill" class="block h-320rpx w-full" :aria-label="item.title" @error="failedImages.push(item.id)" />
-            <view v-else class="h-320rpx flex flex-col items-center justify-center gap-16rpx bg-app-soft text-app-muted">
-              <view class="i-carbon-image text-64rpx" aria-hidden="true" /><text class="text-24rpx">暂无房源图片</text>
-            </view>
-            <view class="p-24rpx">
-              <view class="flex flex-wrap items-center gap-12rpx">
-                <text class="min-w-0 flex-1 break-words text-32rpx font-600 leading-snug">{{ item.title }}</text>
-                <text v-if="item.ownerIsManager" class="shrink-0 rounded-8rpx bg-app-soft px-12rpx py-4rpx text-22rpx text-brand-blue">认证管家</text>
-              </view>
-              <view class="mt-12rpx flex flex-wrap gap-12rpx text-24rpx text-app-muted">
-                <text>{{ PROPERTY_TYPE_LABEL[item.propertyType] }}</text>
-                <text v-if="item.rentalMode">{{ item.rentalMode === 'whole' ? '整租' : '合租' }}</text>
-                <text v-if="item.layout">{{ item.layout }}</text><text v-if="item.areaSqm">{{ item.areaSqm }}㎡</text>
-                <text v-if="item.orientation">{{ item.orientation }}</text><text v-if="item.floorInfo">{{ item.floorInfo }}层</text>
-              </view>
-              <view class="mt-16rpx flex flex-wrap items-baseline justify-between gap-8rpx">
-                <text class="min-w-0 flex-1 truncate text-24rpx text-app-muted">{{ [item.city, item.community || item.district || item.address].filter(Boolean).join(' · ') }}</text>
-                <view class="shrink-0 text-brand-blue">
-                  <text class="text-40rpx font-700">¥{{ item.price }}</text><text class="ml-4rpx text-24rpx">{{ item.priceType === 'rent' ? '/月' : '元' }}</text>
-                </view>
-              </view>
-            </view>
-          </view>
+        <view v-if="items.length" class="property-list">
+          <PropertyCard v-for="item in items" :key="item.id" :item="item" @favorite="favoriteChanged" />
         </view>
         <view v-else class="app-state">
-          <view class="i-carbon-home text-64rpx" aria-hidden="true" /><text>{{ hasFilters ? '没有找到符合条件的房源' : '房源还在准备中，稍后再来看看' }}</text>
-          <button v-if="hasFilters" class="app-secondary-button" @tap="clearFilters">
+          <view class="i-carbon-home text-8" /><text>{{ hasFilters ? '没有找到符合条件的房源' : '房源还在准备中，稍后再来看看' }}</text><button v-if="hasFilters" class="app-secondary-button" @tap="clearFilters">
             查看全部房源
           </button>
         </view>
-        <view v-if="error && items.length" class="app-state !py-32rpx">
+        <view v-if="error && items.length" class="app-state !py-4">
           <text>加载失败，已保留当前房源</text><button class="app-secondary-button" @tap="load(page + 1, 'more')">
             重试加载
           </button>
         </view>
-        <text v-else-if="loadingMore" class="block py-32rpx text-center text-24rpx text-app-muted">正在加载更多…</text>
-        <text v-else-if="items.length && items.length >= total" class="block py-40rpx text-center text-24rpx text-app-muted">已展示全部房源</text>
+        <text v-else-if="loadingMore" class="block py-5 text-center text-xs text-app-muted">正在加载更多…</text>
+        <text v-else-if="items.length && items.length >= total" class="block py-5 text-center text-xs text-app-muted">已展示全部房源</text>
       </template>
-      <view class="h-24rpx" />
     </view>
   </view>
 </template>
+
+<style scoped>
+.home-page {
+  min-height: 100vh;
+  color: #1e3159;
+  background: radial-gradient(ellipse at 90% -5%, #c2d0ff 0%, #e5ebff 28%, #f5f7ff 58%);
+}
+.home-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: calc(var(--status-bar-height, 0px) + 24px) 16px 20px;
+}
+.home-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.brand-name {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  line-height: 1.3;
+}
+.brand-slogan {
+  display: block;
+  margin-top: 5px;
+  font-size: 14px;
+}
+.heading-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+}
+.city-button {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 44px;
+  max-width: 113px;
+  font-size: 13px;
+}
+.city-button text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.heading-chat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  color: #243b6a;
+}
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  margin-top: 21px;
+  padding: 0 12px;
+  border-radius: 28px;
+  background: #ffffffed;
+  box-shadow: 0 8px 18px #596ee614;
+}
+.search-box input {
+  height: 44px;
+  color: #23365c;
+  font-size: 14px;
+}
+.search-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  color: #5360e8;
+  font-size: 12px;
+  line-height: 44px;
+}
+.home-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  color: #687a9b;
+  font-size: 11px;
+}
+.home-error button {
+  min-height: 44px;
+  padding: 0 8px;
+  background: transparent;
+  color: #5160ed;
+  font-size: 12px;
+}
+.type-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 18px;
+  scroll-margin-top: 12px;
+}
+.type-tab {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 2px;
+  border-radius: 25px;
+  background: transparent;
+  color: #677695;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 44px;
+}
+.type-active {
+  background: linear-gradient(135deg, #7a89ff, #a3b3ff);
+  color: #fff;
+  box-shadow: 0 5px 12px #7e8ff62e;
+}
+.type-active::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 38%;
+  right: 38%;
+  height: 3px;
+  border-radius: 3px;
+  background: #5968ff;
+}
+.filter-row {
+  display: flex;
+  gap: 9px;
+  margin: 16px 0 12px;
+}
+.filter-button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+  padding: 0 13px;
+  border-radius: 24px;
+  background: #fff;
+  color: #23365f;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.filter-panel {
+  margin-bottom: 12px;
+}
+.panel-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: #f1f4fc;
+  font-size: 13px;
+}
+.panel-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: #f1f4fc;
+  font-size: 14px;
+}
+.active-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #687a9b;
+  font-size: 12px;
+}
+.active-filters button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 8px;
+  background: transparent;
+  color: #5160ed;
+  font-size: 12px;
+}
+.property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skeleton-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 22px;
+  background: #fff;
+}
+.skeleton-image {
+  width: 34%;
+  height: 118px;
+  border-radius: 13px;
+  background: #e9eef9;
+}
+.skeleton-line {
+  height: 15px;
+  border-radius: 5px;
+  background: #e9eef9;
+}
+/* 微信胶囊占据右上角，页头在其下方布局。 */
+/* #ifdef MP-WEIXIN */
+.home-content {
+  padding-top: calc(var(--status-bar-height, 20px) + 58px);
+}
+/* #endif */
+@media (min-width: 420px) {
+  .brand-name {
+    font-size: 36px;
+  }
+  .search-box {
+    height: 54px;
+  }
+  .filter-button {
+    font-size: 14px;
+  }
+}
+</style>

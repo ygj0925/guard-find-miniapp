@@ -1,24 +1,61 @@
 <script setup lang="ts">
-import type { PropertyInput, RegionNode } from '@/api/property'
-
+import type { PropertyInput, RegionNode, RentalMode } from '@/api/property'
+import { onLoad, onShow, onUnload } from '@dcloudio/uni-app'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { getUserInfo } from '@/api/login'
-import { fetchPropertyDetail, fetchRegionTree, saveProperty } from '@/api/property'
+import { fetchPropertyDetail, fetchRegionTree, propertyPriceSuffix, RENTAL_MODE_LABEL, saveProperty } from '@/api/property'
 import { uploadPropertyImage } from '@/api/propertyImage'
+import { useTokenStore } from '@/store/token'
+import { toLoginPage } from '@/utils/toLoginPage'
 
 definePage({ style: { navigationBarTitleText: '编辑房源' } })
+const tokenStore = useTokenStore()
 const id = ref('')
 const ready = ref(false)
+const accessState = ref<'checking' | 'guest' | 'denied' | 'error' | 'manager'>('checking')
+const loadError = ref('')
 const saving = ref(false)
 const uploading = ref(false)
 let disposed = false
-onUnload(() => {
+let requestVersion = 0
+let operationVersion = 0
+let selectionVersion = 0
+let choosing = false
+let pendingLoad: Promise<void> = Promise.resolve()
+let wakeSelection: (() => void) | undefined
+let loadedToken = ''
+let verifiedToken = ''
+function cancelSelection() {
+  selectionVersion++
+  choosing = false
+  uploading.value = false
+  wakeSelection?.()
+  wakeSelection = undefined
+}
+function dispose() {
   disposed = true
-})
+  requestVersion++
+  operationVersion++
+  saving.value = false
+  cancelSelection()
+}
+onUnload(dispose)
+onBeforeUnmount(dispose)
+watch(() => tokenStore.validToken, () => {
+  requestVersion++
+  operationVersion++
+  ready.value = false
+  verifiedToken = ''
+  loadedToken = ''
+  saving.value = false
+  cancelSelection()
+  accessState.value = tokenStore.updateNowTime().hasLogin ? 'error' : 'guest'
+}, { flush: 'sync' })
 const imageUrls = ref('')
 const facilities = ref('')
 // onLoad 会回填已存房源的地区文案,声明必须在其之前
 const regionLabel = ref('')
-const form = reactive<PropertyInput>({
+const initialForm: PropertyInput = {
   title: '',
   description: '',
   propertyType: 'house',
@@ -29,6 +66,7 @@ const form = reactive<PropertyInput>({
   decoration: '',
   price: 1,
   priceType: 'rent',
+  priceUnit: 'month',
   community: '',
   availableFrom: null,
   rentalMode: null,
@@ -40,7 +78,17 @@ const form = reactive<PropertyInput>({
   contactPhone: '',
   status: 1,
   images: [],
-})
+}
+const form = reactive<PropertyInput>({ ...initialForm, facilities: [], images: [] })
+const rentalModes: (RentalMode | null)[] = [null, 'whole', 'shared', 'room', 'short']
+const rentalModeLabels = rentalModes.map(mode => mode ? RENTAL_MODE_LABEL[mode] : '未指定')
+function syncPriceUnit() {
+  form.priceUnit = form.priceType === 'sale' ? null : form.rentalMode === 'short' ? 'day' : 'month'
+  if (form.priceType === 'sale')
+    form.rentalMode = null
+}
+watch(() => [form.priceType, form.rentalMode], syncPriceUnit, { flush: 'sync' })
+const priceLabel = computed(() => form.priceType === 'sale' ? '总价（元）*' : `租金（元${propertyPriceSuffix(form)}）*`)
 const types = ['住宅', '公寓', '别墅', '商铺']
 const typeValues: PropertyInput['propertyType'][] = [
   'house',
@@ -68,38 +116,99 @@ const fields: {
   { key: 'contactName', label: '联系人', max: 50 },
   { key: 'contactPhone', label: '联系电话', max: 20 },
 ]
-onLoad(async (q) => {
-  // 房源由公寓管家维护:深链/历史入口进来也要拦,不给非管家渲染可保存的表单。
-  // 只在明确拿到 false 时拦截;取用户信息失败时放行到表单,由服务端闸门兜底报错。
+onLoad((q) => {
+  id.value = String(q?.id || '')
+})
+onShow(() => {
+  void load()
+})
+function isCurrent(version: number, token: string) {
+  return !disposed && version === requestVersion
+    && tokenStore.updateNowTime().hasLogin && token === tokenStore.validToken
+}
+function isOperationCurrent(version: number, token: string) {
+  return version === operationVersion && canWrite() && token === verifiedToken
+}
+function canWrite() {
+  return !disposed && ready.value && accessState.value === 'manager'
+    && tokenStore.updateNowTime().hasLogin && verifiedToken === tokenStore.validToken
+}
+function viewProperties() {
+  uni.switchTab({ url: '/pages/index/index' })
+}
+function load() {
+  pendingLoad = loadPage()
+  wakeSelection?.()
+  return pendingLoad
+}
+async function loadPage() {
+  if (disposed)
+    return
+  const session = tokenStore.updateNowTime()
+  const version = ++requestVersion
+  operationVersion++
+  saving.value = false
+  // 原生选图会触发 onShow；仅保留尚未上传的选择，写入前等待最新核验。
+  uploading.value = choosing
+  ready.value = false
+  verifiedToken = ''
+  loadError.value = ''
+  if (!session.hasLogin) {
+    accessState.value = 'guest'
+    cancelSelection()
+    return
+  }
+  const token = session.validToken
+  accessState.value = 'checking'
   try {
-    const me = await getUserInfo()
-    if (me.isPropertyManager === false) {
-      uni.showToast({ title: '仅公寓管家可维护房源', icon: 'none' })
-      uni.navigateBack()
+    const me = await getUserInfo({ header: { Authorization: `Bearer ${token}` }, hideErrorToast: true })
+    if (!isCurrent(version, token))
+      return
+    if (me?.isPropertyManager !== true) {
+      accessState.value = 'denied'
+      cancelSelection()
       return
     }
+    accessState.value = 'manager'
+    verifiedToken = token
   }
   catch {
-    // 交由 http 层处理登录态;此处不阻断加载
+    if (isCurrent(version, token)) {
+      accessState.value = 'error'
+      cancelSelection()
+    }
+    return
   }
-  id.value = String(q?.id || '')
-  void loadRegionTree()
-  if (!id.value) {
+  if (loadedToken === token) {
     ready.value = true
     return
   }
+  Object.assign(form, initialForm, { images: [], facilities: [] })
+  imageUrls.value = ''
+  facilities.value = ''
+  regionLabel.value = ''
+  void loadRegionTree(version, token)
   try {
-    const p = await fetchPropertyDetail(id.value)
-    Object.assign(form, p)
-    imageUrls.value = p.images.join('\n')
-    facilities.value = p.facilities.join('，')
-    regionLabel.value = [p.city, p.district].filter(Boolean).join(' ')
+    if (id.value) {
+      const p = await fetchPropertyDetail(id.value)
+      if (!isCurrent(version, token))
+        return
+      Object.assign(form, p)
+      syncPriceUnit()
+      imageUrls.value = p.images.join('\n')
+      facilities.value = p.facilities.join('，')
+      regionLabel.value = [p.city, p.district].filter(Boolean).join(' ')
+    }
+    if (!isCurrent(version, token))
+      return
+    loadedToken = token
     ready.value = true
   }
   catch {
-    uni.showToast({ title: '房源加载失败，请返回重试', icon: 'none' })
+    if (isCurrent(version, token))
+      loadError.value = '房源加载失败，请重试'
   }
-})
+}
 
 /** 省市区级联:数据来自 backend /miniapp/region/tree,与用户侧服务同源 */
 const regionTree = ref<RegionNode[]>([])
@@ -115,9 +224,11 @@ const districts = computed(() =>
     ?.map(c => c.name) ?? [],
 )
 
-async function loadRegionTree() {
+async function loadRegionTree(version: number, token: string) {
   try {
-    regionTree.value = await fetchRegionTree()
+    const tree = await fetchRegionTree()
+    if (isCurrent(version, token))
+      regionTree.value = tree
   }
   catch {}
 }
@@ -163,31 +274,49 @@ function removeImage(index: number) {
     imageUrls.value = imageList.value.filter((_, i) => i !== index).join('\n')
 }
 function chooseImages() {
-  if (uploading.value || saving.value)
+  if (uploading.value || saving.value || !canWrite())
     return
+  const token = verifiedToken
   const count = 9 - imageList.value.length
   if (count <= 0) {
     uni.showToast({ title: '最多9张图片', icon: 'none' })
     return
   }
+  const selection = ++selectionVersion
+  const isSelectionCurrent = () => !disposed && selection === selectionVersion
+    && tokenStore.updateNowTime().hasLogin && token === tokenStore.validToken
+  choosing = true
   uploading.value = true
   uni.chooseImage({
     count,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: async (res) => {
+      let version: number | undefined
       try {
+        while (isSelectionCurrent()) {
+          const pending = pendingLoad
+          await Promise.race([pending, new Promise<void>((resolve) => {
+            wakeSelection = resolve
+          })])
+          if (pending === pendingLoad)
+            break
+        }
+        if (!isSelectionCurrent() || !canWrite())
+          return
+        choosing = false
+        version = operationVersion
         for (const path of res.tempFilePaths) {
-          if (disposed)
+          if (!isOperationCurrent(version, token))
             break
           const url = await uploadPropertyImage(path)
-          if (disposed)
+          if (!isOperationCurrent(version, token))
             break
           imageUrls.value = [...imageList.value, url].join('\n')
         }
       }
       catch (error) {
-        if (!disposed) {
+        if (version !== undefined && isOperationCurrent(version, token)) {
           uni.showToast({
             title: error instanceof Error ? error.message : '图片上传失败',
             icon: 'none',
@@ -195,17 +324,28 @@ function chooseImages() {
         }
       }
       finally {
-        uploading.value = false
+        if (selection === selectionVersion)
+          wakeSelection = undefined
+        if (isSelectionCurrent() && (version === undefined || version === operationVersion)) {
+          choosing = false
+          uploading.value = false
+        }
       }
     },
     fail: () => {
-      uploading.value = false
+      if (isSelectionCurrent()) {
+        choosing = false
+        uploading.value = false
+      }
     },
   })
 }
 async function submit(status: 1 | 2) {
-  if (saving.value || uploading.value || !ready.value)
+  if (saving.value || uploading.value || !canWrite())
     return
+  const version = operationVersion
+  const token = verifiedToken
+  syncPriceUnit()
   const images = imageUrls.value
     .split(/\r?\n/)
     .map(s => s.trim())
@@ -235,6 +375,7 @@ async function submit(status: 1 | 2) {
       price: Number(form.price),
       areaSqm: form.areaSqm ? Number(form.areaSqm) : null,
       rentalMode: form.priceType === 'rent' ? form.rentalMode : null,
+      priceUnit: form.priceType === 'sale' ? null : form.rentalMode === 'short' ? 'day' : 'month',
       status,
       images,
       facilities: facilities.value
@@ -242,18 +383,25 @@ async function submit(status: 1 | 2) {
         .map(s => s.trim())
         .filter(Boolean),
     })
-    uni.showToast({ title: '已保存', icon: 'success' })
-    uni.navigateBack()
+    if (isOperationCurrent(version, token)) {
+      uni.showToast({ title: '已保存', icon: 'success' })
+      uni.navigateBack()
+    }
+  }
+  catch {
+    if (isOperationCurrent(version, token))
+      uni.showToast({ title: '保存失败，填写信息已保留，请重试', icon: 'none' })
   }
   finally {
-    saving.value = false
+    if (isOperationCurrent(version, token))
+      saving.value = false
   }
 }
 </script>
 
 <template>
-  <view v-if="ready" class="min-h-full bg-#F7F8FA p-4">
-    <view class="rounded-xl bg-white p-4">
+  <view v-if="ready" class="edit-page app-page p-4">
+    <view class="app-panel p-4">
       <text class="block text-sm">标题 *</text><input
         v-model="form.title"
         class="my-3 border-b border-gray-2 py-2"
@@ -280,31 +428,16 @@ async function submit(status: 1 | 2) {
       </picker>
       <picker
         v-if="form.priceType === 'rent'"
-        :range="['未指定', '整租', '合租']"
-        @change="
-          form.rentalMode
-            = Number($event.detail.value) === 1
-              ? 'whole'
-              : Number($event.detail.value) === 2
-                ? 'shared'
-                : null
-        "
+        :range="rentalModeLabels"
+        :value="rentalModes.indexOf(form.rentalMode)"
+        @change="form.rentalMode = rentalModes[Number($event.detail.value)] ?? null"
       >
-        <view class="py-3">
-          租赁方式：{{
-            form.rentalMode === "whole"
-              ? "整租"
-              : form.rentalMode === "shared"
-                ? "合租"
-                : "未指定"
-          }}
-          ›
+        <view class="min-h-11 py-3">
+          租赁方式：{{ form.rentalMode ? RENTAL_MODE_LABEL[form.rentalMode] : '未指定' }} ›
         </view>
       </picker>
       <text class="block text-sm">
-        {{
-          form.priceType === "rent" ? "月租（元）*" : "总价（元）*"
-        }}
+        {{ priceLabel }}
       </text><input
         v-model="form.price"
         type="digit"
@@ -391,17 +524,45 @@ async function submit(status: 1 | 2) {
       />
     </view>
     <view class="mt-4 flex gap-3">
-      <button class="flex-1" :disabled="saving || uploading" @tap="submit(1)">
+      <button class="app-secondary-button flex-1" :disabled="saving || uploading" @tap="submit(1)">
         存为草稿
       </button><button
-        class="flex-1 bg-#1677FF text-white"
+        class="app-primary-button flex-1"
         :disabled="saving || uploading"
         @tap="submit(2)"
       >
         保存并上架
       </button>
     </view>
-  </view><view v-else class="p-10 text-center">
-    正在加载房源…
+  </view>
+  <view v-else class="edit-page app-page">
+    <view class="app-content py-6">
+      <view class="app-panel app-state gap-3 px-5 py-12">
+        <text class="text-center text-base text-app-ink font-semibold">
+          {{ accessState === 'guest' ? '登录后维护房源' : accessState === 'denied' ? '房源由公寓管家统一维护' : accessState === 'error' ? '管理身份核验失败' : loadError || '正在加载房源…' }}
+        </text>
+        <button v-if="accessState === 'guest'" class="app-primary-button w-full" @tap="toLoginPage()">
+          去登录
+        </button>
+        <button v-else-if="accessState === 'error' || loadError" class="app-secondary-button w-full" @tap="load">
+          重新加载
+        </button>
+        <button v-if="accessState === 'denied'" class="app-secondary-button w-full" @tap="viewProperties">
+          查看房源
+        </button>
+      </view>
+    </view>
   </view>
 </template>
+
+<style scoped>
+.edit-page {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+input,
+picker > view,
+button {
+  min-height: 44px;
+}
+</style>
