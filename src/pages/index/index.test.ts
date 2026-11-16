@@ -11,11 +11,13 @@ const state = vi.hoisted(() => ({
   load: undefined as undefined | (() => void),
   more: undefined as undefined | (() => void),
   unload: undefined as undefined | (() => void),
+  scroll: undefined as undefined | ((event: { scrollTop: number }) => void),
 }))
 vi.mock('@dcloudio/uni-app', () => ({
   onLoad: (fn: () => void) => { state.load = fn },
   onReachBottom: (fn: () => void) => { state.more = fn },
   onUnload: (fn: () => void) => { state.unload = fn },
+  onPageScroll: (fn: (event: { scrollTop: number }) => void) => { state.scroll = fn },
   onPullDownRefresh: vi.fn(),
   onShow: vi.fn(),
   onShareAppMessage: vi.fn(),
@@ -55,6 +57,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('首页搜索与分页', () => {
+  it('仅标题行置顶，滚动后显示半透明背景，返回顶部后恢复透明', async () => {
+    const wrapper = await render()
+    const header = wrapper.get('.home-sticky-header')
+    expect(header.text()).toBe('泊之湾')
+    expect(header.find('.home-toolbar').exists()).toBe(false)
+    expect(header.classes()).not.toContain('is-scrolled')
+    state.scroll?.({ scrollTop: 80 })
+    await wrapper.vm.$nextTick()
+    expect(header.classes()).toContain('is-scrolled')
+    state.scroll?.({ scrollTop: 0 })
+    await wrapper.vm.$nextTick()
+    expect(header.classes()).not.toContain('is-scrolled')
+    wrapper.unmount()
+  })
+
   it('分页只使用已提交条件，不使用尚未搜索的文字', async () => {
     const wrapper = await render()
     await wrapper.get('input[aria-label="房源关键词"]').setValue('未提交')

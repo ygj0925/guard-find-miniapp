@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Property, PropertyType } from '@/api/property'
 import type { HomeBanner, PropertyHome } from '@/api/propertyHome'
-import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow, onUnload } from '@dcloudio/uni-app'
+import { onLoad, onPageScroll, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow, onUnload } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
 import { fetchProperties, fetchRegionTree, PROPERTY_TYPE_LABEL } from '@/api/property'
 import { fetchPropertyHome } from '@/api/propertyHome'
@@ -15,6 +15,12 @@ import HomeShortcuts from '@/components/HomeShortcuts.vue'
 
 definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '上海泊之湾公寓', backgroundColor: '#F5F7FF', enablePullDownRefresh: true } })
 const PAGE_SIZE = 10
+const headerScrolled = ref(false)
+onPageScroll(({ scrollTop }) => {
+  const scrolled = scrollTop > 8
+  if (headerScrolled.value !== scrolled)
+    headerScrolled.value = scrolled
+})
 const draft = reactive(defaultPropertyFilters())
 const applied = ref(buildPropertyFilters(draft))
 const filterOpen = ref(false)
@@ -257,28 +263,29 @@ onReachBottom(() => {
 
 <template>
   <view class="home-page app-tab-page">
-    <view class="home-sticky-header">
+    <view class="home-sticky-header" :class="{ 'is-scrolled': headerScrolled }">
       <view class="home-header-content">
         <view class="home-heading">
           <view class="brand-block">
-            <text class="brand-name">泊之湾</text><text class="brand-slogan">找一处，安心住下。</text>
-          </view>
-        </view>
-        <view class="home-toolbar">
-          <view class="heading-actions">
-            <picker :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCity">
-              <view class="city-button" role="button" aria-label="选择城市">
-                <view class="i-carbon-location text-5" /><text>{{ draft.city || '全国' }}</text><view class="i-carbon-chevron-down text-3" />
-              </view>
-            </picker>
-            <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
-              <view class="i-carbon-chat text-7" />
-            </button>
+            <text class="brand-name">泊之湾</text>
           </view>
         </view>
       </view>
     </view>
     <view class="home-content">
+      <text class="brand-slogan">找一处，安心住下。</text>
+      <view class="home-toolbar">
+        <view class="heading-actions">
+          <picker :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCity">
+            <view class="city-button" role="button" aria-label="选择城市">
+              <view class="i-carbon-location text-5" /><text>{{ draft.city || '全国' }}</text><view class="i-carbon-chevron-down text-3" />
+            </view>
+          </picker>
+          <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
+            <view class="i-carbon-chat text-7" />
+          </button>
+        </view>
+      </view>
       <view class="search-box">
         <view class="i-carbon-search shrink-0 text-7 text-#6454ff" aria-hidden="true" />
         <input v-model="draft.keyword" class="min-w-0 flex-1" placeholder="搜索标题、小区、地址" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
@@ -405,6 +412,10 @@ onReachBottom(() => {
   top: 0;
   z-index: 100;
   padding: calc(var(--status-bar-height, 0px) + 16px) 16px 8px;
+  background: transparent;
+  transition: background-color 180ms ease;
+}
+.home-sticky-header.is-scrolled {
   background: rgba(245, 247, 255, 0.84);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -421,10 +432,13 @@ onReachBottom(() => {
 }
 .brand-name {
   display: block;
-  font-size: 32px;
+  overflow: hidden;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: 1px;
-  line-height: 1.3;
+  line-height: 44px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .brand-slogan {
   display: block;
@@ -645,9 +659,6 @@ onReachBottom(() => {
 }
 /* #endif */
 @media (min-width: 420px) {
-  .brand-name {
-    font-size: 36px;
-  }
   .search-box {
     height: 54px;
   }
