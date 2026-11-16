@@ -15,8 +15,8 @@ import { toLoginPage } from '@/utils/toLoginPage'
 
 definePage({
   style: {
-    navigationBarTitleText: '消息',
-    backgroundColor: '#F7F8FA',
+    navigationStyle: 'custom',
+    backgroundColor: '#F7F9FF',
     enablePullDownRefresh: true,
   },
 })
@@ -210,15 +210,11 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <view class="message-page app-tab-page bg-app-surface text-app-ink">
-    <view class="app-content pb-48rpx pt-40rpx">
-      <view class="mb-40rpx">
-        <text class="block text-64rpx font-bold leading-80rpx">消息</text>
-        <text class="mt-12rpx block text-28rpx text-app-ink-soft leading-40rpx">
-          房源咨询与看房动态
-        </text>
-      </view>
-
+  <view class="message-page pencil-page app-tab-page">
+    <view class="message-header">
+      <text class="message-heading">消息通知</text><text class="message-subheading">及时掌握房源动态与服务进展</text>
+    </view>
+    <view class="message-content app-content pb-48rpx pt-0">
       <view v-if="!isAuthenticated" class="guest-state app-panel">
         <view class="guest-icon" aria-hidden="true">
           <view class="i-carbon-chat h-64rpx w-64rpx" />
@@ -368,7 +364,34 @@ onPullDownRefresh(() => {
 <style scoped>
 .message-page {
   box-sizing: border-box;
-  min-height: calc(100vh + env(safe-area-inset-bottom));
+  min-height: calc(var(--app-viewport-height) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--app-page-bottom-safe) + 24rpx);
+}
+.message-header {
+  padding: calc(var(--status-bar-height, 0px) + 52rpx) 45rpx 28rpx;
+}
+.message-heading {
+  display: block;
+  color: #173b92;
+  font-size: 45rpx;
+  font-weight: 700;
+  line-height: 60rpx;
+}
+.message-subheading {
+  display: block;
+  margin-top: 8rpx;
+  color: #58709e;
+  font-size: 25rpx;
+  line-height: 38rpx;
+}
+.message-content {
+  padding: 0 38rpx;
+}
+.message-content :deep(.app-panel) {
+  border: 1rpx solid #edf1fa;
+  border-radius: 34rpx;
+  background: white;
+  box-shadow: 0 6rpx 19rpx #c6d2ea33;
 }
 .guest-state {
   display: flex;
@@ -385,11 +408,11 @@ onPullDownRefresh(() => {
   justify-content: center;
   border-radius: 40rpx;
   background: #eaf2ff;
-  color: #2d6fe6;
+  color: #3569df;
 }
 .guest-title {
   margin-top: 32rpx;
-  color: #121c39;
+  color: #26365e;
   font-size: 34rpx;
   font-weight: 600;
   line-height: 48rpx;
@@ -397,7 +420,7 @@ onPullDownRefresh(() => {
 .guest-copy {
   max-width: 540rpx;
   margin-top: 16rpx;
-  color: #657086;
+  color: #7181a3;
   font-size: 28rpx;
   line-height: 44rpx;
 }
@@ -410,7 +433,7 @@ onPullDownRefresh(() => {
   margin-top: 16rpx;
   padding: 0 24rpx;
   background: transparent;
-  color: #2d6fe6;
+  color: #3569df;
   font-size: 28rpx;
 }
 </style>

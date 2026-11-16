@@ -1,0 +1,62 @@
+.pencil-page {
+  box-sizing: border-box;
+  min-height: var(--app-viewport-height);
+  background: linear-gradient(180deg, #dce8ff 0, #f7f9ff 356rpx, #f7f9ff 100%);
+  color: #26365e;
+}
+.pencil-title {
+  display: block;
+  color: #173b92;
+  font-size: 45rpx;
+  font-weight: 700;
+  line-height: 60rpx;
+}
+.pencil-subtitle {
+  display: block;
+  margin-top: 8rpx;
+  color: #58709e;
+  font-size: 25rpx;
+  line-height: 38rpx;
+}
+.pencil-primary {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 98rpx;
+  margin: 0;
+  padding: 20rpx 32rpx;
+  border: 0;
+  border-radius: 49rpx;
+  background: #3569df;
+  color: white;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 42rpx;
+  transition: opacity 180ms ease;
+}
+.pencil-primary::after {
+  border: 0;
+}
+.pencil-primary:active {
+  opacity: 0.76;
+}
+.pencil-primary[disabled] {
+  background: #3569df;
+  color: white;
+  opacity: 0.55;
+}
+.pencil-page .app-state {
+  margin-top: 34rpx;
+  padding: 52rpx 28rpx;
+  border-radius: 34rpx;
+  background: white;
+  color: #7b88a4;
+  text-align: center;
+}
+.pencil-page .app-secondary-button {
+  border-color: #e7eeff;
+  border-radius: 26rpx;
+  background: #e7eeff;
+  color: #3962c7;
+}

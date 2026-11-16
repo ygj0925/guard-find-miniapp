@@ -11,8 +11,8 @@ import { toLoginPage } from '@/utils/toLoginPage'
 
 definePage({
   style: {
-    navigationBarTitleText: '我的',
-    backgroundColor: '#F7F8FA',
+    navigationStyle: 'custom',
+    backgroundColor: '#F7F9FF',
   },
 })
 
@@ -85,7 +85,10 @@ function goSupport() {
 function onLogout() {
   uni.showModal({
     title: '退出登录',
-    content: '确定退出当前账号?',
+    content: '退出后仍可浏览房源，收藏、预约和消息服务需重新登录。',
+    confirmText: '退出登录',
+    cancelText: '继续使用',
+    confirmColor: '#3569DF',
     success: async (res) => {
       if (!res.confirm)
         return
@@ -105,8 +108,8 @@ function onLogout() {
 </script>
 
 <template>
-  <view class="app-tab-page bg-app-surface text-app-ink">
-    <view class="app-content pb-48rpx pt-40rpx">
+  <view class="pencil-page profile-page app-tab-page">
+    <view class="profile-content app-content pb-48rpx pt-40rpx">
       <text class="mb-40rpx block text-64rpx font-bold leading-80rpx">我的</text>
 
       <view class="app-panel overflow-hidden p-32rpx">
@@ -238,4 +241,30 @@ function onLogout() {
   </view>
 </template>
 
-<style scoped></style>
+<style scoped>
+.profile-page {
+  padding-bottom: calc(var(--app-page-bottom-safe) + 40rpx);
+}
+.profile-content {
+  padding-top: calc(var(--status-bar-height, 0px) + 52rpx);
+}
+.profile-content > text:first-child {
+  margin-bottom: 32rpx;
+  color: #173b92;
+  font-size: 45rpx;
+  line-height: 60rpx;
+}
+.profile-content > .app-panel {
+  border-radius: 38rpx;
+  box-shadow: 0 6rpx 19rpx #c6d2ea44;
+}
+.profile-content .app-panel {
+  border-color: #edf1fa;
+}
+.profile-content .app-section-title {
+  color: #26365e;
+}
+.profile-content .app-tap:active {
+  opacity: 0.76;
+}
+</style>

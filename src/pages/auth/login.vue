@@ -9,10 +9,10 @@ definePage({
   excludeLoginPath: true,
   style: {
     navigationStyle: 'custom',
-    navigationBarBackgroundColor: '#EDF6FF',
+    navigationBarBackgroundColor: '#F7F9FF',
     navigationBarTextStyle: 'black',
     navigationBarTitleText: '上海泊之湾公寓',
-    backgroundColor: '#EDF6FF',
+    backgroundColor: '#F7F9FF',
   },
 })
 
@@ -20,6 +20,10 @@ const tokenStore = useTokenStore()
 const appName = import.meta.env.VITE_APP_TITLE
 const loading = ref(false)
 const agreed = ref(false)
+
+function skipLogin() {
+  uni.switchTab({ url: '/pages/index/index' })
+}
 
 function openAgreement(type: 'user' | 'privacy') {
   uni.navigateTo({ url: `/pages/agreement/index?type=${type}` })
@@ -33,6 +37,7 @@ async function ensureAgreed(): Promise<boolean> {
     content: '登录前请阅读并同意《用户协议》和《隐私政策》。',
     confirmText: '同意并登录',
     cancelText: '暂不登录',
+    confirmColor: '#3569DF',
   })
   if (confirm)
     agreed.value = true
@@ -72,49 +77,125 @@ async function onWxLogin() {
 </script>
 
 <template>
-  <view class="min-h-full flex flex-col items-center bg-#EDF6FF px-8">
-    <view class="mt-32 flex flex-col items-center">
-      <view class="h-20 w-20 flex items-center justify-center rounded-3xl bg-#1677FF text-3xl text-white shadow-lg">
-        泊
-      </view>
-      <text class="mt-4 text-center text-xl text-#303133 font-bold">{{ appName }}</text>
-      <text class="mt-1 text-center text-sm text-#909399">公寓找房 · 看房预约 · 管家服务</text>
+  <view class="pencil-page login-page">
+    <view class="login-brand">
+      <text class="pencil-title">泊之湾</text><text class="pencil-subtitle">找一处，安心住下。</text>
     </view>
-
-    <button
-      class="mt-24 w-full flex items-center justify-center gap-2 rounded-full bg-#07C160 py-3 text-base text-white"
-      :disabled="loading"
-      @tap="onWxLogin"
-    >
-      {{ loading ? '登录中…' : '微信一键登录' }}
+    <view class="login-heading">
+      <text class="login-title">欢迎登录</text><text class="pencil-subtitle">登录后享受更完整的租住服务</text>
+    </view>
+    <view class="login-card">
+      <view class="login-symbol" aria-hidden="true">
+        <view class="i-carbon-chat h-56rpx w-56rpx" />
+      </view>
+      <text class="login-card-title">微信快捷登录</text><text class="login-card-copy">{{ appName }}</text>
+      <text class="login-card-copy">收藏心仪房源，预约看房，随时联系管家</text>
+      <button class="pencil-primary login-submit" :disabled="loading" :loading="loading" @tap="onWxLogin">
+        {{ loading ? '登录中…' : '微信一键登录' }}
+      </button>
+      <view class="login-agreement">
+        <button class="app-tap agreement-check" role="checkbox" :aria-checked="agreed" aria-label="我已阅读并同意用户协议和隐私政策" @tap="agreed = !agreed">
+          <view class="h-32rpx w-32rpx" :class="agreed ? 'i-carbon-checkbox-checked-filled' : 'i-carbon-checkbox'" />
+        </button><view><text @tap="agreed = !agreed">我已阅读并同意</text><text class="agreement-link" @tap="openAgreement('user')">《用户协议》</text><text>和</text><text class="agreement-link" @tap="openAgreement('privacy')">《隐私政策》</text></view>
+      </view>
+      <text class="login-note">未注册的微信将自动创建账号</text>
+    </view>
+    <button class="app-tap login-guest" @tap="skipLogin">
+      暂不登录 ›
     </button>
-
-    <view class="mt-4 flex items-start justify-center text-xs text-#909399 leading-5">
-      <view
-        class="shrink-0 p-3"
-        role="checkbox"
-        :aria-checked="agreed"
-        aria-label="我已阅读并同意用户协议和隐私政策"
-        @tap="agreed = !agreed"
-      >
-        <view
-          class="h-5 w-5"
-          :class="agreed ? 'i-carbon-checkbox-checked-filled text-#1677FF' : 'i-carbon-checkbox text-#A8ABB2'"
-        />
-      </view>
-      <view class="min-w-0 py-3">
-        <text @tap="agreed = !agreed">我已阅读并同意</text>
-        <text class="text-#1677FF" @tap="openAgreement('user')">《用户协议》</text>
-        <text>和</text>
-        <text class="text-#1677FF" @tap="openAgreement('privacy')">《隐私政策》</text>
-      </view>
-    </view>
-
-    <text class="mt-3 text-center text-xs text-#A8ABB2">
-      未注册的微信将自动创建账号
-    </text>
   </view>
 </template>
 
 <style scoped>
+.login-page {
+  padding: calc(var(--status-bar-height, 0px) + 52rpx) 38rpx 80rpx;
+}
+.login-brand,
+.login-heading {
+  padding: 0 7rpx;
+}
+.login-heading {
+  margin-top: 106rpx;
+}
+.login-title {
+  display: block;
+  color: #1e2c50;
+  font-size: 49rpx;
+  font-weight: 700;
+  line-height: 64rpx;
+}
+.login-card {
+  margin-top: 48rpx;
+  padding: 52rpx 38rpx 34rpx;
+  border-radius: 38rpx;
+  background: white;
+  box-shadow: 0 6rpx 19rpx #c6d2ea55;
+  text-align: center;
+}
+.login-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 104rpx;
+  height: 104rpx;
+  margin: 0 auto 24rpx;
+  border-radius: 30rpx;
+  color: #3569df;
+  background: #e8f0ff;
+}
+.login-card-title {
+  display: block;
+  color: #26365e;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.login-card-copy {
+  display: block;
+  margin-top: 16rpx;
+  color: #7b88a4;
+  font-size: 24rpx;
+  line-height: 38rpx;
+}
+.login-submit {
+  width: 100%;
+  margin-top: 38rpx;
+}
+.login-agreement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16rpx;
+  color: #8d9ab2;
+  font-size: 21rpx;
+  line-height: 34rpx;
+  text-align: left;
+}
+.agreement-check {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 82rpx;
+  min-height: 82rpx;
+  padding: 0;
+  background: transparent;
+  color: #3569df;
+}
+.agreement-link {
+  color: #3962c7;
+}
+.login-note {
+  display: block;
+  margin-top: 12rpx;
+  color: #8d9ab2;
+  font-size: 21rpx;
+}
+.login-guest {
+  margin: 40rpx auto 0;
+  min-height: 88rpx;
+  padding: 20rpx 30rpx;
+  background: transparent;
+  color: #58709e;
+  font-size: 25rpx;
+}
 </style>
