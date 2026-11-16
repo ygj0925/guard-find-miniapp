@@ -40,13 +40,6 @@ export const customTabbarList: CustomTabBarItem[] = [
     iconActive: 'i-carbon-chat',
   },
   {
-    text: '房源管理',
-    pagePath: 'pages/property/manager',
-    iconType: 'unocss',
-    icon: 'i-carbon-building',
-    iconActive: 'i-carbon-building',
-  },
-  {
     text: '我的',
     pagePath: 'pages/me/me',
     iconType: 'unocss',

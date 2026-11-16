@@ -79,6 +79,20 @@ async function open() {
 }
 
 describe('message list synchronization', () => {
+  it('keeps guests on the message page without fetching private data', async () => {
+    token.validToken = ''
+    await open()
+
+    expect(wrapper!.text()).toContain('登录后查看消息')
+    expect(mocks.login).not.toHaveBeenCalled()
+    expect(mocks.conversations).not.toHaveBeenCalled()
+    expect(mocks.unread).not.toHaveBeenCalled()
+    expect(mocks.subscribe).not.toHaveBeenCalled()
+
+    await wrapper!.get('[aria-label="登录或注册"]').trigger('tap')
+    expect(mocks.login).toHaveBeenCalledOnce()
+  })
+
   it('shows support unread without reading messages and polls only while visible', async () => {
     await open()
     expect(wrapper!.text()).toContain('3')

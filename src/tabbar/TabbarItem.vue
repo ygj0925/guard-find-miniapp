@@ -55,17 +55,4 @@ function getIconByIndex(index: number, item: CustomTabBarItem) {
   min-height: 44px;
   border-radius: 18px;
 }
-.tabbar-item-active {
-  background: #f0f2ff;
-}
-.tabbar-item-active::after {
-  position: absolute;
-  bottom: -3px;
-  left: 36%;
-  right: 36%;
-  height: 3px;
-  border-radius: 3px;
-  background: #5968ff;
-  content: '';
-}
 </style>

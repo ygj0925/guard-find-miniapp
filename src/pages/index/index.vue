@@ -257,20 +257,28 @@ onReachBottom(() => {
 
 <template>
   <view class="home-page app-tab-page">
-    <view class="home-content">
-      <view class="home-heading">
-        <view><text class="brand-name">泊之湾</text><text class="brand-slogan">找一处，安心住下。</text></view>
-        <view class="heading-actions">
-          <picker :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCity">
-            <view class="city-button" role="button" aria-label="选择城市">
-              <view class="i-carbon-location text-5" /><text>{{ draft.city || '全国' }}</text><view class="i-carbon-chevron-down text-3" />
-            </view>
-          </picker>
-          <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
-            <view class="i-carbon-chat text-7" />
-          </button>
+    <view class="home-sticky-header">
+      <view class="home-header-content">
+        <view class="home-heading">
+          <view class="brand-block">
+            <text class="brand-name">泊之湾</text><text class="brand-slogan">找一处，安心住下。</text>
+          </view>
+        </view>
+        <view class="home-toolbar">
+          <view class="heading-actions">
+            <picker :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCity">
+              <view class="city-button" role="button" aria-label="选择城市">
+                <view class="i-carbon-location text-5" /><text>{{ draft.city || '全国' }}</text><view class="i-carbon-chevron-down text-3" />
+              </view>
+            </picker>
+            <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
+              <view class="i-carbon-chat text-7" />
+            </button>
+          </view>
         </view>
       </view>
+    </view>
+    <view class="home-content">
       <view class="search-box">
         <view class="i-carbon-search shrink-0 text-7 text-#6454ff" aria-hidden="true" />
         <input v-model="draft.keyword" class="min-w-0 flex-1" placeholder="搜索标题、小区、地址" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
@@ -343,6 +351,9 @@ onReachBottom(() => {
           重置筛选
         </button>
       </view>
+      <view v-if="!loading && !error && items.length" class="result-summary" aria-live="polite">
+        <text>为你找到</text><text class="result-count">{{ total }}</text><text>套房源</text>
+      </view>
       <view v-if="loading" class="property-list" aria-label="正在加载房源">
         <view v-for="n in 2" :key="n" class="skeleton-card">
           <view class="skeleton-image" /><view class="min-w-0 flex-1">
@@ -378,20 +389,35 @@ onReachBottom(() => {
 
 <style scoped>
 .home-page {
-  min-height: 100vh;
+  box-sizing: border-box;
+  min-height: calc(100vh + env(safe-area-inset-bottom));
+  min-height: calc(var(--app-viewport-height, 100vh) + env(safe-area-inset-bottom));
   color: #1e3159;
   background: radial-gradient(ellipse at 90% -5%, #c2d0ff 0%, #e5ebff 28%, #f5f7ff 58%);
 }
 .home-content {
   max-width: 720px;
   margin: 0 auto;
-  padding: calc(var(--status-bar-height, 0px) + 24px) 16px 20px;
+  padding: 0 16px 20px;
+}
+.home-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: calc(var(--status-bar-height, 0px) + 16px) 16px 8px;
+  background: rgba(245, 247, 255, 0.84);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.home-header-content {
+  max-width: 720px;
+  margin: 0 auto;
 }
 .home-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  min-width: 0;
+}
+.brand-block {
+  max-width: 58%;
 }
 .brand-name {
   display: block;
@@ -407,9 +433,16 @@ onReachBottom(() => {
 }
 .heading-actions {
   display: flex;
-  flex-shrink: 0;
   align-items: center;
+  justify-content: space-between;
   gap: 5px;
+  width: 100%;
+}
+.home-toolbar {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 4px;
 }
 .city-button {
   display: flex;
@@ -439,7 +472,7 @@ onReachBottom(() => {
   align-items: center;
   gap: 10px;
   height: 50px;
-  margin-top: 21px;
+  margin-top: 14px;
   padding: 0 12px;
   border-radius: 28px;
   background: #ffffffed;
@@ -568,6 +601,20 @@ onReachBottom(() => {
   color: #5160ed;
   font-size: 12px;
 }
+.result-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 6px 2px 10px;
+  color: #687a9b;
+  font-size: 12px;
+}
+.result-count {
+  color: #263f72;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .property-list {
   display: flex;
   flex-direction: column;
@@ -591,10 +638,10 @@ onReachBottom(() => {
   border-radius: 5px;
   background: #e9eef9;
 }
-/* 微信胶囊占据右上角，页头在其下方布局。 */
+/* 微信胶囊占据右上角，品牌留在左侧，操作按钮放到下一行。 */
 /* #ifdef MP-WEIXIN */
-.home-content {
-  padding-top: calc(var(--status-bar-height, 20px) + 58px);
+.home-sticky-header {
+  padding-top: calc(var(--status-bar-height, 20px) + 8px);
 }
 /* #endif */
 @media (min-width: 420px) {
