@@ -18,6 +18,8 @@ type _LocationUrl =
   "/pages/property/bookings" |
   "/pages/property/detail" |
   "/pages/property/edit" |
+  "/pages/property/lease-detail" |
+  "/pages/property/leases" |
   "/pages/property/manager" |
   "/pages/property/personal";
 

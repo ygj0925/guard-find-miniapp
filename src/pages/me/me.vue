@@ -175,6 +175,17 @@ function onLogout() {
         <view class="mt-20rpx app-panel overflow-hidden">
           <button
             class="app-tap min-h-136rpx w-full flex items-center gap-24rpx border-0 border-b border-app-border border-solid bg-white p-32rpx text-left leading-normal"
+            aria-label="我的租约，合同签署与续租"
+            @tap="go('/pages/property/leases')"
+          >
+            <view class="i-carbon-document h-48rpx w-48rpx shrink-0 text-brand-blue" aria-hidden="true" />
+            <view class="min-w-0 flex-1">
+              <text class="block text-32rpx text-app-ink leading-44rpx">我的租约</text><text class="mt-6rpx block text-24rpx text-app-muted">合同签署 · 续租申请 · 临期提醒</text>
+            </view>
+            <view class="i-carbon-chevron-right h-36rpx w-36rpx shrink-0 text-app-muted" aria-hidden="true" />
+          </button>
+          <button
+            class="app-tap min-h-136rpx w-full flex items-center gap-24rpx border-0 border-b border-app-border border-solid bg-white p-32rpx text-left leading-normal"
             aria-label="查看业务通知"
             @tap="go('/pages/message/notices')"
           >

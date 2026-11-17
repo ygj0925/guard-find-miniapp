@@ -1,41 +1,103 @@
 <script setup lang="ts">
-import type { BookingDetail,OpsSettings } from '@/api/operations'
-import { actOnBooking,bookingLabels,fetchBookingDetail,fetchOpsSettings,subscribeBooking } from '@/api/operations'
+import type { BookingDetail, OpsSettings } from '@/api/operations'
+import { computed, ref, watch } from 'vue'
+import { actOnBooking, bookingLabels, fetchBookingDetail, fetchOpsSettings, subscribeBooking } from '@/api/operations'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
 
-definePage({style:{navigationBarTitleText:'预约详情'}})
-const id=ref('')
-const data=ref<BookingDetail|null>(null)
-const settings=ref<OpsSettings|null>(null)
-const loading=ref(false)
-const failed=ref(false)
-const busy=ref(false)
-const action=ref('')
-const reason=ref('')
-const date=ref('')
-const time=ref('')
-const error=ref('')
-let generation=0
-const names:Record<string,string>={CONFIRM:'确认预约',REJECT:'拒绝预约',CANCEL:'取消预约',RESCHEDULE:'申请改期',VISIT:'登记到访',COMPLETE:'完成看房',NO_SHOW:'标记未到访'}
-const actions=computed(()=>{const b=data.value;if(!b)return [];if(b.canManage)return b.status===1?['CONFIRM','REJECT','CANCEL','RESCHEDULE']:b.status===2?['VISIT','NO_SHOW','CANCEL','RESCHEDULE']:b.status===5?['COMPLETE']:[];return b.isGuest&&[1,2].includes(b.status)?['CANCEL','RESCHEDULE']:[]})
-onLoad(query=>{id.value=String(query?.id||'')})
-onShow(()=>void load())
-onUnload(()=>{generation++})
-async function load(){if(!useTokenStore().updateNowTime().hasLogin){toLoginPage();return}const current=++generation;loading.value=true;failed.value=false;try{const result=await fetchBookingDetail(id.value);if(current===generation)data.value=result;try{const config=await fetchOpsSettings();if(current===generation)settings.value=config}catch{}}catch{if(current===generation)failed.value=true}finally{if(current===generation)loading.value=false}}
-function begin(value:string){action.value=value;reason.value='';date.value='';time.value='';error.value=''}
-async function submit(){if(busy.value)return;if(['REJECT','CANCEL','RESCHEDULE','NO_SHOW'].includes(action.value)&&!reason.value.trim()){error.value='请填写原因';return}if(action.value==='RESCHEDULE'&&(!date.value||!time.value)){error.value='请选择新的看房日期与时间';return}busy.value=true;error.value='';try{await actOnBooking(id.value,{action:action.value,reason:reason.value.trim(),bookingTime:action.value==='RESCHEDULE'?`${date.value} ${time.value}:00`:undefined});action.value='';await load();uni.showToast({title:'预约已更新',icon:'none'})}catch(failure){error.value=failure instanceof Error?failure.message:'处理失败，请重试'}finally{busy.value=false}}
-async function subscribe(){if(busy.value||!settings.value?.subscriptionEnabled)return
-// #ifdef MP-WEIXIN
- const templateId=settings.value.templateId
- uni.requestSubscribeMessage({tmplIds:[templateId],success:async result=>{if(result[templateId]!=='accept'){uni.showToast({title:'未订阅，仍可在业务通知查看结果',icon:'none'});return}busy.value=true;try{await subscribeBooking(id.value,templateId);uni.showToast({title:'已记录本次订阅授权',icon:'none'})}catch{uni.showToast({title:'授权记录失败，请稍后重试',icon:'none'})}finally{busy.value=false}},fail:()=>uni.showToast({title:'无法发起订阅，请检查微信设置',icon:'none'})})
-// #endif
-// #ifndef MP-WEIXIN
- uni.showToast({title:'请在微信小程序中订阅提醒',icon:'none'})
-// #endif
+definePage({ style: { navigationBarTitleText: '预约详情' } })
+const tokenStore = useTokenStore()
+const id = ref('')
+const data = ref<BookingDetail | null>(null)
+const settings = ref<OpsSettings | null>(null)
+const loading = ref(false)
+const failed = ref(false)
+const busy = ref(false)
+const action = ref('')
+const reason = ref('')
+const date = ref('')
+const time = ref('')
+const error = ref('')
+let generation = 0
+let visible = false
+const names: Record<string, string> = { CONFIRM: '确认预约', REJECT: '拒绝预约', CANCEL: '取消预约', RESCHEDULE: '申请改期', VISIT: '登记到访', COMPLETE: '完成看房', NO_SHOW: '标记未到访' }
+const actions = computed(() => {
+  const booking = data.value
+  if (!booking) return []
+  if (booking.canManage) return booking.status === 1 ? ['CONFIRM', 'REJECT', 'CANCEL', 'RESCHEDULE'] : booking.status === 2 ? ['VISIT', 'NO_SHOW', 'CANCEL', 'RESCHEDULE'] : booking.status === 5 ? ['COMPLETE'] : []
+  return booking.isGuest && [1, 2].includes(booking.status) ? ['CANCEL', 'RESCHEDULE'] : []
+})
+function invalidate() { generation++; loading.value = false; busy.value = false }
+function hide() { visible = false; invalidate(); data.value = null; settings.value = null }
+onLoad(query => { id.value = String(query?.id || '') })
+onShow(() => { visible = true; void load() })
+onHide(hide)
+onUnload(hide)
+watch(() => tokenStore.validToken, () => {
+  invalidate(); data.value = null; settings.value = null; action.value = ''; reason.value = ''; error.value = ''
+  if (visible) void load()
+}, { flush: 'sync' })
+function current(version: number, token: string) { return visible && version === generation && token === tokenStore.validToken }
+async function load() {
+  if (!tokenStore.updateNowTime().hasLogin) { invalidate(); data.value = null; toLoginPage(); return }
+  if (!/^[1-9]\d*$/.test(id.value)) { failed.value = true; return }
+  const version = ++generation
+  const token = tokenStore.validToken
+  loading.value = true; failed.value = false
+  try {
+    const [booking, config] = await Promise.all([fetchBookingDetail(id.value), fetchOpsSettings().catch(() => null)])
+    if (!current(version, token)) return
+    data.value = booking; settings.value = config
+  }
+  catch { if (current(version, token)) { failed.value = true; data.value = null } }
+  finally { if (current(version, token)) loading.value = false }
 }
-function support(){uni.navigateTo({url:'/pages/message/chat?mode=support'})}
-function openProperty(){if(data.value)uni.navigateTo({url:`/pages/property/detail?id=${data.value.propertyId}`})}
+function begin(value: string) {
+  if (busy.value || !actions.value.includes(value)) return
+  action.value = value; reason.value = ''; date.value = ''; time.value = ''; error.value = ''
+}
+async function submit() {
+  if (busy.value || !actions.value.includes(action.value)) return
+  if (!tokenStore.updateNowTime().hasLogin) { toLoginPage(); return }
+  if (['REJECT', 'CANCEL', 'RESCHEDULE', 'NO_SHOW'].includes(action.value) && !reason.value.trim()) { error.value = '请填写原因'; return }
+  if (action.value === 'RESCHEDULE' && (!date.value || !time.value)) { error.value = '请选择新的看房日期与时间'; return }
+  const version = generation
+  const token = tokenStore.validToken
+  busy.value = true; error.value = ''
+  try {
+    await actOnBooking(id.value, { action: action.value, reason: reason.value.trim(), bookingTime: action.value === 'RESCHEDULE' ? `${date.value} ${time.value}:00` : undefined })
+    if (!current(version, token)) return
+    action.value = ''; busy.value = false
+    uni.showToast({ title: '预约已更新', icon: 'none' })
+    await load()
+  }
+  catch (failure) { if (current(version, token)) error.value = failure instanceof Error ? failure.message : '处理失败，请重试' }
+  finally { if (current(version, token)) busy.value = false }
+}
+function subscribe() {
+  if (busy.value || !settings.value?.subscriptionEnabled || !tokenStore.updateNowTime().hasLogin) return
+  // #ifdef MP-WEIXIN
+  const templateId = settings.value.templateId
+  const version = generation
+  const token = tokenStore.validToken
+  busy.value = true
+  uni.requestSubscribeMessage({ tmplIds: [templateId], success: async result => {
+    if (!current(version, token)) return
+    if (result[templateId] !== 'accept') { busy.value = false; uni.showToast({ title: '未订阅，仍可在业务通知查看结果', icon: 'none' }); return }
+    try {
+      await subscribeBooking(id.value, templateId)
+      if (current(version, token)) uni.showToast({ title: '已记录本次订阅授权', icon: 'none' })
+    }
+    catch { if (current(version, token)) uni.showToast({ title: '授权记录失败，请稍后重试', icon: 'none' }) }
+    finally { if (current(version, token)) busy.value = false }
+  }, fail: () => { if (current(version, token)) { busy.value = false; uni.showToast({ title: '无法发起订阅，请检查微信设置', icon: 'none' }) } } })
+  // #endif
+  // #ifndef MP-WEIXIN
+  uni.showToast({ title: '请在微信小程序中订阅提醒', icon: 'none' })
+  // #endif
+}
+function support() { uni.navigateTo({ url: '/pages/message/chat?mode=support' }) }
+function openProperty() { if (data.value) uni.navigateTo({ url: `/pages/property/detail?id=${data.value.propertyId}` }) }
 </script>
 
 <template>
