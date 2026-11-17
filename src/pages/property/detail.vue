@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { Property } from '@/api/property'
+import type { Reception } from '@/api/operations'
+import { fetchReception,startConsult,availabilityLabels } from '@/api/operations'
 import type { HttpError } from '@/http/types'
 import {
   fetchPropertyDetail,
@@ -20,6 +22,7 @@ definePage({
 })
 
 const id = ref('')
+const reception = ref<Reception|null>(null)
 const property = ref<Property | null>(null)
 const loading = ref(true)
 const loadError = ref('')
@@ -122,6 +125,7 @@ async function load() {
       return
     property.value = data || null
     missing.value = !data
+    if(data){try{const extra=await fetchReception(String(data.id));if(version===requestVersion)reception.value=extra}catch{if(version===requestVersion)reception.value=null}}
   }
   catch (error: unknown) {
     if (version !== requestVersion)
@@ -177,6 +181,7 @@ async function favorite() {
   }
 }
 function book() {
+  if(reception.value && reception.value.availability!=='ACTIVE'){uni.showToast({title:'该房源暂不接待新的预约',icon:'none'});return}
   if (property.value && requireLogin())
     uni.navigateTo({ url: `/pages/property/bookings?propertyId=${encodeURIComponent(String(property.value.id))}` })
 }
@@ -192,14 +197,13 @@ async function chatWithOwner() {
   if (chatting.value || !property.value || !requireLogin())
     return
   const item = property.value
-  if (!item.userId) {
-    uni.navigateTo({ url: '/pages/message/chat?mode=support' })
-    return
-  }
+  const targetUserId=reception.value?.managerId || item.userId
   chatting.value = true
   const version = requestVersion
   const accessToken = useTokenStore().validToken
   try {
+    await startConsult(String(item.id),!targetUserId)
+    if(!targetUserId){if(version===requestVersion&&accessToken===useTokenStore().validToken)uni.navigateTo({url:'/pages/message/chat?mode=support'});return}
     const user = await useUserStore().fetchUserInfo({ commit: false })
     if (version !== requestVersion || !requireLogin() || accessToken !== useTokenStore().validToken)
       return
@@ -207,13 +211,13 @@ async function chatWithOwner() {
       uni.showToast({ title: '无法确认登录信息，请重新登录', icon: 'none' })
       return
     }
-    if (String(user.userId) === String(item.userId)) {
+    if (String(user.userId) === String(targetUserId)) {
       uni.showToast({ title: '这是您发布的房源，不能与自己私信', icon: 'none' })
       return
     }
-    const name = encodeURIComponent(item.contactName || item.ownerNickname || '房东')
+    const name = encodeURIComponent(reception.value?.managerName || item.contactName || item.ownerNickname || '管家')
     uni.navigateTo({
-      url: `/pages/message/chat?peerId=${encodeURIComponent(String(item.userId))}&peerName=${name}`,
+      url: `/pages/message/chat?peerId=${encodeURIComponent(String(targetUserId))}&peerName=${name}`,
     })
   }
   catch {
@@ -223,6 +227,11 @@ async function chatWithOwner() {
     chatting.value = false
   }
 }
+function navigateToProperty(){
+ const meta=reception.value
+ if(meta?.latitude==null || meta.longitude==null){uni.showToast({title:'位置暂未配置，请联系管家确认集合地点',icon:'none'});return}
+ uni.openLocation({latitude:Number(meta.latitude),longitude:Number(meta.longitude),name:property.value?.title||'看房地点',address:meta.meetingPoint||property.value?.address||'',fail:()=>uni.showToast({title:'导航打开失败，请使用集合地点与管家确认',icon:'none'})})
+}
 function returnToProperties() {
   uni.switchTab({ url: '/pages/index/index' })
 }
@@ -231,6 +240,14 @@ function returnToProperties() {
 <template>
   <view class="detail-page app-page">
     <view class="app-content">
+      <view v-if="property && reception" class="app-panel mb-4 p-5">
+        <text class="block font-bold">{{ availabilityLabels[reception.availability] }} · {{ reception.managerName || '公寓管家接待' }}</text>
+        <text v-if="reception.reason" class="mt-2 block text-app-muted">{{ reception.reason }}</text>
+        <text v-if="reception.reopenDate" class="mt-2 block text-sm">预计重新开放：{{ reception.reopenDate }}</text>
+        <text v-if="reception.meetingPoint" class="mt-3 block">集合地点：{{ reception.meetingPoint }}</text>
+        <text v-if="reception.instructions" class="mt-2 block whitespace-pre-wrap">{{ reception.instructions }}</text>
+        <button class="app-secondary-button mt-4" @tap="navigateToProperty">地图导航 / 到访指引</button>
+      </view>
       <view v-if="loading" class="min-h-90 app-state gap-3 py-16">
         <view class="i-carbon-circle-dash h-8 w-8 animate-spin text-brand-blue" />
         <text class="text-base text-app-ink font-semibold">正在加载房源</text>

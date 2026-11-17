@@ -111,7 +111,7 @@ describe('预约提交时间契约', () => {
     await submit()
     expect(mocks.create).toHaveBeenCalledExactlyOnceWith('property-1', payload)
     expect(uni.showToast).toHaveBeenCalledWith({ title: '预约已提交，待管家确认', icon: 'none' })
-    expect(uni.navigateBack).toHaveBeenCalledOnce()
+    expect(uni.redirectTo).toHaveBeenCalledExactlyOnceWith({url:'/pages/property/booking-detail?id=booking-1'})
   })
 
   it('仅使用 T 格式解析本地未来时间，兼容不接受空格日期的运行时', async () => {
@@ -185,7 +185,7 @@ describe('预约提交时间契约', () => {
     expect(mocks.create).toHaveBeenCalledTimes(2)
     expect(mocks.create).toHaveBeenNthCalledWith(2, 'property-1', payload)
     expect(wrapper!.text()).not.toContain('提交失败')
-    expect(uni.navigateBack).toHaveBeenCalledOnce()
+    expect(uni.redirectTo).toHaveBeenCalledExactlyOnceWith({url:'/pages/property/booking-detail?id=booking-1'})
   })
 })
 
@@ -236,7 +236,7 @@ describe('预约提交状态与导航', () => {
     expect(wrapper!.get('.booking-submit-bar button').text()).toBe('提交预约')
     expect(mocks.create).toHaveBeenCalledOnce()
     expect(uni.showToast).toHaveBeenCalledWith({ title: '预约已提交，待管家确认', icon: 'none' })
-    expect(uni.navigateBack).toHaveBeenCalledOnce()
+    expect(uni.redirectTo).toHaveBeenCalledExactlyOnceWith({url:'/pages/property/booking-detail?id=booking-1'})
   })
 
   it('房源详情未完成时拒绝提交，加载成功后可提交', async () => {
@@ -261,7 +261,7 @@ describe('预约提交状态与导航', () => {
     expect(wrapper!.get('.booking-submit-bar button').attributes('disabled')).toBeUndefined()
     await submit()
     expect(mocks.create).toHaveBeenCalledExactlyOnceWith('property-1', payload)
-    expect(uni.navigateBack).toHaveBeenCalledOnce()
+    expect(uni.redirectTo).toHaveBeenCalledExactlyOnceWith({url:'/pages/property/booking-detail?id=booking-1'})
   })
 
   it('房源详情失败后禁用提交，点击重新加载房源成功后可提交', async () => {
@@ -286,26 +286,15 @@ describe('预约提交状态与导航', () => {
     expect(wrapper!.get('.booking-submit-bar button').attributes('disabled')).toBeUndefined()
     await submit()
     expect(mocks.create).toHaveBeenCalledExactlyOnceWith('property-1', payload)
-    expect(uni.navigateBack).toHaveBeenCalledOnce()
+    expect(uni.redirectTo).toHaveBeenCalledExactlyOnceWith({url:'/pages/property/booking-detail?id=booking-1'})
   })
 
-  it('提交成功后 navigateBack 失败时仅 redirectTo 预约列表', async () => {
+  it('提交成功后直接进入新建预约的详情页', async () => {
     await open()
     await fill()
     await submit()
-    expect(mocks.create).toHaveBeenCalledExactlyOnceWith('property-1', payload)
-    expect(uni.showToast).toHaveBeenCalledWith({ title: '预约已提交，待管家确认', icon: 'none' })
-    expect(uni.navigateBack).toHaveBeenCalledOnce()
-    expect(uni.redirectTo).not.toHaveBeenCalled()
-
-    const back = vi.mocked(uni.navigateBack).mock.calls[0][0]!
-    expect(back.fail).toEqual(expect.any(Function))
-    back.fail!({ errMsg: 'navigateBack:fail' })
-    expect(uni.redirectTo).toHaveBeenCalledExactlyOnceWith({ url: '/pages/property/bookings' })
-    expect(uni.navigateBack).toHaveBeenCalledOnce()
-    expect(uni.navigateTo).not.toHaveBeenCalled()
-    expect(uni.switchTab).not.toHaveBeenCalled()
-    expect(uni.reLaunch).not.toHaveBeenCalled()
+    expect(uni.redirectTo).toHaveBeenCalledExactlyOnceWith({url:'/pages/property/booking-detail?id=booking-1'})
+    expect(uni.navigateBack).not.toHaveBeenCalled()
   })
 
   it('未登录时拒绝提交并调用登录引导', async () => {

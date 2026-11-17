@@ -41,7 +41,7 @@ async function open(item: Notice) {
   await http.post<void>(`/miniapp/notices/${item.id}/read`)
   item.isRead = 1
   if (item.businessType === 'PROPERTY_BOOKING')
-    uni.navigateTo({ url: '/pages/property/bookings' })
+    uni.navigateTo({ url: `/pages/property/booking-detail?id=${encodeURIComponent(String(item.businessId))}` })
   else uni.switchTab({ url: '/pages/message/index' })
 }
 </script>

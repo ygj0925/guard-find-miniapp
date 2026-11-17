@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fetchOpsSettings,acceptPolicy } from '@/api/operations'
 /**
  * 登录页:仅支持微信小程序一键登录(wx.login code → 服务端换 token)。
  */
@@ -57,8 +58,12 @@ async function onWxLogin() {
         fail: (error: any) => reject(new Error(error?.errMsg || '微信授权失败,请重试')),
       })
     })
+    const policy = await fetchOpsSettings()
     const resp = await wechatMiniappLogin(code)
     tokenStore.setTokenInfo(resp)
+    if(policy.policiesPublished){
+      try{await acceptPolicy(policy.policyVersion)}catch(failure){await tokenStore.clearLoginState();throw failure}
+    }
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 600)
     // #endif

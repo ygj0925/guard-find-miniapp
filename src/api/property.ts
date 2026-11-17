@@ -162,7 +162,7 @@ export function createBooking(id: Property['id'], data: BookingInput) {
   return http.post<string>(`/miniapp/property/${id}/booking`, data)
 }
 export function fetchBookings(role: 'guest' | 'owner', page: number) {
-  return http.get<PageResult<Booking>>('/miniapp/property/bookings', {
+  return http.get<PageResult<Booking>>('/miniapp/property/operations/bookings', {
     role,
     page,
     size: 10,

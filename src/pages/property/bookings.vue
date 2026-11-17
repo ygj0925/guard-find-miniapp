@@ -50,6 +50,10 @@ const labels: Record<number, string> = {
   2: '已确认',
   3: '已拒绝',
   4: '已取消',
+  5: '已到访',
+  6: '已完成',
+  7: '未到访',
+  8: '已过期',
 }
 const statusClasses: Record<number, string> = {
   1: 'text-app-warning',
@@ -80,6 +84,7 @@ onReachBottom(() => {
     void load(true)
 })
 
+function openDetail(item:Booking){uni.navigateTo({url:`/pages/property/booking-detail?id=${item.id}`})}
 function localDate() {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -183,16 +188,14 @@ async function submit() {
   busy.value = true
   submitError.value = ''
   try {
-    await createBooking(propertyId.value, {
+    const createdId = await createBooking(propertyId.value, {
       bookingTime,
       contactName: contactName.value,
       contactPhone: contactPhone.value,
       remark: remark.value,
     })
     uni.showToast({ title: '预约已提交，待管家确认', icon: 'none' })
-    uni.navigateBack({
-      fail: () => uni.redirectTo({ url: '/pages/property/bookings' }),
-    })
+    uni.redirectTo({url:`/pages/property/booking-detail?id=${encodeURIComponent(String(createdId))}`})
   }
   catch {
     submitError.value = '提交失败，填写的信息已保留，请重试。'
@@ -416,6 +419,7 @@ function returnToProperty() {
 
         <template v-if="!loginRequired">
           <view v-for="item in items" :key="item.id" class="mt-3 app-panel p-4">
+          <button class="app-tap mb-3 text-brand-blue" @tap="openDetail(item)">预约详情与处理记录</button>
             <view class="flex items-start justify-between gap-3">
               <text class="min-w-0 flex-1 break-words text-base text-app-ink font-semibold leading-6">{{ item.propertyTitle || '房源已删除' }}</text>
               <text class="shrink-0 rounded-md bg-app-soft px-2 py-1 text-xs" :class="statusClasses[item.status] || 'text-app-muted'">{{ labels[item.status] || '状态未知' }}</text>

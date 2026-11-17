@@ -29,6 +29,7 @@ vi.mock('@dcloudio/uni-app', () => ({
   onUnload: (cb: (...args: unknown[]) => unknown) => { mocks.hooks.unload = cb },
   onReachBottom: (cb: (...args: unknown[]) => unknown) => { mocks.hooks.bottom = cb },
 }))
+vi.mock('@/api/operations', async importOriginal => ({...await importOriginal<typeof import('@/api/operations')>(),fetchReception:vi.fn().mockResolvedValue({availability:'ACTIVE'}),startConsult:vi.fn().mockResolvedValue(undefined)}))
 vi.mock('@/api/login', () => ({ getUserInfo: mocks.me }))
 vi.mock('@/http/http', () => ({ http: {} }))
 // 使用实际的标签/计价工具，避免测试和实现各自复制一套契约。

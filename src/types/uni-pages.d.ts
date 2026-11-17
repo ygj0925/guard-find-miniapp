@@ -14,6 +14,7 @@ type _LocationUrl =
   "/pages/message/notices" |
   "/pages/message/support" |
   "/pages/property/activities" |
+  "/pages/property/booking-detail" |
   "/pages/property/bookings" |
   "/pages/property/detail" |
   "/pages/property/edit" |
