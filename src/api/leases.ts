@@ -90,6 +90,8 @@ export interface LeaseActionInput {
   handwriting?: Handwriting
   saveSignature?: boolean
   sealId?: string
+  /** Identity verification session used for a required signing gate. */
+  verificationId?: string
 }
 export const leaseStatusLabels: Record<LeaseStatus, string> = {
   DRAFT: '草稿',

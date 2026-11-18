@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Handwriting, LeaseDetail, SigningProfile } from '@/api/leases'
+import type { IdentityVerificationState } from '@/api/identityVerification'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { actOnLease, fetchSigningProfile, removeSigningAsset } from '@/api/leases'
 import { useTokenStore } from '@/store/token'
@@ -8,6 +9,7 @@ import HandwritingPad from './HandwritingPad.vue'
 import LeaseContractDocument from './LeaseContractDocument.vue'
 import PrivateSignatureImage from './PrivateSignatureImage.vue'
 import LeaseReviewPanel from './LeaseReviewPanel.vue'
+import IdentityVerificationPanel from './IdentityVerificationPanel.vue'
 
 const props = defineProps<{
   lease: LeaseDetail
@@ -28,6 +30,7 @@ const saveSignature = ref(false)
 const useSeal = ref(false)
 const handwriting = ref<Handwriting>({ strokes: [] })
 const profile = ref<SigningProfile>({})
+const identityState = ref<IdentityVerificationState>({ mode: 'DISABLED', status: 'NOT_REQUIRED', required: false })
 const busy = ref(false)
 const profileLoading = ref(false)
 const profileError = ref('')
@@ -176,6 +179,10 @@ async function sign() {
     error.value = '请阅读合同、核对信息并确认签署声明'
     return
   }
+  if (identityState.value.required && identityState.value.status !== 'VERIFIED') {
+    error.value = '请先完成实名认证，再提交合同签署'
+    return
+  }
   if (!hasHandwriting(handwriting.value)) {
     error.value = '请清晰手写本人完整姓名，不能提交空白或过短笔迹'
     return
@@ -189,7 +196,7 @@ async function sign() {
     const confirmed = await uni.showModal({ title: '提交本人签名', content: `以${role.value}“${name.value}”签署当前合同${useSeal.value ? '，并加盖所选印章' : ''}。提交后签名将与本份合同一同保存。`, confirmText: '确认签署' })
     if (!confirmed.confirm || !valid())
       return
-    await actOnLease(props.lease.id, { action: 'SIGN', version: props.lease.version, contentHash: props.lease.contentHash, signedName: name.value, accepted: true, handwriting: handwriting.value, saveSignature: saveSignature.value, ...(useSeal.value ? { sealId: profile.value.seal!.id } : {}) })
+    await actOnLease(props.lease.id, { action: 'SIGN', version: props.lease.version, contentHash: props.lease.contentHash, signedName: name.value, accepted: true, handwriting: handwriting.value, saveSignature: saveSignature.value, ...(useSeal.value ? { sealId: profile.value.seal!.id } : {}), ...(identityState.value.required && identityState.value.sessionId ? { verificationId: identityState.value.sessionId } : {}) })
     if (valid())
       emit('signed')
   }
@@ -210,6 +217,7 @@ watch(() => [props.active, props.lease.id, props.lease.contentHash, props.lease.
   read.value = checked.value = accepted.value = saveSignature.value = useSeal.value = busy.value = false
   handwriting.value = { strokes: [] }
   profile.value = {}
+  identityState.value = { mode: 'DISABLED', status: 'NOT_REQUIRED', required: false }
   error.value = profileError.value = ''
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
@@ -264,6 +272,7 @@ onBeforeUnmount(() => {
       <view v-else class="app-panel p-5">
         <text class="block text-xl font-bold">请签署：{{ name }}</text><text class="mt-2 block text-sm text-app-muted">{{ role }} · 手写签名将显示在合同签署页</text>
         <view class="mt-5">
+          <IdentityVerificationPanel :active="active" :name="name" @state="identityState = $event" />
           <HandwritingPad v-model="handwriting" :disabled="busy" />
         </view>
         <text v-if="profileLoading" class="mt-3 block text-xs text-app-muted">正在读取我的签署资料…</text>

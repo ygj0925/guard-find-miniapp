@@ -19,7 +19,7 @@ async function consent(index = 0) {
   await wrapper!.findAll('.consent-group')[index].trigger('change', { detail: { value: ['yes'] } })
 }
 function open(value = lease) {
-  wrapper = mount(Flow, { props: { lease: value, active: true }, global: { stubs: { 'checkbox-group': { template: '<div class="consent-group"><slot /></div>' }, 'checkbox': true, 'HandwritingPad': { name: 'HandwritingPad', props: ['modelValue'], template: '<div class="pad" />' }, 'LeaseContractDocument': true, 'PrivateSignatureImage': true } } })
+  wrapper = mount(Flow, { props: { lease: value, active: true }, global: { stubs: { 'checkbox-group': { template: '<div class="consent-group"><slot /></div>' }, 'checkbox': true, 'HandwritingPad': { name: 'HandwritingPad', props: ['modelValue'], template: '<div class="pad" />' }, 'LeaseContractDocument': true, 'PrivateSignatureImage': true, 'IdentityVerificationPanel': true } } })
 }
 async function signingStep() {
   await consent()
