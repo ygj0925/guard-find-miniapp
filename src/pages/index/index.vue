@@ -12,6 +12,7 @@ import { buildPropertyFilters, defaultPropertyFilters } from '@/utils/propertyFi
 import { toLoginPage } from '@/utils/toLoginPage'
 import HomeBanners from '@/components/HomeBanners.vue'
 import HomeShortcuts from '@/components/HomeShortcuts.vue'
+import { regionCityNames } from '@/utils/regions'
 
 definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '上海泊之湾公寓', backgroundColor: '#F5F7FF', enablePullDownRefresh: true } })
 const PAGE_SIZE = 10
@@ -114,7 +115,7 @@ async function loadHome() {
 async function loadCities() {
   try {
     const tree = await fetchRegionTree()
-    const names = tree.flatMap(p => ['北京市', '上海市', '天津市', '重庆市'].includes(p.name) ? [p.name] : p.children.map(c => c.name))
+    const names = regionCityNames(tree)
     if (!disposed)
       cities.value = ['不限城市', ...new Set(names)]
   }
@@ -195,6 +196,10 @@ function phone() {
   } })
 }
 function shortcut(key: string) {
+  if (key === 'map') {
+    uni.navigateTo({ url: `/pages/property/map?city=${encodeURIComponent(draft.city || '')}` })
+    return
+  }
   if (key === 'phone') {
     phone()
     return

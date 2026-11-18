@@ -19,8 +19,10 @@ type _LocationUrl =
   "/pages/property/detail" |
   "/pages/property/edit" |
   "/pages/property/lease-detail" |
+  "/pages/property/lease-sign" |
   "/pages/property/leases" |
   "/pages/property/manager" |
+  "/pages/property/map" |
   "/pages/property/personal";
 
 interface NavigateToOptions {

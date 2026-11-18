@@ -228,9 +228,9 @@ async function chatWithOwner() {
   }
 }
 function navigateToProperty(){
- const meta=reception.value
+ const meta=property.value?.publicLatitude != null ? { latitude: property.value.publicLatitude, longitude: property.value.publicLongitude, meetingPoint: property.value.locationLabel } : reception.value
  if(meta?.latitude==null || meta.longitude==null){uni.showToast({title:'位置暂未配置，请联系管家确认集合地点',icon:'none'});return}
- uni.openLocation({latitude:Number(meta.latitude),longitude:Number(meta.longitude),name:property.value?.title||'看房地点',address:meta.meetingPoint||property.value?.address||'',fail:()=>uni.showToast({title:'导航打开失败，请使用集合地点与管家确认',icon:'none'})})
+ uni.openLocation({latitude:Number(meta.latitude),longitude:Number(meta.longitude),name:property.value?.title||'看房地点',address:meta.meetingPoint||'',fail:()=>uni.showToast({title:'导航打开失败，请使用集合地点与管家确认',icon:'none'})})
 }
 function returnToProperties() {
   uni.switchTab({ url: '/pages/index/index' })
@@ -246,7 +246,7 @@ function returnToProperties() {
         <text v-if="reception.reopenDate" class="mt-2 block text-sm">预计重新开放：{{ reception.reopenDate }}</text>
         <text v-if="reception.meetingPoint" class="mt-3 block">集合地点：{{ reception.meetingPoint }}</text>
         <text v-if="reception.instructions" class="mt-2 block whitespace-pre-wrap">{{ reception.instructions }}</text>
-        <button class="app-secondary-button mt-4" @tap="navigateToProperty">地图导航 / 到访指引</button>
+        <button v-if="property.publicLatitude == null" class="app-secondary-button mt-4" @tap="navigateToProperty">地图导航 / 到访指引</button>
       </view>
       <view v-if="loading" class="min-h-90 app-state gap-3 py-16">
         <view class="i-carbon-circle-dash h-8 w-8 animate-spin text-brand-blue" />
@@ -357,6 +357,8 @@ function returnToProperties() {
           </view>
           <text v-if="locationSummary" class="mt-3 block break-words text-sm text-app-ink-soft leading-6">{{ locationSummary }}</text>
           <text v-if="property.address" class="mt-1 block break-words text-sm text-app-muted leading-6">{{ property.address }}</text>
+          <text v-if="property.locationLabel" class="mt-2 block text-sm text-app-muted">公开位置：{{ property.locationLabel }}</text>
+          <button v-if="property.publicLatitude != null && property.publicLongitude != null" class="app-secondary-button mt-3" @tap="navigateToProperty">导航到公开位置</button>
         </view>
 
         <view v-if="facilities.length" class="mt-3 app-panel p-4">

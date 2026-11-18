@@ -10,6 +10,7 @@ import {
 } from '@/api/im'
 import { getUserInfo } from '@/api/login'
 import { fetchSupportContext } from '@/api/operations'
+import { fetchLease } from '@/api/leases'
 import { useTokenStore } from '@/store/token'
 import { createChatSync } from '@/utils/chatSync'
 import { disconnectImSocket, isImSocketConnected, subscribeImSocket } from '@/utils/imSocket'
@@ -32,6 +33,8 @@ const state = reactive<ChatState>({
 })
 const { messages, draft, sending } = toRefs(state)
 const contextProperty=ref<{id:string,title:string}|null>(null)
+const contextLease = ref<{ id: string, title: string } | null>(null)
+let leaseId = ''
 let contextGeneration=0
 const route = { convId: '', peerId: '', support: false }
 const tokenStore = useTokenStore()
@@ -58,6 +61,7 @@ const sync = createChatSync(state, route, {
 })
 
 onLoad((query) => {
+  leaseId = /^[1-9]\d*$/.test(String(query?.leaseId || '')) ? String(query?.leaseId) : ''
   route.support = query?.mode === 'support'
   route.convId = String(query?.convId || '')
   route.peerId = String(query?.peerId || '')
@@ -65,6 +69,9 @@ onLoad((query) => {
   uni.setNavigationBarTitle({ title })
 })
 watch(() => tokenStore.validToken, (token) => {
+  contextGeneration++
+  contextLease.value = null
+  contextProperty.value = null
   if (!token)
     disconnectImSocket()
   sync.tokenChanged(token)
@@ -76,13 +83,22 @@ onShow(() => {
   sync.show()
   const current=++contextGeneration
   const token=tokenStore.validToken
-  if(route.support && token)void fetchSupportContext().then(result=>{if(current===contextGeneration&&token===tokenStore.validToken)contextProperty.value=result.property?.[0]||null}).catch(()=>{})
+  if (route.support && token && leaseId) {
+    void fetchLease(leaseId).then(result => {
+      if (current !== contextGeneration || token !== tokenStore.validToken) return
+      contextLease.value = { id: result.id, title: result.title }
+      contextProperty.value = { id: result.propertyId, title: result.propertyTitle }
+      if (!state.draft) state.draft = `咨询合同 ${result.id}（${result.propertyTitle}）：`
+    }).catch(() => {})
+  }
+  else if(route.support && token)void fetchSupportContext().then(result=>{if(current===contextGeneration&&token===tokenStore.validToken)contextProperty.value=result.property?.[0]||null}).catch(()=>{})
 })
 onHide(()=>{contextGeneration++;sync.hide()})
 onUnload(()=>{contextGeneration++;sync.unload()})
 const onSend = () => sync.send()
 
 function openContext(){if(contextProperty.value)uni.navigateTo({url:`/pages/property/detail?id=${contextProperty.value.id}`})}
+function openContract() { if (contextLease.value) uni.navigateTo({ url: `/pages/property/lease-detail?id=${contextLease.value.id}` }) }
 function fromPeer(item: ImMessage) {
   return String(item.senderId) !== state.myUserId
 }
@@ -94,6 +110,7 @@ function formatTime(value?: string) {
 
 <template>
   <view class="min-h-full bg-#F7F8FA pb-24">
+    <view v-if="contextLease" class="app-panel mb-4 p-4"><text class="text-sm text-app-muted">正在咨询的合同</text><button class="app-tap mt-2 text-brand-blue" @tap="openContract">{{ contextLease.title }} · {{ contextLease.id }}</button></view>
     <view v-if="contextProperty" class="app-panel mb-4 p-4"><text class="text-sm text-app-muted">最近咨询房源</text><button class="app-tap mt-2 text-brand-blue" @tap="openContext">{{ contextProperty.title }}</button></view>
     <view v-if="messages.length" class="px-3 pt-3">
       <view

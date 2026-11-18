@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import type { LeaseAction, LeaseActionInput, LeaseDetail } from '@/api/leases'
 import { computed, ref, watch } from 'vue'
-import { actOnLease, fetchLease, leaseActionLabels, leaseStatusLabels, renewalLabels } from '@/api/leases'
+import { actOnLease, fetchLease, fetchLeasePdf, leaseActionLabels, leaseStatusLabels, renewalLabels } from '@/api/leases'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import LeaseLifecycle from './components/LeaseLifecycle.vue'
+import LeaseContractDocument from './components/LeaseContractDocument.vue'
+import LeaseReviewPanel from './components/LeaseReviewPanel.vue'
+import { openLeasePdf } from '@/utils/leaseSigning'
 
 definePage({ style: { navigationBarTitleText: '合同与租期' } })
 const tokenStore = useTokenStore()
@@ -14,15 +18,13 @@ const loading = ref(false)
 const failed = ref(false)
 const busy = ref(false)
 const error = ref('')
-const accepted = ref(false)
-const signedName = ref('')
 const reason = ref('')
 const requestedEndDate = ref('')
 const action = ref<LeaseAction | ''>('')
 let visible = false
+const pageVisible = ref(false)
 let generation = 0
 const validId = computed(() => /^[1-9]\d*$/.test(id.value))
-const signatureName = computed(() => data.value?.isTenant ? data.value.tenantName : data.value?.landlordName || '')
 const canSign = computed(() => {
   const lease = data.value
   return lease?.status === 'PENDING_SIGNATURE' && ((lease.isTenant && !lease.tenantSignedAt) || (lease.isLandlord && !lease.landlordSignedAt))
@@ -35,10 +37,7 @@ const canRenew = computed(() => {
 })
 const canMoveOut = computed(() => Boolean(data.value?.isTenant && ['SIGNED', 'EXPIRED'].includes(data.value.status) && data.value.moveOutStatus !== 'PENDING' && !['PENDING', 'APPROVED'].includes(data.value.renewalStatus)))
 const signedByMe = computed(() => data.value?.isTenant ? data.value?.tenantSignedAt : data.value?.landlordSignedAt)
-
 function resetInputs() {
-  accepted.value = false
-  signedName.value = ''
   reason.value = ''
   requestedEndDate.value = ''
   action.value = ''
@@ -86,10 +85,6 @@ function begin(value: LeaseAction) {
   requestedEndDate.value = ''
   error.value = ''
 }
-function setAccepted(event: { detail: { value: string[] } }) {
-  if (!busy.value)
-    accepted.value = event.detail.value.includes('accept')
-}
 function validDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
     return false
@@ -107,51 +102,38 @@ async function submit(value: LeaseAction) {
   const lease = data.value
   error.value = ''
   const input: LeaseActionInput = { action: value, version: lease.version }
-  if (value === 'SIGN') {
-    if (!canSign.value)
-      return
-    if (!accepted.value) {
-      error.value = '请完整阅读合同并勾选确认'
-      return
-    }
-    if (signedName.value.trim() !== signatureName.value.trim()) {
-      error.value = '签署姓名需与合同中的本人姓名一致'
-      return
-    }
-    input.accepted = true
-    input.signedName = signedName.value.trim()
-    input.contentHash = lease.contentHash
+  if (value === 'SIGN')
+    return
+  if (!reason.value.trim()) {
+    error.value = '请填写原因或说明'
+    return
   }
-  else {
-    if (!reason.value.trim()) {
-      error.value = '请填写原因或说明'
+  if (value === 'DECLINE' && !canSign.value)
+    return
+  if (value === 'RENEW_REQUEST' && !canRenew.value)
+    return
+  if (value === 'RENEW_CANCEL' && (!lease.isTenant || lease.renewalStatus !== 'PENDING'))
+    return
+  if (value === 'MOVE_OUT_REQUEST' && !canMoveOut.value)
+    return
+  if (value === 'MOVE_OUT_CANCEL' && (!lease.isTenant || lease.moveOutStatus !== 'PENDING'))
+    return
+  input.reason = reason.value.trim()
+  if (value === 'RENEW_REQUEST') {
+    if (!validDate(requestedEndDate.value) || requestedEndDate.value <= lease.endDate) {
+      error.value = '续租结束日期需晚于当前合同结束日期'
       return
     }
-    if (value === 'DECLINE' && !canSign.value)
-      return
-    if (value === 'RENEW_REQUEST' && !canRenew.value)
-      return
-    if (value === 'RENEW_CANCEL' && (!lease.isTenant || lease.renewalStatus !== 'PENDING'))
-      return
-    if (value === 'MOVE_OUT_REQUEST' && !canMoveOut.value)
-      return
-    input.reason = reason.value.trim()
-    if (value === 'RENEW_REQUEST') {
-      if (!validDate(requestedEndDate.value) || requestedEndDate.value <= lease.endDate) {
-        error.value = '续租结束日期需晚于当前合同结束日期'
-        return
-      }
-      input.requestedEndDate = requestedEndDate.value
-    }
+    input.requestedEndDate = requestedEndDate.value
   }
   const current = generation
   const valid = () => visible && current === generation && tokenStore.validToken === token
   busy.value = true
   try {
     const confirmed = await uni.showModal({
-      title: value === 'SIGN' ? '确认签署这份合同？' : leaseActionLabels[value],
-      content: value === 'SIGN' ? `以“${input.signedName}”确认当前完整合同内容。双方均确认后将记录为双方已签署。` : value === 'MOVE_OUT_REQUEST' ? '提交退租意向后由管理人员联系处理，不会立即终止合同。' : '请确认本次提交的信息，处理结果将在合同详情与业务通知中展示。',
-      confirmText: value === 'SIGN' ? '确认签署' : '确认提交',
+      title: leaseActionLabels[value],
+      content: value === 'MOVE_OUT_REQUEST' ? '提交退租意向后由管理人员联系处理，不会立即终止合同。' : '请确认本次提交的信息，处理结果将在合同详情与业务通知中展示。',
+      confirmText: '确认提交',
     })
     if (!confirmed.confirm || !valid())
       return
@@ -160,7 +142,7 @@ async function submit(value: LeaseAction) {
       return
     resetInputs()
     busy.value = false
-    uni.showToast({ title: value === 'SIGN' ? '签署确认已记录' : '申请已提交', icon: 'none' })
+    uni.showToast({ title: '申请已提交', icon: 'none' })
     await load()
   }
   catch (failure) {
@@ -179,27 +161,54 @@ function copyContract() {
   const content = [lease.title, `合同编号：${lease.id}`, `房源：${lease.propertyTitle}`, `地址：${lease.propertyAddress}`, `出租方：${lease.landlordName}`, `承租方：${lease.tenantName}`, `租期：${lease.startDate} 至 ${lease.endDate}`, `月租：${lease.monthlyRent}元；押金：${lease.deposit}元`, '', lease.terms, '', `状态：${leaseStatusLabels[lease.status]}`, `出租方确认：${lease.landlordSignedName || '未确认'} ${lease.landlordSignedAt || ''}`, `承租方确认：${lease.tenantSignedName || '未确认'} ${lease.tenantSignedAt || ''}`, `合同内容校验值：${lease.contentHash}`, '以上为小程序双方确认签署记录，不含第三方实名认证或CA认证。'].join('\n')
   uni.setClipboardData({ data: content, fail: () => uni.showToast({ title: '复制失败，请重试', icon: 'none' }) })
 }
+function openSigning() {
+  if (canSign.value && !busy.value && tokenStore.updateNowTime().validToken)
+    uni.navigateTo({ url: `/pages/property/lease-sign?id=${id.value}` })
+}
+async function download() {
+  const token = tokenStore.updateNowTime().validToken
+  if (!data.value || !token || busy.value)
+    return
+  const current = generation
+  busy.value = true
+  try {
+    const file = await fetchLeasePdf(id.value)
+    if (!visible || generation !== current || tokenStore.validToken !== token)
+      return
+    await openLeasePdf(file, () => visible && generation === current && tokenStore.validToken === token)
+  }
+  catch {
+    if (generation === current)
+      error.value = '合同下载失败，请重试'
+  }
+  finally {
+    if (generation === current)
+      busy.value = false
+  }
+}
 function openLease(value?: string) {
   if (value && /^[1-9]\d*$/.test(value) && tokenStore.updateNowTime().validToken)
     uni.navigateTo({ url: `/pages/property/lease-detail?id=${value}` })
 }
 function support() {
-  uni.navigateTo({ url: '/pages/message/chat?mode=support' })
+  uni.navigateTo({ url: `/pages/message/chat?mode=support&leaseId=${id.value}` })
 }
 onLoad((query) => {
   id.value = String(query?.id || '')
 })
 onShow(() => {
   visible = true
+  pageVisible.value = true
   void load()
 })
 onHide(() => {
   visible = false
+  pageVisible.value = false
   invalidate()
-  accepted.value = false
 })
 onUnload(() => {
   visible = false
+  pageVisible.value = false
   invalidate()
 })
 watch(() => tokenStore.validToken, () => {
@@ -236,6 +245,8 @@ watch(() => tokenStore.validToken, () => {
           <text class="block text-xl font-bold">{{ data.title }}</text>
           <text class="mt-3 block text-brand-blue">{{ leaseStatusLabels[data.status] }}</text>
           <text class="mt-2 block text-sm text-app-muted">合同编号 {{ data.id }}</text>
+          <text v-if="data.status === 'PENDING_SIGNATURE' && data.signatureDeadline" class="mt-2 block text-sm">请于 {{ data.signatureDeadline }} 前完成双方签署</text>
+          <text v-if="data.status === 'SIGNING_EXPIRED'" class="mt-3 block text-sm text-app-danger">本次签署已超时，请联系管家重新发起合同。</text>
           <text class="mt-4 block font-bold">{{ data.propertyTitle }}</text>
           <text class="mt-2 block text-sm">{{ data.propertyAddress }}</text>
           <text class="mt-3 block">出租方：{{ data.landlordName }}</text>
@@ -245,33 +256,32 @@ watch(() => tokenStore.validToken, () => {
           <text v-if="['SIGNED', 'EXPIRED'].includes(data.status)" class="mt-3 block text-brand-blue">{{ data.daysRemaining > 0 ? `距租期结束 ${data.daysRemaining} 天` : data.daysRemaining === 0 ? '今天租期结束' : '本合同租期已结束' }}</text>
         </view>
         <view class="mt-4 app-panel p-5">
-          <text class="block font-bold">完整合同条款</text>
-          <text class="mt-4 block whitespace-pre-wrap break-words text-sm leading-7" selectable>{{ data.terms }}</text>
-          <text class="mt-4 block break-all text-xs text-app-muted" selectable>合同内容校验值：{{ data.contentHash }}</text>
-          <button class="mt-4 app-secondary-button" :disabled="busy" @tap="copyContract">
-            复制合同全文与签署记录
+          <text class="block font-bold">签约进度</text>
+          <view class="grid grid-cols-2 mt-4 gap-3">
+            <view class="rounded-lg bg-app-soft p-3">
+              <text class="block text-xs text-app-muted">出租方 · {{ data.landlordName }}</text><text class="mt-2 block text-sm font-bold">{{ data.landlordSignedAt ? '已签署' : '等待签署' }}</text>
+            </view>
+            <view class="rounded-lg bg-app-soft p-3">
+              <text class="block text-xs text-app-muted">承租方 · {{ data.tenantName }}</text><text class="mt-2 block text-sm font-bold">{{ data.tenantSignedAt ? '已签署' : '等待签署' }}</text>
+            </view>
+          </view>
+          <text v-if="signedByMe && data.status === 'PENDING_SIGNATURE'" class="mt-3 block text-sm text-brand-blue">你已签署，等待另一方签署。</text>
+          <button v-if="canSign" class="mt-5 app-primary-button" :disabled="busy" @tap="openSigning">
+            阅读并手写签署
+          </button>
+          <button class="mt-3 app-secondary-button" :disabled="busy" :loading="busy" @tap="download">
+            下载合同 PDF
+          </button>
+          <text class="mt-2 block text-xs text-app-muted leading-5">PDF包含合同正文与当前签署记录；未签齐时会标注签署中。</text>
+          <button v-if="canSign" class="mt-3 app-secondary-button" :disabled="busy" @tap="begin('DECLINE')">
+            信息有误 / 拒绝签署
           </button>
         </view>
-        <view class="mt-4 app-panel p-5">
-          <text class="block font-bold">双方签署记录</text>
-          <text class="mt-3 block text-sm">出租方：{{ data.landlordSignedName || data.landlordName }} · {{ data.landlordSignedAt || '尚未确认' }}</text>
-          <text class="mt-3 block text-sm">承租方：{{ data.tenantSignedName || data.tenantName }} · {{ data.tenantSignedAt || '尚未确认' }}</text>
-          <text class="mt-4 block text-xs text-app-muted">小程序双方确认签署记录；不含第三方实名认证或CA认证。签署前请核对身份、房源、金额与全部条款，有疑问先联系管家。</text>
-          <text v-if="signedByMe && data.status === 'PENDING_SIGNATURE'" class="mt-3 block text-sm text-brand-blue">你已确认，等待另一方签署。</text>
-        </view>
-        <view v-if="canSign" class="mt-4 app-panel p-5">
-          <text class="block font-bold">本人确认签署</text>
-          <input v-model="signedName" :disabled="busy" :maxlength="100" class="mt-4 rounded-lg bg-app-soft p-3" :placeholder="`请输入合同中的本人姓名：${signatureName}`" aria-label="签署姓名">
-          <checkbox-group class="mt-4" @change="setAccepted">
-            <label class="flex items-start text-sm leading-6"><checkbox value="accept" :checked="accepted" :disabled="busy" /><text>我已完整阅读以上合同，确认本人姓名、租期、金额及条款无误，同意以当前登录账号记录本次签署确认。</text></label>
-          </checkbox-group>
-          <button class="mt-4 app-primary-button" :disabled="busy" :loading="busy" @tap="submit('SIGN')">
-            确认签署合同
-          </button>
-          <button class="mt-3 app-secondary-button" :disabled="busy" @tap="begin('DECLINE')">
-            拒绝签署并说明原因
-          </button>
-        </view>
+        <LeaseContractDocument v-if="pageVisible" :lease="data" class="mt-4" />
+        <LeaseReviewPanel v-if="pageVisible && (data.status === 'PENDING_SIGNATURE' || data.reviews?.length)" :lease="data" :active="pageVisible" @changed="load" />
+        <button class="mt-3 app-secondary-button" :disabled="busy" @tap="copyContract">
+          复制合同全文与签署记录
+        </button>
         <view v-if="['SIGNED', 'EXPIRED'].includes(data.status)" class="mt-4 app-panel p-5">
           <text class="block font-bold">续租与退租</text>
           <text class="mt-3 block text-sm">{{ renewalLabels[data.renewalStatus] }}</text>
@@ -293,11 +303,14 @@ watch(() => tokenStore.validToken, () => {
             提交退租意向
           </button>
           <text v-if="data.moveOutStatus === 'PENDING'" class="mt-3 block text-sm">退租意向待处理，合同尚未终止。</text>
+          <button v-if="data.isTenant && data.moveOutStatus === 'PENDING'" class="mt-3 app-secondary-button" :disabled="busy" @tap="begin('MOVE_OUT_CANCEL')">
+            撤回退租意向
+          </button>
           <text v-if="data.moveOutStatus === 'RESOLVED'" class="mt-3 block text-sm">退租意向已处理，请查看处理记录及当前合同状态。</text>
         </view>
         <view v-if="action" class="mt-4 app-panel p-5">
           <text class="block font-bold">{{ leaseActionLabels[action] }}</text>
-          <textarea v-model="reason" :disabled="busy" :maxlength="500" class="mt-4 min-h-24 w-full rounded-lg bg-app-soft p-3" placeholder="请填写原因或说明" aria-label="申请说明" />
+          <textarea v-model="reason" :disabled="busy" :maxlength="500" class="mt-4 box-border min-h-24 w-full rounded-lg bg-app-soft p-3" placeholder="请填写原因或说明" aria-label="申请说明" />
           <picker v-if="action === 'RENEW_REQUEST'" mode="date" :disabled="busy" :start="data.endDate" :value="requestedEndDate" @change="requestedEndDate = String($event.detail.value)">
             <view class="mt-3 rounded-lg bg-app-soft p-3">
               {{ requestedEndDate || '选择续租结束日期' }}
@@ -316,6 +329,7 @@ watch(() => tokenStore.validToken, () => {
             刷新合同状态
           </button>
         </view>
+        <LeaseLifecycle v-if="['SIGNED', 'EXPIRED', 'TERMINATED'].includes(data.status)" :lease="data" :active="pageVisible" @changed="load" />
         <view class="mt-4 app-panel p-5">
           <text class="block font-bold">租期提醒</text><text class="mt-3 block text-sm text-app-muted">临期与到期提醒在“消息 → 业务通知”中查看。微信订阅提醒暂未启用，请主动关注租期。</text>
           <button class="mt-4 app-secondary-button" @tap="support">

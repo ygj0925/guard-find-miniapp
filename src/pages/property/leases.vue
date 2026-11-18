@@ -17,7 +17,7 @@ const page = ref(0)
 const total = ref(0)
 let generation = 0
 let visible = false
-const filters = [{ value: '', label: '全部' }, { value: 'PENDING_SIGNATURE', label: '待签署' }, { value: 'SIGNED', label: '已签署' }, { value: 'EXPIRED', label: '已到期' }]
+const filters = [{ value: '', label: '全部' }, { value: 'PENDING_SIGNATURE', label: '待签署' }, { value: 'SIGNED', label: '已签署' }, { value: 'EXPIRED', label: '已到期' }, { value: 'SIGNING_EXPIRED', label: '签署超时' }, { value: 'TERMINATED', label: '已终止' }]
 function invalidate() {
   generation++
   loading.value = false

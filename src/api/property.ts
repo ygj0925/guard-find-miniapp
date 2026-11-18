@@ -43,6 +43,10 @@ export interface Property {
   availableFrom: string | null
   rentalMode: RentalMode | null
   address: string
+  publicLatitude?: number | null
+  publicLongitude?: number | null
+  locationLabel?: string | null
+  regionCode?: string | null
   district: string | null
   city: string | null
   facilities: string[]
@@ -108,6 +112,10 @@ export type PropertyInput = Pick<
   | 'availableFrom'
   | 'rentalMode'
   | 'address'
+  | 'publicLatitude'
+  | 'publicLongitude'
+  | 'locationLabel'
+  | 'regionCode'
   | 'district'
   | 'city'
   | 'facilities'
@@ -181,7 +189,7 @@ export interface RegionNode {
   children: RegionNode[]
 }
 
-/** 省市区树(公开接口,免登录,数据与用户侧服务同源) */
+/** 民政部官方版本的县级以上区划树（直辖市直接下挂区县）。 */
 export function fetchRegionTree() {
   return http.get<RegionNode[]>('/miniapp/region/tree')
 }

@@ -7,6 +7,7 @@ const categories = [
   { key: 'apartment', label: '公寓', icon: 'i-carbon-building', color: 'blue' },
 ]
 const services = [
+  { key: 'map', label: '地图找房', icon: 'i-carbon-map', color: 'blue' },
   { key: 'phone', label: '电话咨询', icon: 'i-carbon-phone-filled', color: 'green' },
   { key: 'chat', label: '在线咨询', icon: 'i-carbon-chat', color: 'blue' },
   { key: 'recommended', label: '房源推荐', icon: 'i-carbon-star-filled', color: 'gold' },

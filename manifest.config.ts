@@ -30,6 +30,7 @@ export default defineManifestConfig({
   'transformPx': false,
   'locale': VITE_FALLBACK_LOCALE, // 'zh-Hans'
   'h5': {
+    sdkConfigs: { maps: { qqmap: { key: env.VITE_TENCENT_MAP_KEY || '' } } },
     router: {
       base: VITE_APP_PUBLIC_BASE,
     },
@@ -118,6 +119,8 @@ export default defineManifestConfig({
   'quickapp': {},
   /* 小程序特有相关 */
   'mp-weixin': {
+    permission: { 'scope.userLocation': { desc: '用于您主动发起的附近找房和地图选点' } },
+    requiredPrivateInfos: ['getLocation', 'chooseLocation'],
     appid: VITE_WX_APPID,
     lazyCodeLoading: 'requiredComponents',
     setting: {

@@ -7,6 +7,7 @@ import { fetchPropertyDetail, fetchRegionTree, propertyPriceSuffix, RENTAL_MODE_
 import { uploadPropertyImage } from '@/api/propertyImage'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import { regionColumns } from '@/utils/regions'
 
 definePage({ style: { navigationBarTitleText: '编辑房源' } })
 const tokenStore = useTokenStore()
@@ -210,7 +211,7 @@ async function loadPage() {
   }
 }
 
-/** 省市区级联:数据来自 backend /miniapp/region/tree,与用户侧服务同源 */
+/** 官方区划级联；直辖市和省直辖县使用展示列归一化，不编造区划代码。 */
 const regionTree = ref<RegionNode[]>([])
 const provinceIdx = ref(0)
 const cityIdx = ref(0)
@@ -228,7 +229,7 @@ async function loadRegionTree(version: number, token: string) {
   try {
     const tree = await fetchRegionTree()
     if (isCurrent(version, token))
-      regionTree.value = tree
+      regionTree.value = regionColumns(tree)
   }
   catch {}
 }
@@ -259,6 +260,7 @@ function onRegionConfirm(e: { detail: { value: number[] } }) {
   const district = city?.children?.[d]
   form.city = city?.name ?? ''
   form.district = district?.name ?? ''
+  form.regionCode = String(district?.code || city?.code || province?.code || '') || null
   regionLabel.value = [province?.name, city?.name, district?.name]
     .filter(Boolean)
     .join(' ')
@@ -269,6 +271,22 @@ const imageList = computed(() =>
     .map(s => s.trim())
     .filter(Boolean),
 )
+function choosePublicLocation() {
+  if (!canWrite() || saving.value) return
+  const token = verifiedToken
+  uni.chooseLocation({
+    latitude: form.publicLatitude ?? undefined,
+    longitude: form.publicLongitude ?? undefined,
+    success: async (location) => {
+      await pendingLoad
+      if (!canWrite() || token !== verifiedToken) return
+      form.publicLatitude = location.latitude
+      form.publicLongitude = location.longitude
+      form.locationLabel = location.name || '房源公开位置'
+    },
+    fail: () => uni.showToast({ title: '未选择位置，可在后台补录公开位置', icon: 'none' }),
+  })
+}
 function removeImage(index: number) {
   if (!uploading.value)
     imageUrls.value = imageList.value.filter((_, i) => i !== index).join('\n')
@@ -469,6 +487,13 @@ async function submit(status: 1 | 2) {
           所在地区：{{ regionLabel || (provinces.length ? '请选择' : '区划加载中…') }} ›
         </view>
       </picker>
+      <view class="my-3 rounded-xl bg-gray-1 p-3">
+        <text class="block font-bold">地图公开位置</text>
+        <text class="my-2 block text-sm text-gray-6">请选择小区入口或公寓门店；不要标记私人房间位置。</text>
+        <text v-if="form.locationLabel" class="my-2 block">{{ form.locationLabel }}</text>
+        <button :disabled="saving" @tap="choosePublicLocation">{{ form.publicLatitude != null ? '重新选择位置' : '地图选点' }}</button>
+        <button v-if="form.publicLatitude != null" class="mt-2" @tap="form.publicLatitude = null; form.publicLongitude = null; form.locationLabel = null">移除公开位置</button>
+      </view>
       <text class="block text-sm">详细地址 *</text><input
         v-model="form.address"
         :maxlength="200"

@@ -64,42 +64,18 @@ async function open(id = '501') {
 function button(label: string) {
   return wrapper!.findAll('button').find(node => node.text() === label)!
 }
-async function consent() {
-  await wrapper!.get('input').setValue('张三')
-  await wrapper!.get('.agreement').trigger('change', { detail: { value: ['accept'] } })
-}
-
-it('requires explicit consent and exact party name before submitting frozen hash and version', async () => {
+it('opens the dedicated reading and handwritten-signing flow without submitting from the detail page', async () => {
+  vi.spyOn(uni, 'navigateTo')
   await open()
-  await button('确认签署合同').trigger('tap')
+  expect(wrapper!.find('input').exists()).toBe(false)
+  await button('阅读并手写签署').trigger('tap')
+  expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages/property/lease-sign?id=501' })
   expect(mocks.action).not.toHaveBeenCalled()
-  expect(wrapper!.text()).toContain('请完整阅读合同并勾选确认')
-  await wrapper!.get('input').setValue('其他姓名')
-  await wrapper!.get('.agreement').trigger('change', { detail: { value: ['accept'] } })
-  await button('确认签署合同').trigger('tap')
-  expect(mocks.action).not.toHaveBeenCalled()
-  await consent()
-  await button('确认签署合同').trigger('tap')
-  await flushPromises()
-  expect(mocks.action).toHaveBeenCalledWith('501', { action: 'SIGN', version: 4, contentHash: 'frozen-content-hash', signedName: '张三', accepted: true })
-})
-it('keeps signature inputs on failure and never resubmits after modal cancellation', async () => {
-  await open()
-  await consent()
-  mocks.action.mockRejectedValueOnce(new Error('合同版本已变更'))
-  await button('确认签署合同').trigger('tap')
-  await flushPromises()
-  expect(wrapper!.text()).toContain('合同版本已变更')
-  expect((wrapper!.get('input').element as HTMLInputElement).value).toBe('张三')
-  vi.mocked(uni.showModal).mockResolvedValueOnce({ confirm: false, cancel: true, errMsg: '' })
-  await button('确认签署合同').trigger('tap')
-  await flushPromises()
-  expect(mocks.action).toHaveBeenCalledTimes(1)
 })
 it('shows only the unsigned participant action and copies full immutable contract text', async () => {
   mocks.detail.mockResolvedValueOnce({ ...detail, tenantSignedAt: '2026-11-17 10:00:00', tenantSignedName: '张三' })
   await open()
-  expect(button('确认签署合同')).toBeUndefined()
+  expect(button('阅读并手写签署')).toBeUndefined()
   expect(wrapper!.text()).toContain('等待另一方签署')
   await button('复制合同全文与签署记录').trigger('tap')
   expect(uni.setClipboardData).toHaveBeenCalledWith(expect.objectContaining({ data: expect.stringContaining('完整合同条款') }))
@@ -191,8 +167,9 @@ it('does not sign if account changes while confirming', async () => {
     resolve = done
   }))
   await open()
-  await consent()
-  await button('确认签署合同').trigger('tap')
+  await button('信息有误 / 拒绝签署').trigger('tap')
+  await wrapper!.get('textarea').setValue('身份信息有误')
+  await button('确认提交申请').trigger('tap')
   token.validToken = ''
   resolve({ confirm: true, cancel: false, errMsg: '' })
   await flushPromises()
