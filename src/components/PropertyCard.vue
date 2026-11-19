@@ -74,9 +74,10 @@ async function favorite() {
 .property-card {
   position: relative;
   min-width: 0;
-  border-radius: 22px;
+  border-radius: 20px;
   background: #fff;
-  padding: 10px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(72, 96, 164, 0.08);
 }
 .property-main {
   display: flex;
@@ -91,8 +92,8 @@ async function favorite() {
 .property-image {
   position: relative;
   flex-shrink: 0;
-  width: 34%;
-  min-height: 118px;
+  width: 35%;
+  min-height: 132px;
   overflow: hidden;
   border-radius: 13px;
 }
@@ -104,11 +105,11 @@ async function favorite() {
   position: absolute;
   top: 0;
   left: 0;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 0 0 8px 0;
   background: #6375ff;
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
 }
 .property-info {
   flex: 1;
@@ -122,7 +123,7 @@ async function favorite() {
   -webkit-line-clamp: 2;
   padding-right: 30px;
   color: #162650;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 650;
   line-height: 1.5;
 }
@@ -132,7 +133,7 @@ async function favorite() {
   gap: 3px;
   margin-top: 6px;
   color: #71809d;
-  font-size: 11px;
+  font-size: 12px;
 }
 .property-tags {
   display: flex;
@@ -140,7 +141,7 @@ async function favorite() {
   flex-wrap: wrap;
   margin-top: 7px;
   color: #7784a2;
-  font-size: 10px;
+  font-size: 11px;
 }
 .property-tags text {
   max-width: 90px;
@@ -156,7 +157,7 @@ async function favorite() {
   align-items: baseline;
   margin-top: 8px;
   color: #4a56ff;
-  font-size: 23px;
+  font-size: 24px;
   font-weight: 750;
   line-height: 1.2;
 }
@@ -190,11 +191,9 @@ async function favorite() {
   .property-card {
     padding: 12px;
   }
-  .property-title {
-    font-size: 16px;
-  }
+  .property-title { font-size: 17px; }
   .property-image {
-    min-height: 135px;
+    min-height: 145px;
   }
   .location-line {
     font-size: 12px;

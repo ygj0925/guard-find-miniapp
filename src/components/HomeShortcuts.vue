@@ -51,10 +51,10 @@ const services = [
   gap: 4px;
 }
 .category-row {
-  margin-top: 26px;
+  margin-top: 22px;
 }
 .service-row {
-  margin-top: 19px;
+  margin-top: 18px;
 }
 .shortcut {
   display: flex;
@@ -68,7 +68,7 @@ const services = [
   border-radius: 12px;
   background: transparent;
   color: #1e3159;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
 }
 .shortcut-art {
@@ -76,9 +76,9 @@ const services = [
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 17px;
+  width: 58px;
+  height: 58px;
+  border-radius: 19px;
   background: linear-gradient(145deg, #ffffffd9, var(--tint));
 }
 .art-icon {
@@ -157,12 +157,12 @@ const services = [
   right: 0;
 }
 .service-row .shortcut {
-  font-size: 12px;
+  font-size: 13px;
 }
 .service-row .shortcut-art {
-  width: 43px;
-  height: 43px;
-  border-radius: 14px;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
 }
 .service-row .art-icon {
   width: 30px;
@@ -216,13 +216,10 @@ const services = [
   .service-row .shortcut {
     font-size: 12px;
   }
-  .shortcut-art {
-    width: 58px;
-    height: 58px;
-  }
+  .shortcut-art { width: 64px; height: 64px; }
   .service-row .shortcut-art {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
   }
 }
 </style>

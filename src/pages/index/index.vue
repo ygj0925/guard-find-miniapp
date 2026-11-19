@@ -406,18 +406,22 @@ onReachBottom(() => {
   min-height: calc(100vh + env(safe-area-inset-bottom));
   min-height: calc(var(--app-viewport-height, 100vh) + env(safe-area-inset-bottom));
   color: #1e3159;
-  background: radial-gradient(ellipse at 90% -5%, #c2d0ff 0%, #e5ebff 28%, #f5f7ff 58%);
+  background-color: #f5f8ff;
+  background-image: url('/static/images/property-system-background.png');
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: 100% auto;
 }
 .home-content {
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 16px 20px;
+  padding: 0 20px 20px;
 }
 .home-sticky-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: calc(env(safe-area-inset-top) + 10px) 16px 8px;
+  padding: calc(var(--status-bar-height, 20px) + 12px) 20px 8px;
   background: transparent;
   transition: background-color 180ms ease;
 }
@@ -439,7 +443,7 @@ onReachBottom(() => {
 .brand-name {
   display: block;
   overflow: hidden;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: 1px;
   line-height: 44px;
@@ -448,7 +452,7 @@ onReachBottom(() => {
 }
 .brand-slogan {
   display: block;
-  margin-top: 5px;
+  margin-top: 2px;
   font-size: 14px;
 }
 .heading-actions {
@@ -460,8 +464,8 @@ onReachBottom(() => {
 }
 .home-toolbar {
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 10px);
-  right: 16px;
+  top: calc(var(--status-bar-height, 20px) + 12px);
+  right: 20px;
   z-index: 101;
 }
 .city-button {
@@ -469,8 +473,8 @@ onReachBottom(() => {
   gap: 4px;
   align-items: center;
   min-height: 44px;
-  max-width: 113px;
-  font-size: 13px;
+  max-width: 118px;
+  font-size: 15px;
 }
 .city-button text {
   overflow: hidden;
@@ -481,25 +485,26 @@ onReachBottom(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   padding: 0;
   background: transparent;
+  border-radius: 24px;
   color: #243b6a;
 }
 .search-box {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 50px;
-  margin-top: 14px;
+  height: 56px;
+  margin-top: 16px;
   padding: 0 12px;
-  border-radius: 28px;
+  border-radius: 30px;
   background: #ffffffed;
   box-shadow: 0 8px 18px #596ee614;
 }
 .search-box input {
-  height: 44px;
+  height: 50px;
   color: #23365c;
   font-size: 14px;
 }

@@ -39,8 +39,8 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
 
 <style scoped>
 .banner-swiper {
-  height: 132px;
-  margin-top: 25px;
+  height: 104px;
+  margin-top: 24px;
   border-radius: 20px;
   overflow: hidden;
 }
@@ -69,9 +69,9 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 5px;
   max-width: 80%;
-  padding: 20px 18px;
+  padding: 17px 18px;
   color: #fff;
 }
 .banner-title {
@@ -79,7 +79,7 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
   overflow: hidden;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
 }
@@ -117,10 +117,10 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
 }
 @media (min-width: 420px) {
   .banner-swiper {
-    height: 148px;
+    height: 116px;
   }
   .banner-title {
-    font-size: 23px;
+    font-size: 20px;
   }
   .banner-subtitle {
     font-size: 12px;
