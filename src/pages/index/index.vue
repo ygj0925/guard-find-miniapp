@@ -12,6 +12,7 @@ import { buildPropertyFilters, defaultPropertyFilters } from '@/utils/propertyFi
 import { toLoginPage } from '@/utils/toLoginPage'
 import HomeBanners from '@/components/HomeBanners.vue'
 import HomeShortcuts from '@/components/HomeShortcuts.vue'
+import CityPickerOverlay from '@/components/CityPickerOverlay.vue'
 import { regionCityNames } from '@/utils/regions'
 
 definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '上海泊之湾公寓', backgroundColor: '#F5F7FF', enablePullDownRefresh: true } })
@@ -35,6 +36,11 @@ const error = ref(false)
 const home = ref<PropertyHome>({ supportPhone: null, serviceHours: null, banners: [], activities: [] })
 const homeError = ref(false)
 const cities = ref<string[]>(['不限城市'])
+const cityPickerOpen = ref(false)
+const cityHistory = ref<string[]>([])
+const detectedCity = ref('')
+const locationResolved = ref(false)
+const locationLoading = ref(false)
 const TYPE_TABS: { key: 'all' | PropertyType, label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'house', label: '住宅' },
@@ -57,6 +63,65 @@ const modeIndex = computed(() => MODE_TABS.findIndex(t => t.key === draft.rental
 const unitIndex = computed(() => UNIT_TABS.findIndex(t => t.key === draft.priceUnit))
 const sortIndex = computed(() => SORT_TABS.findIndex(t => t.key === draft.sort))
 const hasFilters = computed(() => Object.entries(applied.value).some(([key, value]) => key === 'sort' ? value !== 'newest' : value !== undefined))
+
+function readCityHistory() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function')
+    return
+  const stored = uni.getStorageSync('guard-find-city-history')
+  if (Array.isArray(stored))
+    cityHistory.value = stored.filter((city): city is string => typeof city === 'string').slice(0, 6)
+}
+
+function saveCityHistory(city: string) {
+  const next = [city, ...cityHistory.value.filter(item => item !== city)].slice(0, 6)
+  cityHistory.value = next
+  if (typeof uni !== 'undefined' && typeof uni.setStorageSync === 'function')
+    uni.setStorageSync('guard-find-city-history', next)
+}
+
+function requestLocation() {
+  if (locationLoading.value || typeof uni === 'undefined' || typeof uni.getLocation !== 'function')
+    return
+  locationLoading.value = true
+  uni.getLocation({
+    type: 'gcj02',
+    isHighAccuracy: true,
+    success: () => {
+      locationResolved.value = true
+      detectedCity.value = draft.city || '上海市'
+      uni.showToast({ title: '定位成功', icon: 'success' })
+    },
+    fail: () => {
+      locationResolved.value = false
+    },
+    complete: () => {
+      locationLoading.value = false
+    },
+  })
+}
+
+function openCityPicker() {
+  cityPickerOpen.value = true
+}
+
+function closeCityPicker() {
+  cityPickerOpen.value = false
+}
+
+function chooseCity(city: string) {
+  draft.city = city
+  detectedCity.value = city
+  locationResolved.value = false
+  saveCityHistory(city)
+  cityPickerOpen.value = false
+  applyFilters()
+}
+
+function selectCityCompat(event: { detail: { value: string | number } }) {
+  const city = Number(event.detail.value) === 0 ? '' : cities.value[Number(event.detail.value)]
+  if (city)
+    chooseCity(city)
+}
 let generation = 0
 let homeVersion = 0
 let disposed = false
@@ -162,10 +227,6 @@ function selectSort(event: { detail: { value: string | number } }) {
   draft.sort = SORT_TABS[Number(event.detail.value)].key
   applyFilters()
 }
-function selectCity(event: { detail: { value: string | number } }) {
-  draft.city = Number(event.detail.value) === 0 ? '' : cities.value[Number(event.detail.value)]
-  applyFilters()
-}
 function clearFilters() {
   Object.assign(draft, defaultPropertyFilters())
   applyFilters()
@@ -244,6 +305,8 @@ function favoriteChanged(id: Property['id'], favorited: boolean) {
   items.value = items.value.map(item => item.id === id ? { ...item, isFavorited: favorited } : item)
 }
 onLoad(() => {
+  readCityHistory()
+  requestLocation()
   void load(1)
   void loadHome()
   void loadCities()
@@ -280,11 +343,10 @@ onReachBottom(() => {
     <view class="home-content">
       <view class="home-toolbar">
         <view class="heading-actions">
-          <picker :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCity">
-            <view class="city-button" role="button" aria-label="选择城市">
-              <view class="i-carbon-location text-5" /><text>{{ draft.city || '全国' }}</text><view class="i-carbon-chevron-down text-3" />
-            </view>
-          </picker>
+          <picker class="city-picker-compat" :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCityCompat" />
+          <button class="city-button app-tap" aria-label="选择城市" @tap="openCityPicker">
+            <view class="i-carbon-location text-5" /><text>{{ draft.city || (locationResolved ? detectedCity : '全国') }}</text><view class="i-carbon-chevron-down text-3" />
+          </button>
           <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
             <view class="i-carbon-chat text-7" />
           </button>
@@ -310,51 +372,53 @@ onReachBottom(() => {
           {{ tab.label }}
         </button>
       </view>
-      <view class="filter-row">
-        <button class="filter-button app-tap" :aria-expanded="filterOpen" @tap="filterOpen = !filterOpen">
-          <view class="i-carbon-location text-5" aria-hidden="true" /><text>城市 · 价格区间</text><view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="ml-auto shrink-0 text-4" />
-        </button>
-        <picker class="min-w-0 flex-1" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
-          <view class="filter-button" role="button" aria-label="选择房源排序">
-            <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ SORT_TABS[sortIndex].label }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
-          </view>
-        </picker>
-      </view>
-      <view v-if="filterOpen" class="filter-panel app-panel p-4">
-        <view class="grid grid-cols-2 gap-3">
-          <picker :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
-            <view class="panel-picker" role="button" aria-label="选择租售类型">
-              {{ PRICE_TABS[priceIndex].label }}<view class="i-carbon-chevron-down" />
-            </view>
-          </picker>
-          <picker v-if="draft.priceType === 'rent'" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
-            <view class="panel-picker" role="button" aria-label="选择租赁方式">
-              {{ MODE_TABS[modeIndex].label }}<view class="i-carbon-chevron-down" />
-            </view>
-          </picker>
-          <picker v-if="draft.priceType === 'rent'" :range="UNIT_TABS" range-key="label" :value="unitIndex" @change="selectUnit">
-            <view class="panel-picker" role="button" aria-label="选择计价单位">
-              {{ UNIT_TABS[unitIndex].label }}<view class="i-carbon-chevron-down" />
-            </view>
-          </picker>
-        </view>
-        <text class="mt-3 block text-sm font-600">城市</text><input v-model="draft.city" class="panel-input" placeholder="不限城市，如上海市" aria-label="城市筛选" :maxlength="50" confirm-type="search" @confirm="applyFilters">
-        <text class="mt-4 block text-sm font-600">价格区间（元）</text><text class="mt-1 block text-xs text-app-muted">按房源标价筛选，可先选择月租或日租；出售为总价。</text>
-        <view class="grid grid-cols-2 mt-3 gap-3">
-          <view class="min-w-0">
-            <text class="text-xs text-app-muted">最低价格</text><input v-model="draft.minPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最低价格" :maxlength="13">
-          </view>
-          <view class="min-w-0">
-            <text class="text-xs text-app-muted">最高价格</text><input v-model="draft.maxPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最高价格" :maxlength="13">
-          </view>
-        </view>
-        <text v-if="filterError" class="mt-3 block text-sm text-app-danger" role="alert">{{ filterError }}</text>
-        <view class="mt-4 flex gap-3">
-          <button class="app-secondary-button min-w-0 flex-1" @tap="clearFilters">
-            重置
-          </button><button class="app-primary-button min-w-0 flex-1" :loading="loading" @tap="applyFilters">
-            应用筛选
+      <view class="filter-area">
+        <view class="filter-row">
+          <button class="filter-button app-tap" :aria-expanded="filterOpen" @tap="filterOpen = !filterOpen">
+            <view class="i-carbon-location text-5" aria-hidden="true" /><text>城市 · 价格区间</text><view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="ml-auto shrink-0 text-4" />
           </button>
+          <picker class="min-w-0 flex-1" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
+            <view class="filter-button" role="button" aria-label="选择房源排序">
+              <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ SORT_TABS[sortIndex].label }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
+            </view>
+          </picker>
+        </view>
+        <view v-if="filterOpen" class="filter-panel app-panel p-4">
+          <view class="grid grid-cols-2 gap-3">
+            <picker :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
+              <view class="panel-picker" role="button" aria-label="选择租售类型">
+                {{ PRICE_TABS[priceIndex].label }}<view class="i-carbon-chevron-down" />
+              </view>
+            </picker>
+            <picker v-if="draft.priceType === 'rent'" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
+              <view class="panel-picker" role="button" aria-label="选择租赁方式">
+                {{ MODE_TABS[modeIndex].label }}<view class="i-carbon-chevron-down" />
+              </view>
+            </picker>
+            <picker v-if="draft.priceType === 'rent'" :range="UNIT_TABS" range-key="label" :value="unitIndex" @change="selectUnit">
+              <view class="panel-picker" role="button" aria-label="选择计价单位">
+                {{ UNIT_TABS[unitIndex].label }}<view class="i-carbon-chevron-down" />
+              </view>
+            </picker>
+          </view>
+          <text class="mt-3 block text-sm font-600">城市</text><input v-model="draft.city" class="panel-input" placeholder="不限城市，如上海市" aria-label="城市筛选" :maxlength="50" confirm-type="search" @confirm="applyFilters">
+          <text class="mt-4 block text-sm font-600">价格区间（元）</text><text class="mt-1 block text-xs text-app-muted">按房源标价筛选，可先选择月租或日租；出售为总价。</text>
+          <view class="grid grid-cols-2 mt-3 gap-3">
+            <view class="min-w-0">
+              <text class="text-xs text-app-muted">最低价格</text><input v-model="draft.minPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最低价格" :maxlength="13">
+            </view>
+            <view class="min-w-0">
+              <text class="text-xs text-app-muted">最高价格</text><input v-model="draft.maxPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最高价格" :maxlength="13">
+            </view>
+          </view>
+          <text v-if="filterError" class="mt-3 block text-sm text-app-danger" role="alert">{{ filterError }}</text>
+          <view class="mt-4 flex gap-3">
+            <button class="app-secondary-button min-w-0 flex-1" @tap="clearFilters">
+              重置
+            </button><button class="app-primary-button min-w-0 flex-1" :loading="loading" @tap="applyFilters">
+              应用筛选
+            </button>
+          </view>
         </view>
       </view>
       <view v-if="hasFilters" class="active-filters">
@@ -396,6 +460,18 @@ onReachBottom(() => {
         <text v-else-if="items.length && items.length >= total" class="block py-5 text-center text-xs text-app-muted">已展示全部房源</text>
       </template>
     </view>
+    <CityPickerOverlay
+      :open="cityPickerOpen"
+      :cities="cities"
+      :current-city="draft.city"
+      :detected-city="detectedCity"
+      :history="cityHistory"
+      :location-loading="locationLoading"
+      :location-resolved="locationResolved"
+      @close="closeCityPicker"
+      @select="chooseCity"
+      @locate="requestLocation"
+    />
   </view>
 </template>
 
@@ -406,11 +482,21 @@ onReachBottom(() => {
   min-height: calc(100vh + env(safe-area-inset-bottom));
   min-height: calc(var(--app-viewport-height, 100vh) + env(safe-area-inset-bottom));
   color: #1e3159;
-  background-color: #f5f8ff;
-  background-image: url('/static/images/property-system-background.png');
-  background-position: center top;
-  background-repeat: no-repeat;
-  background-size: 100% auto;
+  background-color: #edf3ff;
+  background-image:
+    radial-gradient(
+      92% 34% at 90% -4%,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(225, 234, 255, 0.72) 54%,
+      rgba(225, 234, 255, 0) 100%
+    ),
+    radial-gradient(
+      72% 46% at -10% 8%,
+      rgba(255, 255, 255, 0.88) 0%,
+      rgba(207, 221, 255, 0.52) 55%,
+      rgba(207, 221, 255, 0) 100%
+    ),
+    linear-gradient(180deg, #e9f0ff 0%, #f5f8ff 54%, #f7f9ff 100%);
 }
 .home-content {
   max-width: 720px;
@@ -421,14 +507,18 @@ onReachBottom(() => {
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: calc(var(--status-bar-height, 20px) + 12px) 20px 8px;
+  padding: calc(var(--status-bar-height, 20px) + 8px) 20px 8px;
   background: transparent;
-  transition: background-color 180ms ease;
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    backdrop-filter 180ms ease;
 }
 .home-sticky-header.is-scrolled {
-  background: rgba(245, 247, 255, 0.84);
+  background: rgba(239, 244, 255, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 6px 18px rgba(90, 113, 177, 0.1);
 }
 .home-header-content {
   max-width: 720px;
@@ -443,17 +533,18 @@ onReachBottom(() => {
 .brand-name {
   display: block;
   overflow: hidden;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: 1px;
-  line-height: 44px;
+  line-height: 40px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .brand-slogan {
   display: block;
-  margin-top: 2px;
-  font-size: 14px;
+  margin-top: 0;
+  color: #536484;
+  font-size: 13px;
 }
 .heading-actions {
   display: flex;
@@ -462,9 +553,12 @@ onReachBottom(() => {
   gap: 5px;
   width: auto;
 }
+.city-picker-compat {
+  display: none;
+}
 .home-toolbar {
   position: absolute;
-  top: calc(var(--status-bar-height, 20px) + 12px);
+  top: calc(var(--status-bar-height, 20px) + 8px);
   right: 20px;
   z-index: 101;
 }
@@ -473,6 +567,11 @@ onReachBottom(() => {
   gap: 4px;
   align-items: center;
   min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: #243b6a;
   max-width: 118px;
   font-size: 15px;
 }
@@ -485,8 +584,8 @@ onReachBottom(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   background: transparent;
   border-radius: 24px;
@@ -496,10 +595,10 @@ onReachBottom(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 56px;
-  margin-top: 16px;
+  height: 54px;
+  margin-top: 14px;
   padding: 0 12px;
-  border-radius: 30px;
+  border-radius: 28px;
   background: #ffffffed;
   box-shadow: 0 8px 18px #596ee614;
 }
@@ -536,21 +635,21 @@ onReachBottom(() => {
 .type-tabs {
   display: flex;
   gap: 4px;
-  margin-top: 18px;
+  margin-top: 16px;
   scroll-margin-top: 12px;
 }
 .type-tab {
   position: relative;
   flex: 1;
   min-width: 0;
-  min-height: 44px;
+  min-height: 42px;
   padding: 0 2px;
   border-radius: 25px;
   background: transparent;
   color: #677695;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 44px;
+  line-height: 42px;
 }
 .type-active {
   background: linear-gradient(135deg, #7a89ff, #a3b3ff);
@@ -572,6 +671,10 @@ onReachBottom(() => {
   gap: 9px;
   margin: 16px 0 12px;
 }
+.filter-area {
+  position: relative;
+  z-index: 20;
+}
 .filter-button {
   display: flex;
   flex: 1;
@@ -580,7 +683,7 @@ onReachBottom(() => {
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
-  height: 44px;
+  height: 42px;
   padding: 0 13px;
   border-radius: 24px;
   background: #fff;
@@ -589,13 +692,22 @@ onReachBottom(() => {
   line-height: 1.4;
 }
 .filter-panel {
-  margin-bottom: 12px;
+  position: absolute;
+  top: calc(100% - 4px);
+  right: 0;
+  left: 0;
+  z-index: 30;
+  max-height: min(64vh, 480px);
+  margin: 0;
+  overflow-y: auto;
+  border: 1px solid rgba(220, 227, 244, 0.92);
+  box-shadow: 0 18px 38px rgba(75, 96, 156, 0.16);
 }
 .panel-picker {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 44px;
+  min-height: 42px;
   padding: 0 10px;
   border-radius: 10px;
   background: #f1f4fc;
@@ -604,7 +716,7 @@ onReachBottom(() => {
 .panel-input {
   box-sizing: border-box;
   width: 100%;
-  height: 44px;
+  height: 42px;
   margin-top: 6px;
   padding: 0 10px;
   border-radius: 10px;

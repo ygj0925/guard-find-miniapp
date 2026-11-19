@@ -22,7 +22,7 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
   <swiper class="banner-swiper" :indicator-dots="displayed.length > 1" indicator-color="#ffffff70" indicator-active-color="#ffffff" :circular="displayed.length > 1" :autoplay="displayed.length > 1" :interval="6000">
     <swiper-item v-for="banner in displayed" :key="banner.id">
       <button class="home-banner app-tap" :aria-label="banner.title" @tap="emit('select', banner)">
-        <image :src="banner.imageUrl && !failed.includes(banner.id) ? banner.imageUrl : '/static/images/home-banner.jpg'" mode="aspectFill" class="banner-image" aria-hidden="true" @error="failed.push(banner.id)" />
+        <image :src="banner.imageUrl && !failed.includes(banner.id) ? banner.imageUrl : '/static/images/home-banner.png'" mode="aspectFill" class="banner-image" aria-hidden="true" @error="failed.push(banner.id)" />
         <view class="banner-shade" />
         <view class="banner-copy">
           <text class="banner-title">{{ banner.title }}</text>

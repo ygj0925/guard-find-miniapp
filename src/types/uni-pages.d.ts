@@ -32,7 +32,7 @@ interface NavigateToOptions {
 interface RedirectToOptions extends NavigateToOptions {}
 
 interface SwitchTabOptions {
-  url: "/pages/index/index" | "/pages/message/index" | "/pages/me/me"
+  url: "/pages/index/index" | "/pages/property/bookings" | "/pages/message/index" | "/pages/me/me"
 }
 
 type ReLaunchOptions = NavigateToOptions | SwitchTabOptions;
