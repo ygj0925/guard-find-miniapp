@@ -16,12 +16,12 @@ const parties = [{ role: 'LANDLORD', key: 'landlord', label: '出租方（甲方
     <text class="mt-2 block break-all text-center text-xs text-app-muted">合同编号 {{ lease.id }}</text>
     <view class="contract-divider" />
     <view class="contract-facts">
-      <text>出租方（甲方）</text><text>{{ lease.landlordName }}</text>
-      <text>承租方（乙方）</text><text>{{ lease.tenantName }}</text>
-      <text>租赁房源</text><text>{{ lease.propertyTitle }}</text>
-      <text>房屋坐落</text><text>{{ lease.propertyAddress }}</text>
-      <text>租赁期限</text><text>{{ lease.startDate }} 至 {{ lease.endDate }}</text>
-      <text>月租金 / 押金</text><text>¥{{ lease.monthlyRent }} / ¥{{ lease.deposit }}</text>
+      <text class="contract-fact-label">出租方（甲方）</text><text>{{ lease.landlordName }}</text>
+      <text class="contract-fact-label">承租方（乙方）</text><text>{{ lease.tenantName }}</text>
+      <text class="contract-fact-label">租赁房源</text><text>{{ lease.propertyTitle }}</text>
+      <text class="contract-fact-label">房屋坐落</text><text>{{ lease.propertyAddress }}</text>
+      <text class="contract-fact-label">租赁期限</text><text>{{ lease.startDate }} 至 {{ lease.endDate }}</text>
+      <text class="contract-fact-label">月租金 / 押金</text><text>¥{{ lease.monthlyRent }} / ¥{{ lease.deposit }}</text>
     </view>
     <view class="contract-divider" />
     <text class="block font-bold">合同条款</text>
@@ -85,7 +85,7 @@ const parties = [{ role: 'LANDLORD', key: 'landlord', label: '出租方（甲方
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
-.contract-facts > :nth-child(odd) {
+.contract-fact-label {
   color: #66748a;
 }
 .signature-record {
