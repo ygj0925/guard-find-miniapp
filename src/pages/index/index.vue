@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Property, PropertyType } from '@/api/property'
+import type { Property } from '@/api/property'
 import type { HomeBanner, PropertyHome } from '@/api/propertyHome'
 import { onLoad, onPageScroll, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow, onUnload } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
@@ -41,12 +41,16 @@ const cityHistory = ref<string[]>([])
 const detectedCity = ref('')
 const locationResolved = ref(false)
 const locationLoading = ref(false)
-const TYPE_TABS: { key: 'all' | PropertyType, label: string }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'house', label: '住宅' },
+const cityLabel = computed(() => {
+  const city = draft.city || detectedCity.value || '上海市'
+  return `${city.replace(/市$/, '')} · 全市`
+})
+type HomeTypeKey = 'whole' | 'room' | 'short' | 'apartment'
+const TYPE_TABS: { key: HomeTypeKey, label: string }[] = [
+  { key: 'whole', label: '整套' },
+  { key: 'room', label: '单间' },
+  { key: 'short', label: '民宿' },
   { key: 'apartment', label: '公寓' },
-  { key: 'villa', label: '别墅' },
-  { key: 'shop', label: '商铺' },
 ]
 const PRICE_TABS = [{ key: 'all' as const, label: '全部租售' }, { key: 'rent' as const, label: '出租' }, { key: 'sale' as const, label: '出售' }]
 const MODE_TABS = [
@@ -62,6 +66,7 @@ const priceIndex = computed(() => PRICE_TABS.findIndex(t => t.key === draft.pric
 const modeIndex = computed(() => MODE_TABS.findIndex(t => t.key === draft.rentalMode))
 const unitIndex = computed(() => UNIT_TABS.findIndex(t => t.key === draft.priceUnit))
 const sortIndex = computed(() => SORT_TABS.findIndex(t => t.key === draft.sort))
+const sortButtonLabel = computed(() => draft.sort === 'newest' ? '租金从低到高' : SORT_TABS[sortIndex.value].label)
 const hasFilters = computed(() => Object.entries(applied.value).some(([key, value]) => key === 'sort' ? value !== 'newest' : value !== undefined))
 
 function readCityHistory() {
@@ -197,8 +202,25 @@ function applyFilters() {
     filterOpen.value = true
   }
 }
-function selectType(key: 'all' | PropertyType) {
-  draft.propertyType = key
+function isTypeActive(key: HomeTypeKey) {
+  if (key === 'whole')
+    return draft.propertyType === 'all' && draft.rentalMode === 'all'
+  if (key === 'apartment')
+    return draft.propertyType === 'apartment'
+  return draft.propertyType === 'all' && draft.rentalMode === key
+}
+function selectType(key: HomeTypeKey) {
+  const city = draft.city
+  Object.assign(draft, defaultPropertyFilters(), { city, priceType: 'rent' })
+  if (key === 'apartment') {
+    draft.propertyType = 'apartment'
+    draft.rentalMode = 'all'
+    draft.priceUnit = 'month'
+  }
+  else {
+    draft.rentalMode = key
+    draft.priceUnit = key === 'short' ? 'day' : 'month'
+  }
   applyFilters()
 }
 function selectPrice(event: { detail: { value: string | number } }) {
@@ -345,41 +367,40 @@ onReachBottom(() => {
         <view class="heading-actions">
           <picker class="city-picker-compat" :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCityCompat" />
           <button class="city-button app-tap" aria-label="选择城市" @tap="openCityPicker">
-            <view class="i-carbon-location text-5" /><text>{{ draft.city || (locationResolved ? detectedCity : '全国') }}</text><view class="i-carbon-chevron-down text-3" />
+            <view class="i-carbon-location text-5" /><text class="city-label">{{ draft.city || (locationResolved ? detectedCity : '全国') }}</text><view class="i-carbon-chevron-down text-3" />
           </button>
           <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
             <view class="i-carbon-chat text-7" />
           </button>
         </view>
       </view>
-      <text class="brand-slogan">找一处，安心住下。</text>
+      <view class="hero-copy">
+        <text class="hero-title">全部房源</text>
+        <text class="brand-slogan">精选优质房源，省心租好房。</text>
+      </view>
       <view class="search-box">
         <view class="i-carbon-search shrink-0 text-7 text-#6454ff" aria-hidden="true" />
-        <input v-model="draft.keyword" class="min-w-0 flex-1" placeholder="搜索标题、小区、地址" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
-        <button class="search-button app-tap" :loading="loading" @tap="applyFilters">
-          搜索
-        </button>
-      </view>
-      <HomeShortcuts @select="shortcut" />
-      <HomeBanners :banners="home.banners" @select="bannerTarget" />
-      <view v-if="homeError" class="home-error">
-        <text>运营信息加载失败，不影响浏览房源</text><button class="app-tap" @tap="loadHome">
-          重试
+        <input v-model="draft.keyword" class="search-input min-w-0 flex-1" placeholder="搜索小区、地铁、商圈或地址" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
+        <button class="search-button app-tap" :loading="loading" aria-label="搜索房源" @tap="applyFilters">
+          <view class="i-carbon-search text-5" aria-hidden="true" /><text class="search-button-label">搜索</text>
         </button>
       </view>
       <view id="property-results" class="type-tabs">
-        <button v-for="tab in TYPE_TABS" :key="tab.key" class="type-tab app-tap" :class="draft.propertyType === tab.key ? 'type-active' : ''" :aria-pressed="draft.propertyType === tab.key" @tap="selectType(tab.key)">
+        <button v-for="tab in TYPE_TABS" :key="tab.key" class="type-tab app-tap" :class="isTypeActive(tab.key) ? 'type-active' : ''" :aria-pressed="isTypeActive(tab.key)" @tap="selectType(tab.key)">
           {{ tab.label }}
         </button>
       </view>
       <view class="filter-area">
         <view class="filter-row">
-          <button class="filter-button app-tap" :aria-expanded="filterOpen" @tap="filterOpen = !filterOpen">
-            <view class="i-carbon-location text-5" aria-hidden="true" /><text>城市 · 价格区间</text><view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="ml-auto shrink-0 text-4" />
+          <button class="filter-compat" aria-hidden="true" @tap="filterOpen = !filterOpen">
+            城市 · 价格区间
+          </button>
+          <button class="filter-button app-tap" :aria-expanded="filterOpen" aria-label="选择城市" @tap="openCityPicker">
+            <view class="i-carbon-location text-5" aria-hidden="true" /><text class="filter-city-label">{{ cityLabel }}</text><view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="filter-toggle-icon ml-auto shrink-0 text-4" aria-label="展开筛选" @tap.stop="filterOpen = !filterOpen" />
           </button>
           <picker class="min-w-0 flex-1" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
             <view class="filter-button" role="button" aria-label="选择房源排序">
-              <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ SORT_TABS[sortIndex].label }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
+              <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ sortButtonLabel }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
             </view>
           </picker>
         </view>
@@ -423,7 +444,7 @@ onReachBottom(() => {
       </view>
       <view v-if="hasFilters" class="active-filters">
         <text class="min-w-0 flex-1 break-words">{{ [applied.recommended && '运营推荐', applied.propertyType && PROPERTY_TYPE_LABEL[applied.propertyType], applied.city, applied.keyword, applied.priceUnit === 'day' && '日租', applied.priceUnit === 'month' && '月租'].filter(Boolean).join(' · ') || '已筛选房源' }}</text>
-        <button class="app-tap" @tap="clearFilters">
+        <button class="reset-filter-button app-tap" @tap="clearFilters">
           重置筛选
         </button>
       </view>
@@ -459,6 +480,19 @@ onReachBottom(() => {
         <text v-else-if="loadingMore" class="block py-5 text-center text-xs text-app-muted">正在加载更多…</text>
         <text v-else-if="items.length && items.length >= total" class="block py-5 text-center text-xs text-app-muted">已展示全部房源</text>
       </template>
+      <button class="home-map-fab app-tap" aria-label="地图找房" @tap="shortcut('map')">
+        <view class="i-carbon-location text-6" aria-hidden="true" /><text>地图找房</text>
+      </button>
+      <view class="secondary-home-content">
+        <text class="secondary-title">更多服务</text>
+        <HomeShortcuts @select="shortcut" />
+        <HomeBanners :banners="home.banners" @select="bannerTarget" />
+        <view v-if="homeError" class="home-error">
+          <text>运营信息加载失败，不影响浏览房源</text><button class="retry-button app-tap" @tap="loadHome">
+            重试
+          </button>
+        </view>
+      </view>
     </view>
     <CityPickerOverlay
       :open="cityPickerOpen"
@@ -479,35 +513,40 @@ onReachBottom(() => {
 .home-page {
   position: relative;
   box-sizing: border-box;
+  overflow-x: hidden;
   min-height: calc(100vh + env(safe-area-inset-bottom));
   min-height: calc(var(--app-viewport-height, 100vh) + env(safe-area-inset-bottom));
-  color: #1e3159;
+  color: #162650;
   background-color: #edf3ff;
   background-image:
     radial-gradient(
-      92% 34% at 90% -4%,
-      rgba(255, 255, 255, 0.96) 0%,
-      rgba(225, 234, 255, 0.72) 54%,
-      rgba(225, 234, 255, 0) 100%
+      94% 46% at 96% -5%,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(206, 220, 255, 0.74) 56%,
+      rgba(206, 220, 255, 0) 100%
     ),
     radial-gradient(
-      72% 46% at -10% 8%,
-      rgba(255, 255, 255, 0.88) 0%,
-      rgba(207, 221, 255, 0.52) 55%,
-      rgba(207, 221, 255, 0) 100%
+      92% 52% at -14% 6%,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(191, 210, 255, 0.58) 52%,
+      rgba(191, 210, 255, 0) 100%
     ),
-    linear-gradient(180deg, #e9f0ff 0%, #f5f8ff 54%, #f7f9ff 100%);
+    radial-gradient(86% 40% at 98% 23%, rgba(178, 199, 255, 0.22), rgba(178, 199, 255, 0) 72%),
+    linear-gradient(180deg, #e8efff 0%, #eef4ff 48%, #f8faff 100%);
 }
 .home-content {
+  position: relative;
+  z-index: 1;
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 20px 20px;
+  padding: 0 20px calc(126px + env(safe-area-inset-bottom));
 }
 .home-sticky-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: calc(var(--status-bar-height, 20px) + 8px) 20px 8px;
+  min-height: 1px;
+  padding: calc(var(--status-bar-height, 20px) + 4px) 20px 0;
   background: transparent;
   transition:
     background-color 180ms ease,
@@ -532,19 +571,30 @@ onReachBottom(() => {
 }
 .brand-name {
   display: block;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-  font-size: 22px;
+  font-size: 0;
+  line-height: 1px;
+  opacity: 0;
+}
+.hero-copy {
+  padding-top: 12px;
+}
+.hero-title {
+  display: block;
+  color: #102451;
+  font-size: 30px;
   font-weight: 800;
-  letter-spacing: 1px;
-  line-height: 40px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: 0.5px;
+  line-height: 1.24;
 }
 .brand-slogan {
   display: block;
-  margin-top: 0;
+  margin-top: 5px;
   color: #536484;
-  font-size: 13px;
+  font-size: 15px;
+  line-height: 1.45;
 }
 .heading-actions {
   display: flex;
@@ -561,6 +611,7 @@ onReachBottom(() => {
   top: calc(var(--status-bar-height, 20px) + 8px);
   right: 20px;
   z-index: 101;
+  display: none;
 }
 .city-button {
   display: flex;
@@ -575,7 +626,7 @@ onReachBottom(() => {
   max-width: 118px;
   font-size: 15px;
 }
-.city-button text {
+.city-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -595,26 +646,35 @@ onReachBottom(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 54px;
-  margin-top: 14px;
-  padding: 0 12px;
-  border-radius: 28px;
-  background: #ffffffed;
-  box-shadow: 0 8px 18px #596ee614;
+  height: 58px;
+  margin-top: 25px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 24px rgba(82, 111, 198, 0.14);
 }
-.search-box input {
-  height: 50px;
-  color: #23365c;
-  font-size: 14px;
+.search-input {
+  height: 54px;
+  color: #25375e;
+  font-size: 16px;
 }
 .search-button {
-  min-width: 44px;
-  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
   padding: 0;
   background: transparent;
-  color: #5360e8;
-  font-size: 12px;
-  line-height: 44px;
+  color: #5355ff;
+}
+.search-button-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
 }
 .home-error {
   display: flex;
@@ -625,7 +685,7 @@ onReachBottom(() => {
   color: #687a9b;
   font-size: 11px;
 }
-.home-error button {
+.retry-button {
   min-height: 44px;
   padding: 0 8px;
   background: transparent;
@@ -634,46 +694,41 @@ onReachBottom(() => {
 }
 .type-tabs {
   display: flex;
-  gap: 4px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 28px;
   scroll-margin-top: 12px;
 }
 .type-tab {
   position: relative;
   flex: 1;
   min-width: 0;
-  min-height: 42px;
-  padding: 0 2px;
-  border-radius: 25px;
-  background: transparent;
+  min-height: 52px;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.74);
   color: #677695;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 42px;
+  line-height: 52px;
 }
 .type-active {
-  background: linear-gradient(135deg, #7a89ff, #a3b3ff);
+  border-color: transparent;
+  background: linear-gradient(135deg, #6478ff 0%, #4c4bfa 100%);
   color: #fff;
-  box-shadow: 0 5px 12px #7e8ff62e;
-}
-.type-active::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 38%;
-  right: 38%;
-  height: 3px;
-  border-radius: 3px;
-  background: #5968ff;
+  box-shadow: 0 9px 18px rgba(80, 83, 255, 0.22);
 }
 .filter-row {
   display: flex;
-  gap: 9px;
-  margin: 16px 0 12px;
+  gap: 12px;
+  margin: 24px 0 18px;
 }
 .filter-area {
   position: relative;
   z-index: 20;
+}
+.filter-compat {
+  display: none;
 }
 .filter-button {
   display: flex;
@@ -683,13 +738,20 @@ onReachBottom(() => {
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
-  height: 42px;
-  padding: 0 13px;
-  border-radius: 24px;
-  background: #fff;
+  height: 48px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.9);
   color: #23365f;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
+  box-shadow: 0 8px 18px rgba(82, 111, 198, 0.08);
+}
+.filter-city-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .filter-panel {
   position: absolute;
@@ -730,7 +792,7 @@ onReachBottom(() => {
   color: #687a9b;
   font-size: 12px;
 }
-.active-filters button {
+.reset-filter-button {
   flex-shrink: 0;
   min-height: 44px;
   padding: 0 8px;
@@ -755,7 +817,7 @@ onReachBottom(() => {
 .property-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
 }
 .skeleton-card {
   display: flex;
@@ -775,6 +837,36 @@ onReachBottom(() => {
   border-radius: 5px;
   background: #e9eef9;
 }
+.home-map-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--app-tabbar-height, 54px) + env(safe-area-inset-bottom) + 16px);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 54px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #7088ff 0%, #4c4bfa 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 12px 24px rgba(78, 81, 255, 0.28);
+}
+.secondary-home-content {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(222, 230, 248, 0.9);
+}
+.secondary-title {
+  display: block;
+  margin-bottom: 4px;
+  color: #536484;
+  font-size: 13px;
+  font-weight: 700;
+}
 /* 微信胶囊占据右上角，品牌留在左侧，操作按钮放到下一行。 */
 /* #ifdef MP-WEIXIN */
 .home-sticky-header {
@@ -783,10 +875,16 @@ onReachBottom(() => {
 /* #endif */
 @media (min-width: 420px) {
   .search-box {
-    height: 54px;
+    height: 62px;
+  }
+  .hero-title {
+    font-size: 32px;
+  }
+  .brand-slogan {
+    font-size: 16px;
   }
   .filter-button {
-    font-size: 14px;
+    font-size: 15px;
   }
 }
 </style>

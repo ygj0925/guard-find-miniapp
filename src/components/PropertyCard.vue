@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Property } from '@/api/property'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { propertyPriceSuffix, toggleFavorite } from '@/api/property'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
@@ -9,6 +9,15 @@ const props = defineProps<{ item: Property }>()
 const emit = defineEmits<{ favorite: [id: Property['id'], favorited: boolean] }>()
 const failed = ref(false)
 const busy = ref(false)
+const cornerLabel = computed(() => {
+  if (props.item.recommended)
+    return '优选'
+  if (props.item.facilities?.some(item => /地铁/.test(item)) || /地铁/.test(props.item.title))
+    return '近地铁'
+  if (props.item.propertyType === 'apartment')
+    return '品质公寓'
+  return ''
+})
 
 function detail() {
   uni.navigateTo({ url: `/pages/property/detail?id=${encodeURIComponent(String(props.item.id))}` })
@@ -42,11 +51,11 @@ async function favorite() {
   <view class="property-card">
     <button class="property-main app-tap" :aria-label="`查看房源：${item.title}`" @tap="detail">
       <view class="property-image">
-        <image v-if="item.images?.length && !failed" :src="item.images[0]" mode="aspectFill" class="h-full w-full" aria-hidden="true" @error="failed = true" />
+        <image v-if="item.images?.length && !failed" :src="item.images[0]" mode="aspectFill" class="property-photo h-full w-full" aria-hidden="true" @error="failed = true" />
         <view v-else class="h-full flex flex-col items-center justify-center gap-2 bg-app-soft text-app-muted">
           <view class="i-carbon-image text-7" aria-hidden="true" /><text class="text-10px">暂无图片</text>
         </view>
-        <text v-if="item.recommended" class="preferred">优选</text>
+        <text v-if="cornerLabel" class="preferred">{{ cornerLabel }}</text>
       </view>
       <view class="property-info">
         <text class="property-title">{{ item.title }}</text>
@@ -55,9 +64,9 @@ async function favorite() {
           <text class="truncate">{{ [item.district || item.city, item.community || item.address].filter(Boolean).join(' · ') }}</text>
         </view>
         <view class="property-tags">
-          <text v-if="item.layout">{{ item.layout }}</text>
-          <text v-if="item.areaSqm">{{ item.areaSqm }}㎡</text>
-          <text v-if="item.facilities?.length">{{ item.facilities[0] }}</text>
+          <text v-if="item.layout" class="property-tag">{{ item.layout }}</text>
+          <text v-if="item.areaSqm" class="property-tag">{{ item.areaSqm }}㎡</text>
+          <text v-if="item.facilities?.length" class="property-tag">{{ item.facilities[0] }}</text>
         </view>
         <view class="property-price">
           <text class="currency">¥</text><text>{{ item.price }}</text><text class="price-unit">{{ propertyPriceSuffix(item) }}</text>
@@ -74,14 +83,14 @@ async function favorite() {
 .property-card {
   position: relative;
   min-width: 0;
-  border-radius: 20px;
+  border-radius: 24px;
   background: #fff;
-  padding: 12px;
-  box-shadow: 0 10px 24px rgba(72, 96, 164, 0.08);
+  padding: 14px;
+  box-shadow: 0 12px 26px rgba(72, 96, 164, 0.1);
 }
 .property-main {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
   padding: 0;
@@ -92,12 +101,12 @@ async function favorite() {
 .property-image {
   position: relative;
   flex-shrink: 0;
-  width: 35%;
-  min-height: 132px;
+  width: 36%;
+  min-height: 142px;
   overflow: hidden;
-  border-radius: 13px;
+  border-radius: 16px;
 }
-.property-image image {
+.property-photo {
   position: absolute;
   inset: 0;
 }
@@ -105,11 +114,12 @@ async function favorite() {
   position: absolute;
   top: 0;
   left: 0;
-  padding: 3px 10px;
-  border-radius: 0 0 8px 0;
-  background: #6375ff;
+  padding: 4px 11px;
+  border-radius: 0 0 11px 0;
+  background: linear-gradient(135deg, #6e82ff, #5360ff);
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 600;
 }
 .property-info {
   flex: 1;
@@ -123,41 +133,41 @@ async function favorite() {
   -webkit-line-clamp: 2;
   padding-right: 30px;
   color: #162650;
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 1.5;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.42;
 }
 .location-line {
   display: flex;
   align-items: center;
   gap: 3px;
-  margin-top: 6px;
+  margin-top: 8px;
   color: #71809d;
-  font-size: 12px;
+  font-size: 13px;
 }
 .property-tags {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
-  margin-top: 7px;
+  margin-top: 8px;
   color: #7784a2;
-  font-size: 11px;
+  font-size: 12px;
 }
-.property-tags text {
+.property-tag {
   max-width: 90px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 2px 5px;
-  border-radius: 5px;
+  padding: 3px 7px;
+  border-radius: 8px;
   background: #f3f5fc;
 }
 .property-price {
   display: flex;
   align-items: baseline;
-  margin-top: 8px;
+  margin-top: 11px;
   color: #4a56ff;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 750;
   line-height: 1.2;
 }
@@ -189,17 +199,19 @@ async function favorite() {
 }
 @media (min-width: 420px) {
   .property-card {
-    padding: 12px;
+    padding: 14px;
   }
-  .property-title { font-size: 17px; }
+  .property-title {
+    font-size: 18px;
+  }
   .property-image {
-    min-height: 145px;
+    min-height: 152px;
   }
   .location-line {
-    font-size: 12px;
+    font-size: 13px;
   }
   .property-tags {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 </style>
