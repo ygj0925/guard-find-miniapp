@@ -45,6 +45,7 @@ const cityLabel = computed(() => {
   const city = draft.city || detectedCity.value || '上海市'
   return `${city.replace(/市$/, '')} · 全市`
 })
+const cityDisplay = computed(() => draft.city || detectedCity.value || '全国')
 type HomeTypeKey = 'whole' | 'room' | 'short' | 'apartment'
 const TYPE_TABS: { key: HomeTypeKey, label: string }[] = [
   { key: 'whole', label: '整套' },
@@ -361,13 +362,14 @@ onReachBottom(() => {
           </view>
         </view>
       </view>
+      <text v-if="headerScrolled" class="sticky-title">全部房源</text>
     </view>
     <view class="home-content">
       <view class="home-toolbar">
         <view class="heading-actions">
           <picker class="city-picker-compat" :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCityCompat" />
           <button class="city-button app-tap" aria-label="选择城市" @tap="openCityPicker">
-            <view class="i-carbon-location text-5" /><text class="city-label">{{ draft.city || (locationResolved ? detectedCity : '全国') }}</text><view class="i-carbon-chevron-down text-3" />
+            <view class="i-carbon-location text-5" /><text class="city-label">{{ cityDisplay }}</text><view class="i-carbon-chevron-down text-3" />
           </button>
           <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
             <view class="i-carbon-chat text-7" />
@@ -390,7 +392,7 @@ onReachBottom(() => {
           {{ tab.label }}
         </button>
       </view>
-      <view class="filter-area">
+      <view class="filter-area" :class="{ 'is-sticky': headerScrolled }">
         <view class="filter-row">
           <button class="filter-compat" aria-hidden="true" @tap="filterOpen = !filterOpen">
             城市 · 价格区间
@@ -559,6 +561,15 @@ onReachBottom(() => {
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 6px 18px rgba(90, 113, 177, 0.1);
 }
+.sticky-title {
+  position: absolute;
+  top: calc(var(--status-bar-height, 20px) + 8px);
+  left: 20px;
+  color: #162650;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 32px;
+}
 .home-header-content {
   max-width: 720px;
   margin: 0 auto;
@@ -726,6 +737,23 @@ onReachBottom(() => {
 .filter-area {
   position: relative;
   z-index: 20;
+}
+.filter-area.is-sticky {
+  position: sticky;
+  top: calc(var(--status-bar-height, 20px) + 4px);
+  z-index: 90;
+  margin-right: -20px;
+  margin-left: -20px;
+  padding: 8px 20px;
+  border-bottom: 1px solid rgba(218, 226, 246, 0.78);
+  background: rgba(239, 244, 255, 0.9);
+  box-shadow: 0 8px 18px rgba(90, 113, 177, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.filter-area.is-sticky .filter-row {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 .filter-compat {
   display: none;

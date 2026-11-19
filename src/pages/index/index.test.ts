@@ -57,7 +57,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('首页搜索与分页', () => {
-  it('仅标题行置顶，滚动后显示半透明背景，返回顶部后恢复透明', async () => {
+  it('标题与筛选行滚动后吸顶，返回顶部后恢复透明', async () => {
     const wrapper = await render()
     const header = wrapper.get('.home-sticky-header')
     expect(header.text()).toBe('泊之湾')
@@ -66,9 +66,11 @@ describe('首页搜索与分页', () => {
     state.scroll?.({ scrollTop: 80 })
     await wrapper.vm.$nextTick()
     expect(header.classes()).toContain('is-scrolled')
+    expect(wrapper.get('.filter-area').classes()).toContain('is-sticky')
     state.scroll?.({ scrollTop: 0 })
     await wrapper.vm.$nextTick()
     expect(header.classes()).not.toContain('is-scrolled')
+    expect(wrapper.get('.filter-area').classes()).not.toContain('is-sticky')
     wrapper.unmount()
   })
 
