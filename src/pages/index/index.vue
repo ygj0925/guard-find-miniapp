@@ -278,7 +278,6 @@ onReachBottom(() => {
       </view>
     </view>
     <view class="home-content">
-      <text class="brand-slogan">找一处，安心住下。</text>
       <view class="home-toolbar">
         <view class="heading-actions">
           <picker :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCity">
@@ -291,6 +290,7 @@ onReachBottom(() => {
           </button>
         </view>
       </view>
+      <text class="brand-slogan">找一处，安心住下。</text>
       <view class="search-box">
         <view class="i-carbon-search shrink-0 text-7 text-#6454ff" aria-hidden="true" />
         <input v-model="draft.keyword" class="min-w-0 flex-1" placeholder="搜索标题、小区、地址" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
@@ -401,6 +401,7 @@ onReachBottom(() => {
 
 <style scoped>
 .home-page {
+  position: relative;
   box-sizing: border-box;
   min-height: calc(100vh + env(safe-area-inset-bottom));
   min-height: calc(var(--app-viewport-height, 100vh) + env(safe-area-inset-bottom));
@@ -416,7 +417,7 @@ onReachBottom(() => {
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: calc(var(--status-bar-height, 0px) + 16px) 16px 8px;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 8px;
   background: transparent;
   transition: background-color 180ms ease;
 }
@@ -433,7 +434,7 @@ onReachBottom(() => {
   min-width: 0;
 }
 .brand-block {
-  max-width: 58%;
+  max-width: 52%;
 }
 .brand-name {
   display: block;
@@ -453,15 +454,15 @@ onReachBottom(() => {
 .heading-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 5px;
-  width: 100%;
+  width: auto;
 }
 .home-toolbar {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  margin-top: 4px;
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: 16px;
+  z-index: 101;
 }
 .city-button {
   display: flex;

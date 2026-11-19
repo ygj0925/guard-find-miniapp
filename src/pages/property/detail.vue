@@ -13,9 +13,11 @@ import {
 import { useTokenStore } from '@/store/token'
 import { useUserStore } from '@/store/user'
 import { toLoginPage } from '@/utils/toLoginPage'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
 definePage({
   style: {
+    navigationStyle: 'custom',
     navigationBarTitleText: '房源详情',
     backgroundColor: '#F7F8FA',
   },
@@ -239,6 +241,7 @@ function returnToProperties() {
 
 <template>
   <view class="detail-page app-page">
+    <WeChatPageHeader title="房源详情" subtitle="实景房源 · 预约看房" />
     <view class="app-content">
       <view v-if="property && reception" class="app-panel mb-4 p-5">
         <text class="block font-bold">{{ availabilityLabels[reception.availability] }} · {{ reception.managerName || '公寓管家接待' }}</text>
@@ -424,12 +427,17 @@ function returnToProperties() {
 <style scoped>
 .detail-page {
   padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at 88% 0, rgba(169, 194, 255, 0.5), transparent 32%),
+    #f5f7ff;
 }
 
 .detail-media {
-  height: 280px;
+  height: 300px;
   margin: 0 -16px;
   overflow: hidden;
+  border-radius: 0 0 28px 28px;
+  background: #e7edff;
 }
 
 .detail-action-bar {

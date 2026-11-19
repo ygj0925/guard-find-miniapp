@@ -99,7 +99,7 @@ onMounted(syncTabbarVisibility)
 
 <template>
   <view v-if="customTabbarEnable && shouldShowTabbar">
-    <view class="fixed inset-x-0 bottom-0 z-1000 box-border border-t-1rpx border-app-border border-t-solid bg-white" @touchmove.stop.prevent>
+    <view class="app-custom-tabbar fixed inset-x-0 bottom-0 z-1000 box-border border-t-1rpx border-app-border border-t-solid bg-white" @touchmove.stop.prevent>
       <view class="mx-auto h-54px max-w-860px flex items-center">
         <button
           v-for="(item, index) in tabbarList"
@@ -123,3 +123,15 @@ onMounted(syncTabbarVisibility)
     </view>
   </view>
 </template>
+
+<style scoped>
+.app-custom-tabbar {
+  border-top-color: rgba(226, 232, 250, 0.92);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 28px rgba(70, 104, 184, 0.1);
+  padding-top: 4px;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+</style>

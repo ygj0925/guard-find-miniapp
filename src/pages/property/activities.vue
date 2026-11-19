@@ -6,8 +6,9 @@ import { computed, ref } from 'vue'
 import { fetchProperties } from '@/api/property'
 import { fetchPropertyHome } from '@/api/propertyHome'
 import PropertyCard from '@/components/PropertyCard.vue'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '优惠活动', backgroundColor: '#F5F7FF', enablePullDownRefresh: true } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '优惠活动', backgroundColor: '#F5F7FF', enablePullDownRefresh: true } })
 const id = ref('')
 const activities = ref<PropertyActivity[]>([])
 const items = ref<Property[]>([])
@@ -101,6 +102,7 @@ function goHome() {
 
 <template>
   <view class="app-page bg-#F5F7FF">
+    <WeChatPageHeader title="优惠活动" subtitle="精选福利与限时房源" :show-back="false" />
     <view class="app-content py-4">
       <view v-if="error" class="app-state">
         <view class="i-carbon-cloud-offline text-8" /><text>活动加载失败，请重试</text><button class="app-secondary-button" @tap="load">

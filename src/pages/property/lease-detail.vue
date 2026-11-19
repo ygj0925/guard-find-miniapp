@@ -8,8 +8,9 @@ import LeaseLifecycle from './components/LeaseLifecycle.vue'
 import LeaseContractDocument from './components/LeaseContractDocument.vue'
 import LeaseReviewPanel from './components/LeaseReviewPanel.vue'
 import { openLeasePdf } from '@/utils/leaseSigning'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '合同与租期' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '合同与租期', backgroundColor: '#F5F7FF' } })
 const tokenStore = useTokenStore()
 const authenticated = computed(() => Boolean(tokenStore.validToken))
 const id = ref('')
@@ -223,6 +224,7 @@ watch(() => tokenStore.validToken, () => {
 
 <template>
   <view class="app-page">
+    <WeChatPageHeader title="合同与租期" subtitle="审阅合同、签署与续租进度" />
     <view class="app-content py-6">
       <view v-if="!authenticated" class="app-panel p-5">
         <text class="block">登录后查看本人合同</text><button class="mt-4 app-primary-button" @tap="toLoginPage">

@@ -14,8 +14,9 @@ import {
 } from '@/api/property'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '我的房源', backgroundColor: '#F7F8FA' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '我的房源', backgroundColor: '#F5F7FF' } })
 
 type Kind = 'mine' | 'favorites' | 'history'
 const TITLES: Record<Kind, string> = { mine: '我的房源', favorites: '我的收藏', history: '浏览记录' }
@@ -242,6 +243,7 @@ function unfavorite(item: Property) {
 
 <template>
   <view class="personal-page app-page">
+    <WeChatPageHeader :title="TITLES[kind]" subtitle="管理房源、收藏与浏览记录" />
     <view class="app-content py-4">
       <view class="mb-4 flex items-end justify-between gap-3">
         <text class="text-24px text-app-ink font-bold">{{ TITLES[kind] }}</text>
@@ -364,5 +366,11 @@ function unfavorite(item: Property) {
 <style scoped>
 .personal-page {
   padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at 90% 0, rgba(170, 196, 255, 0.45), transparent 32%),
+    #f5f7ff;
+}
+.personal-page .app-panel {
+  box-shadow: 0 12px 28px rgba(70, 104, 184, 0.1);
 }
 </style>

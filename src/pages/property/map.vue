@@ -5,8 +5,9 @@ import { computed, ref } from 'vue'
 import { fetchCommunities, fetchMapProperties, fetchRegionSource } from '@/api/propertyMap'
 import { fetchRegionTree } from '@/api/property'
 import { regionCityNames } from '@/utils/regions'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '地图找房', backgroundColor: '#F5F7FA' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '地图找房', backgroundColor: '#F5F7FF' } })
 const city = ref('')
 const cityOptions = ref(['不限城市'])
 const keyword = ref('')
@@ -182,6 +183,7 @@ onUnload(() => {
 
 <template>
   <view class="map-page">
+    <WeChatPageHeader title="地图找房" subtitle="按位置发现附近房源" />
     <view class="search-panel">
       <view class="flex items-center gap-2">
         <picker :range="cityOptions" :value="Math.max(0, cityOptions.indexOf(city))" @change="changeCity">
@@ -291,12 +293,15 @@ onUnload(() => {
 .map-page {
   color: #1e3159;
   padding-bottom: env(safe-area-inset-bottom);
-  background: #f5f7fa;
+  background: #f5f7ff;
   min-height: 100vh;
 }
 .search-panel {
-  padding: 14px 12px;
-  background: #fff;
+  margin: 0 12px 12px;
+  padding: 14px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 28px rgba(75, 100, 170, 0.1);
 }
 .city-button {
   max-width: 90px;
@@ -306,7 +311,8 @@ onUnload(() => {
   align-items: center;
 }
 .search-button {
-  background: #263d74;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #5360ff, #7892ff);
   color: white;
   margin: 0;
   padding: 0 12px;
@@ -318,21 +324,28 @@ onUnload(() => {
   padding: 0 12px;
   line-height: 44px;
   font-size: 13px;
-  border: 1px solid #dae1ed;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid #e3e8fa;
+  border-radius: 22px;
+  background: #f6f8ff;
   color: #263d74;
 }
 .property-map {
   width: 100%;
   height: 44vh;
   min-height: 260px;
+  border-radius: 28px;
 }
 .results {
+  margin: 12px;
   padding: 16px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 28px rgba(75, 100, 170, 0.08);
 }
 .property-result {
-  border-bottom: 1px solid #e1e5ed;
+  margin-top: 10px;
+  border-bottom: 1px solid #edf0f8;
+  border-radius: 18px;
   padding: 18px 0;
 }
 .property-result.selected {

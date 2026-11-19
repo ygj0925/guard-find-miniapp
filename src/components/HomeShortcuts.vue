@@ -1,18 +1,18 @@
 <script setup lang="ts">
 const emit = defineEmits<{ select: [key: string] }>()
 const categories = [
-  { key: 'whole', label: '整套房源', icon: 'i-carbon-home', color: 'purple' },
-  { key: 'room', label: '单间', icon: 'i-carbon-door', color: 'orange' },
-  { key: 'short', label: '民宿短租', icon: 'i-carbon-lounge', color: 'green' },
-  { key: 'apartment', label: '公寓', icon: 'i-carbon-building', color: 'blue' },
+  { key: 'whole', label: '整套房源', icon: 'i-carbon-home', image: '/static/images/design-icons/home.png', color: 'purple' },
+  { key: 'room', label: '单间', icon: 'i-carbon-home', image: '/static/images/design-icons/room.png', color: 'orange' },
+  { key: 'short', label: '民宿短租', icon: 'i-carbon-home', image: '/static/images/design-icons/homestay.png', color: 'green' },
+  { key: 'apartment', label: '公寓', icon: 'i-carbon-building', image: '/static/images/design-icons/apartment.png', color: 'blue' },
 ]
 const services = [
-  { key: 'map', label: '地图找房', icon: 'i-carbon-map', color: 'blue' },
-  { key: 'phone', label: '电话咨询', icon: 'i-carbon-phone-filled', color: 'green' },
-  { key: 'chat', label: '在线咨询', icon: 'i-carbon-chat', color: 'blue' },
-  { key: 'recommended', label: '房源推荐', icon: 'i-carbon-star-filled', color: 'gold' },
-  { key: 'activities', label: '优惠活动', icon: 'i-carbon-gift', color: 'red' },
-  { key: 'support', label: '客服中心', icon: 'i-carbon-headset', color: 'purple' },
+  { key: 'map', label: '地图找房', icon: 'i-carbon-map', image: '/static/images/design-icons/map.png', color: 'blue' },
+  { key: 'phone', label: '电话咨询', icon: 'i-carbon-phone-filled', image: '/static/images/design-icons/phone.png', color: 'green' },
+  { key: 'chat', label: '在线咨询', icon: 'i-carbon-chat', image: '/static/images/design-icons/chat.png', color: 'blue' },
+  { key: 'recommended', label: '房源推荐', icon: 'i-carbon-star-filled', image: '/static/images/design-icons/favorite.png', color: 'gold' },
+  { key: 'activities', label: '优惠活动', icon: 'i-carbon-gift', image: '/static/images/design-icons/calendar.png', color: 'red' },
+  { key: 'support', label: '客服中心', icon: 'i-carbon-headset', image: '/static/images/design-icons/service.png', color: 'purple' },
 ]
 </script>
 
@@ -20,6 +20,7 @@ const services = [
   <view class="shortcut-row category-row">
     <button v-for="entry in categories" :key="entry.key" class="shortcut app-tap" @tap="emit('select', entry.key)">
       <view class="shortcut-art" :class="entry.color">
+        <image v-if="entry.image" :src="entry.image" mode="aspectFit" class="shortcut-icon" aria-hidden="true" />
         <view v-if="entry.key === 'room'" class="room-art" aria-hidden="true">
           <view class="room-handle" />
         </view>
@@ -34,6 +35,7 @@ const services = [
   <view class="shortcut-row service-row">
     <button v-for="entry in services" :key="entry.key" class="shortcut app-tap" @tap="emit('select', entry.key)">
       <view class="shortcut-art" :class="entry.color">
+        <image v-if="entry.image" :src="entry.image" mode="aspectFit" class="shortcut-icon" aria-hidden="true" />
         <view :class="entry.icon" class="art-icon" aria-hidden="true" />
         <text v-if="entry.key === 'recommended'" class="hot-label">HOT</text>
       </view>
@@ -84,6 +86,18 @@ const services = [
   height: 36px;
   background: linear-gradient(140deg, var(--light), var(--deep));
   filter: drop-shadow(0 4px 2px var(--tint));
+}
+.shortcut-icon {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.shortcut-art > .art-icon,
+.shortcut-art > .room-art,
+.shortcut-art > .short-art {
+  display: none;
 }
 .room-art {
   position: relative;
@@ -186,6 +200,7 @@ const services = [
 }
 .hot-label {
   position: absolute;
+  z-index: 2;
   right: -10px;
   top: -5px;
   padding: 1px 5px;

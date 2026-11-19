@@ -5,8 +5,9 @@ import { fetchLease } from '@/api/leases'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
 import LeaseSigningFlow from './components/LeaseSigningFlow.vue'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '签署租赁合同' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '签署租赁合同', backgroundColor: '#F5F7FF' } })
 const store = useTokenStore()
 const authenticated = computed(() => Boolean(store.validToken))
 const id = ref('')
@@ -70,6 +71,7 @@ watch(() => store.validToken, () => {
 
 <template>
   <view class="app-page">
+    <WeChatPageHeader title="在线签约" subtitle="阅读合同 · 手写签名 · 完成签署" />
     <view class="app-content py-5" style="padding-bottom: calc(24px + env(safe-area-inset-bottom))">
       <view v-if="!authenticated" class="app-panel p-5">
         <text>请本人登录后签署合同</text><button class="mt-4 app-primary-button" @tap="toLoginPage">

@@ -4,8 +4,9 @@ import { computed, ref, watch } from 'vue'
 import { actOnBooking, bookingLabels, fetchBookingDetail, fetchOpsSettings, subscribeBooking } from '@/api/operations'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '预约详情' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '预约详情', backgroundColor: '#F5F7FF' } })
 const tokenStore = useTokenStore()
 const id = ref('')
 const data = ref<BookingDetail | null>(null)
@@ -101,7 +102,7 @@ function openProperty() { if (data.value) uni.navigateTo({ url: `/pages/property
 </script>
 
 <template>
- <view class="app-page"><view class="app-content py-6">
+  <view class="app-page"><WeChatPageHeader title="预约详情" subtitle="看房安排与接待信息" /><view class="app-content py-6">
   <view v-if="loading" class="app-panel p-6">正在加载预约…</view>
   <view v-else-if="failed" class="app-panel p-6"><text>预约加载失败或已无权访问</text><button class="app-secondary-button mt-4" @tap="load">重新加载</button></view>
   <template v-else-if="data">

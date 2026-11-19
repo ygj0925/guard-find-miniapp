@@ -4,8 +4,9 @@ import { computed, ref, watch } from 'vue'
 import { fetchLeases, leaseStatusLabels } from '@/api/leases'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '我的租约', enablePullDownRefresh: true } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '我的租约', backgroundColor: '#F5F7FF', enablePullDownRefresh: true } })
 const tokenStore = useTokenStore()
 const authenticated = computed(() => Boolean(tokenStore.validToken))
 const items = ref<LeaseDetail[]>([])
@@ -93,6 +94,7 @@ watch(() => tokenStore.validToken, () => {
 
 <template>
   <view class="app-page">
+    <WeChatPageHeader title="我的租约" subtitle="合同签署、审阅与续租进度" />
     <view class="app-content py-6">
       <view v-if="!authenticated" class="app-panel p-5">
         <text class="block text-lg font-bold">登录后查看合同与续租进度</text>

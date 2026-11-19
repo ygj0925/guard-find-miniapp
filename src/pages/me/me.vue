@@ -8,6 +8,7 @@ import { useTokenStore } from '@/store/token'
 import { useUserStore } from '@/store/user'
 import { refreshMessageBadge, setMessageBadge } from '@/utils/messageBadge'
 import { toLoginPage } from '@/utils/toLoginPage'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
 definePage({
   style: {
@@ -109,8 +110,9 @@ function onLogout() {
 
 <template>
   <view class="pencil-page profile-page app-tab-page">
+    <WeChatPageHeader title="我的" subtitle="管理收藏、租约与签约资料" :show-back="false" transparent />
     <view class="profile-content app-content pb-48rpx pt-40rpx">
-      <text class="mb-40rpx block text-64rpx font-bold leading-80rpx">我的</text>
+      <text class="profile-greeting">安心住下，从这里开始</text>
 
       <view class="app-panel overflow-hidden p-32rpx">
         <view class="min-w-0 flex items-center gap-24rpx py-8rpx">
@@ -257,17 +259,17 @@ function onLogout() {
   padding-bottom: calc(var(--app-page-bottom-safe) + 40rpx);
 }
 .profile-content {
-  padding-top: calc(var(--status-bar-height, 0px) + 52rpx);
+  padding-top: 18rpx;
 }
-.profile-content > text:first-child {
+.profile-greeting {
   margin-bottom: 32rpx;
-  color: #173b92;
-  font-size: 45rpx;
-  line-height: 60rpx;
+  color: #5d6f98;
+  font-size: 26rpx;
+  line-height: 38rpx;
 }
 .profile-content > .app-panel {
   border-radius: 38rpx;
-  box-shadow: 0 6rpx 19rpx #c6d2ea44;
+  box-shadow: 0 14rpx 34rpx rgba(70, 104, 184, 0.12);
 }
 .profile-content .app-panel {
   border-color: #edf1fa;

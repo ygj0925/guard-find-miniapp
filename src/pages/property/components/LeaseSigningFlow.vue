@@ -324,3 +324,21 @@ onBeforeUnmount(() => {
     </template>
   </view>
 </template>
+
+<style scoped>
+.app-panel {
+  border-radius: 26px;
+  box-shadow: 0 12px 28px rgba(70, 104, 184, 0.1);
+}
+.app-panel > .bg-app-soft,
+.app-panel .bg-app-soft {
+  border-radius: 18px;
+  background: #eef3ff;
+}
+.contract-paper {
+  margin-bottom: 16px;
+  border: 0;
+  border-radius: 26px;
+  box-shadow: 0 12px 28px rgba(70, 104, 184, 0.08);
+}
+</style>

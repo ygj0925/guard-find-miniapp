@@ -9,8 +9,9 @@ import {
 } from '@/api/property'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '看房预约', backgroundColor: '#F7F8FA' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '看房预约', backgroundColor: '#F5F7FF' } })
 
 const propertyId = ref('')
 const property = ref<Property | null>(null)
@@ -254,6 +255,7 @@ function returnToProperty() {
 
 <template>
   <view class="bookings-page app-page" :class="propertyId ? 'booking-form-page' : ''">
+    <WeChatPageHeader title="看房预约" subtitle="选择方便的时间，管家会及时联系你" />
     <view class="app-content py-4">
       <template v-if="propertyId">
         <view v-if="propertyLoading" class="app-panel app-state gap-2 p-6">

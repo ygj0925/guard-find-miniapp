@@ -4,8 +4,9 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { getUserInfo } from '@/api/login'
 import { useTokenStore } from '@/store/token'
 import { toLoginPage } from '@/utils/toLoginPage'
+import WeChatPageHeader from '@/components/WeChatPageHeader.vue'
 
-definePage({ style: { navigationBarTitleText: '房源管理' } })
+definePage({ style: { navigationStyle: 'custom', navigationBarTitleText: '房源管理', backgroundColor: '#F5F7FF' } })
 
 type Identity = 'checking' | 'guest' | 'resident' | 'manager' | 'error'
 const tokenStore = useTokenStore()
@@ -93,6 +94,7 @@ function viewProperties() {
 
 <template>
   <view class="app-tab-page">
+    <WeChatPageHeader title="房源管理" subtitle="发布、维护与处理看房预约" />
     <view class="app-content py-6">
       <text class="block text-26px text-app-ink font-bold">房源管理</text>
       <text class="mt-2 block text-sm text-app-muted leading-6">公寓管家统一维护，房源信息安心可靠</text>

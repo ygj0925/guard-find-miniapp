@@ -6,7 +6,7 @@ page {
   --wot-button-primary-bg-color: #2d6fe6;
   --app-tabbar-height: 54px;
   --app-viewport-height: 100vh;
-  --app-page-background: #f7f8fa;
+  --app-page-background: #f5f7ff;
   --app-page-bottom-safe: calc(var(--app-tabbar-height) + env(safe-area-inset-bottom));
   --app-ink: #121c39;
   --app-ink-soft: #33415f;
@@ -25,6 +25,9 @@ page {
   --app-info: #3974f6;
   --app-card-radius: 32rpx;
   --app-card-shadow: 0 14rpx 34rpx rgba(70, 104, 184, 0.12);
+  --app-ice-background: #edf4ff;
+  --app-surface-elevated: rgba(255, 255, 255, 0.94);
+  --app-brand-indigo: #5360ff;
   --app-brand-hero: linear-gradient(135deg, #0879ff 0%, var(--app-brand-sky) 52%, var(--app-brand-mint) 100%);
   --app-brand-header: linear-gradient(104deg, #0d68ed 0%, #3d70ff 62%, #567aff 100%);
   --app-blue-white-gradient: linear-gradient(180deg, #247cf0 0%, #43a9ef 18%, #9dd5f7 40%, #e7f4ff 68%, #ffffff 100%);
@@ -46,6 +49,50 @@ page,
 button,
 navigator {
   -webkit-tap-highlight-color: transparent;
+}
+
+.app-page,
+.app-tab-page {
+  box-sizing: border-box;
+  min-height: calc(var(--app-viewport-height, 100vh) + env(safe-area-inset-bottom));
+  background: var(--app-page-background);
+  color: var(--app-ink);
+}
+
+.app-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding-right: 16px;
+  padding-left: 16px;
+}
+
+.app-panel {
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface-elevated);
+  box-shadow: var(--app-card-shadow);
+}
+
+.app-primary-button,
+.app-secondary-button {
+  min-height: 48px;
+  border-radius: 24px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-primary-button {
+  background: linear-gradient(135deg, #5968ff 0%, #6f8cff 100%);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(83, 96, 255, 0.22);
+}
+
+.app-secondary-button {
+  border: 1px solid #e2e8fb;
+  background: #eef2ff;
+  color: #5360cf;
 }
 
 .app-tap,
