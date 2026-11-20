@@ -211,8 +211,10 @@ onPullDownRefresh(() => {
 
 <template>
   <view class="message-page pencil-page app-tab-page">
-    <view class="message-header">
-      <text class="message-heading">消息通知</text><text class="message-subheading">及时掌握房源动态与服务进展</text>
+    <view class="message-header-slot">
+      <view class="message-header">
+        <text class="message-heading">消息通知</text><text class="message-subheading">及时掌握房源动态与服务进展</text>
+      </view>
     </view>
     <view class="message-content app-content pb-48rpx pt-0">
       <view v-if="!isAuthenticated" class="guest-state app-panel">
@@ -367,8 +369,22 @@ onPullDownRefresh(() => {
   min-height: calc(var(--app-viewport-height) + env(safe-area-inset-bottom));
   padding-bottom: calc(var(--app-page-bottom-safe) + 24rpx);
 }
+.message-header-slot {
+  height: calc(var(--status-bar-height, 0px) + 186rpx);
+  min-height: 186rpx;
+}
 .message-header {
   padding: calc(var(--status-bar-height, 0px) + 52rpx) 45rpx 28rpx;
+  box-sizing: border-box;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1000;
+  background: rgba(237, 243, 255, 0.96);
+  box-shadow: 0 6rpx 18rpx rgba(90, 113, 177, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 .message-heading {
   display: block;

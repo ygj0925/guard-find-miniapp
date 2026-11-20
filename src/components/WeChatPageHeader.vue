@@ -39,25 +39,35 @@ function goBack() {
 </script>
 
 <template>
-  <view class="wechat-header" :class="{ 'wechat-header-transparent': transparent }">
-    <view class="wechat-header-safe" />
-    <view class="wechat-header-row" :style="{ '--wechat-capsule-space': `${capsuleSpace}px` }">
-      <button v-if="showBack" class="wechat-header-back app-tap" aria-label="返回" @tap="goBack">
-        <view class="i-carbon-arrow-left text-5" aria-hidden="true" />
-      </button>
-      <view class="wechat-header-copy" :class="{ 'wechat-header-copy-offset': showBack }">
-        <text class="wechat-header-title">{{ title }}</text>
-        <text v-if="subtitle" class="wechat-header-subtitle">{{ subtitle }}</text>
+  <view class="wechat-header-shell">
+    <view class="wechat-header" :class="{ 'wechat-header-transparent': transparent }">
+      <view class="wechat-header-safe" />
+      <view class="wechat-header-row" :style="{ '--wechat-capsule-space': `${capsuleSpace}px` }">
+        <button v-if="showBack" class="wechat-header-back app-tap" aria-label="返回" @tap="goBack">
+          <view class="i-carbon-arrow-left text-5" aria-hidden="true" />
+        </button>
+        <view class="wechat-header-copy" :class="{ 'wechat-header-copy-offset': showBack }">
+          <text class="wechat-header-title">{{ title }}</text>
+          <text v-if="subtitle" class="wechat-header-subtitle">{{ subtitle }}</text>
+        </view>
+        <view class="wechat-header-capsule-space" aria-hidden="true" />
       </view>
-      <view class="wechat-header-capsule-space" aria-hidden="true" />
     </view>
   </view>
 </template>
 
 <style scoped>
+.wechat-header-shell {
+  height: calc(env(safe-area-inset-top) + 52px);
+  min-height: 76px;
+}
 .wechat-header {
-  position: relative;
-  z-index: 10;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1000;
+  box-sizing: border-box;
   background: rgba(245, 248, 255, 0.9);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);

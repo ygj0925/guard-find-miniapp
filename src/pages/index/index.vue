@@ -354,15 +354,16 @@ onReachBottom(() => {
 
 <template>
   <view class="home-page app-tab-page">
-    <view class="home-sticky-header" :class="{ 'is-scrolled': headerScrolled }">
-      <view class="home-header-content">
-        <view class="home-heading">
-          <view class="brand-block">
-            <text class="brand-name">泊之湾</text>
+    <view class="home-header-slot">
+      <view class="home-sticky-header" :class="{ 'is-scrolled': headerScrolled }">
+        <view class="home-header-content">
+          <view class="home-heading">
+            <view class="brand-block">
+              <text class="brand-name">{{ headerScrolled ? '全部房源' : '泊之湾' }}</text>
+            </view>
           </view>
         </view>
       </view>
-      <text v-if="headerScrolled" class="sticky-title">全部房源</text>
     </view>
     <view class="home-content">
       <view class="home-toolbar">
@@ -392,55 +393,57 @@ onReachBottom(() => {
           {{ tab.label }}
         </button>
       </view>
-      <view class="filter-area" :class="{ 'is-sticky': headerScrolled }">
-        <view class="filter-row">
-          <button class="filter-compat" aria-hidden="true" @tap="filterOpen = !filterOpen">
-            城市 · 价格区间
-          </button>
-          <button class="filter-button app-tap" :aria-expanded="filterOpen" aria-label="选择城市" @tap="openCityPicker">
-            <view class="i-carbon-location text-5" aria-hidden="true" /><text class="filter-city-label">{{ cityLabel }}</text><view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="filter-toggle-icon ml-auto shrink-0 text-4" aria-label="展开筛选" @tap.stop="filterOpen = !filterOpen" />
-          </button>
-          <picker class="min-w-0 flex-1" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
-            <view class="filter-button" role="button" aria-label="选择房源排序">
-              <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ sortButtonLabel }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
-            </view>
-          </picker>
-        </view>
-        <view v-if="filterOpen" class="filter-panel app-panel p-4">
-          <view class="grid grid-cols-2 gap-3">
-            <picker :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
-              <view class="panel-picker" role="button" aria-label="选择租售类型">
-                {{ PRICE_TABS[priceIndex].label }}<view class="i-carbon-chevron-down" />
-              </view>
-            </picker>
-            <picker v-if="draft.priceType === 'rent'" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
-              <view class="panel-picker" role="button" aria-label="选择租赁方式">
-                {{ MODE_TABS[modeIndex].label }}<view class="i-carbon-chevron-down" />
-              </view>
-            </picker>
-            <picker v-if="draft.priceType === 'rent'" :range="UNIT_TABS" range-key="label" :value="unitIndex" @change="selectUnit">
-              <view class="panel-picker" role="button" aria-label="选择计价单位">
-                {{ UNIT_TABS[unitIndex].label }}<view class="i-carbon-chevron-down" />
-              </view>
-            </picker>
-          </view>
-          <text class="mt-3 block text-sm font-600">城市</text><input v-model="draft.city" class="panel-input" placeholder="不限城市，如上海市" aria-label="城市筛选" :maxlength="50" confirm-type="search" @confirm="applyFilters">
-          <text class="mt-4 block text-sm font-600">价格区间（元）</text><text class="mt-1 block text-xs text-app-muted">按房源标价筛选，可先选择月租或日租；出售为总价。</text>
-          <view class="grid grid-cols-2 mt-3 gap-3">
-            <view class="min-w-0">
-              <text class="text-xs text-app-muted">最低价格</text><input v-model="draft.minPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最低价格" :maxlength="13">
-            </view>
-            <view class="min-w-0">
-              <text class="text-xs text-app-muted">最高价格</text><input v-model="draft.maxPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最高价格" :maxlength="13">
-            </view>
-          </view>
-          <text v-if="filterError" class="mt-3 block text-sm text-app-danger" role="alert">{{ filterError }}</text>
-          <view class="mt-4 flex gap-3">
-            <button class="app-secondary-button min-w-0 flex-1" @tap="clearFilters">
-              重置
-            </button><button class="app-primary-button min-w-0 flex-1" :loading="loading" @tap="applyFilters">
-              应用筛选
+      <view class="filter-slot" :class="{ 'is-sticky': headerScrolled }">
+        <view class="filter-area" :class="{ 'is-sticky': headerScrolled }">
+          <view class="filter-row">
+            <button class="filter-compat" aria-hidden="true" @tap="filterOpen = !filterOpen">
+              城市 · 价格区间
             </button>
+            <button class="filter-button app-tap" :aria-expanded="filterOpen" aria-label="选择城市" @tap="openCityPicker">
+              <view class="i-carbon-location text-5" aria-hidden="true" /><text class="filter-city-label">{{ cityLabel }}</text><view :class="filterOpen ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="filter-toggle-icon ml-auto shrink-0 text-4" aria-label="展开筛选" @tap.stop="filterOpen = !filterOpen" />
+            </button>
+            <picker class="min-w-0 flex-1" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
+              <view class="filter-button" role="button" aria-label="选择房源排序">
+                <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ sortButtonLabel }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
+              </view>
+            </picker>
+          </view>
+          <view v-if="filterOpen" class="filter-panel app-panel p-4">
+            <view class="grid grid-cols-2 gap-3">
+              <picker :range="PRICE_TABS" range-key="label" :value="priceIndex" @change="selectPrice">
+                <view class="panel-picker" role="button" aria-label="选择租售类型">
+                  {{ PRICE_TABS[priceIndex].label }}<view class="i-carbon-chevron-down" />
+                </view>
+              </picker>
+              <picker v-if="draft.priceType === 'rent'" :range="MODE_TABS" range-key="label" :value="modeIndex" @change="selectMode">
+                <view class="panel-picker" role="button" aria-label="选择租赁方式">
+                  {{ MODE_TABS[modeIndex].label }}<view class="i-carbon-chevron-down" />
+                </view>
+              </picker>
+              <picker v-if="draft.priceType === 'rent'" :range="UNIT_TABS" range-key="label" :value="unitIndex" @change="selectUnit">
+                <view class="panel-picker" role="button" aria-label="选择计价单位">
+                  {{ UNIT_TABS[unitIndex].label }}<view class="i-carbon-chevron-down" />
+                </view>
+              </picker>
+            </view>
+            <text class="mt-3 block text-sm font-600">城市</text><input v-model="draft.city" class="panel-input" placeholder="不限城市，如上海市" aria-label="城市筛选" :maxlength="50" confirm-type="search" @confirm="applyFilters">
+            <text class="mt-4 block text-sm font-600">价格区间（元）</text><text class="mt-1 block text-xs text-app-muted">按房源标价筛选，可先选择月租或日租；出售为总价。</text>
+            <view class="grid grid-cols-2 mt-3 gap-3">
+              <view class="min-w-0">
+                <text class="text-xs text-app-muted">最低价格</text><input v-model="draft.minPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最低价格" :maxlength="13">
+              </view>
+              <view class="min-w-0">
+                <text class="text-xs text-app-muted">最高价格</text><input v-model="draft.maxPrice" type="digit" class="panel-input" placeholder="不限" aria-label="最高价格" :maxlength="13">
+              </view>
+            </view>
+            <text v-if="filterError" class="mt-3 block text-sm text-app-danger" role="alert">{{ filterError }}</text>
+            <view class="mt-4 flex gap-3">
+              <button class="app-secondary-button min-w-0 flex-1" @tap="clearFilters">
+                重置
+              </button><button class="app-primary-button min-w-0 flex-1" :loading="loading" @tap="applyFilters">
+                应用筛选
+              </button>
+            </view>
           </view>
         </view>
       </view>
@@ -543,11 +546,19 @@ onReachBottom(() => {
   margin: 0 auto;
   padding: 0 20px calc(126px + env(safe-area-inset-bottom));
 }
+.home-header-slot {
+  height: calc(env(safe-area-inset-top) + 52px);
+  min-height: 76px;
+}
 .home-sticky-header {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
-  min-height: 1px;
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  z-index: 1000;
+  height: calc(env(safe-area-inset-top) + 52px);
+  min-height: 76px;
   padding: calc(var(--status-bar-height, 20px) + 4px) 20px 0;
   background: transparent;
   transition:
@@ -561,15 +572,6 @@ onReachBottom(() => {
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 6px 18px rgba(90, 113, 177, 0.1);
 }
-.sticky-title {
-  position: absolute;
-  top: calc(var(--status-bar-height, 20px) + 8px);
-  left: 20px;
-  color: #162650;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 32px;
-}
 .home-header-content {
   max-width: 720px;
   margin: 0 auto;
@@ -582,12 +584,13 @@ onReachBottom(() => {
 }
 .brand-name {
   display: block;
-  width: 1px;
-  height: 1px;
   overflow: hidden;
-  font-size: 0;
-  line-height: 1px;
-  opacity: 0;
+  color: #162650;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 32px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .hero-copy {
   padding-top: 12px;
@@ -734,16 +737,26 @@ onReachBottom(() => {
   gap: 12px;
   margin: 24px 0 18px;
 }
+.filter-slot {
+  position: relative;
+  z-index: 20;
+}
+.filter-slot.is-sticky {
+  /* 固定层脱离文档流时保留原筛选行高度，避免滚动位置跳动。 */
+  height: 90px;
+}
 .filter-area {
   position: relative;
   z-index: 20;
 }
 .filter-area.is-sticky {
-  position: sticky;
-  top: calc(var(--status-bar-height, 20px) + 4px);
+  position: fixed;
+  top: calc(var(--status-bar-height, 20px) + 52px);
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
   z-index: 90;
-  margin-right: -20px;
-  margin-left: -20px;
+  width: 100%;
   padding: 8px 20px;
   border-bottom: 1px solid rgba(218, 226, 246, 0.78);
   background: rgba(239, 244, 255, 0.9);
