@@ -39,18 +39,19 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
 
 <style scoped>
 .banner-swiper {
-  height: 104px;
-  margin-top: 24px;
-  border-radius: 20px;
+  height: 112px;
+  margin-top: 22px;
+  border-radius: 24px;
   overflow: hidden;
+  box-shadow: 0 10px 22px rgba(47, 78, 153, 0.12);
 }
 .home-banner {
   position: relative;
   height: 100%;
   width: 100%;
   padding: 0;
-  background: #6377ff;
-  border-radius: 20px;
+  background: #5366f6;
+  border-radius: 24px;
   text-align: left;
 }
 .banner-image {
@@ -62,7 +63,7 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
 .banner-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, #4948fbf2 0%, #4e5bede0 38%, #497fff00 100%);
+  background: linear-gradient(90deg, rgba(50, 67, 220, 0.95) 0%, rgba(62, 86, 228, 0.78) 42%, rgba(62, 86, 228, 0.04) 100%);
 }
 .banner-copy {
   position: relative;
@@ -71,7 +72,7 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
   align-items: flex-start;
   gap: 5px;
   max-width: 80%;
-  padding: 17px 18px;
+  padding: 18px 18px;
   color: #fff;
 }
 .banner-title {
@@ -96,9 +97,10 @@ const displayed = computed<HomeBanner[]>(() => props.banners.length
   align-items: center;
   gap: 5px;
   margin-top: 4px;
-  padding: 5px 12px;
+  min-height: 32px;
+  padding: 0 14px;
   border-radius: 18px;
-  background: #fff0b0;
+  background: #ffe28c;
   color: #243158;
   font-size: 12px;
   font-weight: 650;

@@ -52,7 +52,12 @@ function getIconByIndex(index: number, item: CustomTabBarItem) {
 <style scoped>
 .tabbar-item {
   min-width: 64px;
-  min-height: 44px;
+  min-height: 46px;
   border-radius: 18px;
+  padding: 2px 12px;
+}
+.tabbar-item-active {
+  background: #edf1ff;
+  box-shadow: inset 0 -3px 0 #5366f6;
 }
 </style>

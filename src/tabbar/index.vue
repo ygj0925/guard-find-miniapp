@@ -81,8 +81,8 @@ onMounted(() => {
 })
 // #endif
 
-const activeColor = '#5360FF'
-const inactiveColor = '#7A869F'
+const activeColor = '#5366F6'
+const inactiveColor = '#7F8BA2'
 
 function getColorByIndex(index: number) {
   return tabbarStore.curIdx === index ? activeColor : inactiveColor
@@ -126,12 +126,10 @@ onMounted(syncTabbarVisibility)
 
 <style scoped>
 .app-custom-tabbar {
-  border-top-color: rgba(226, 232, 250, 0.92);
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -10px 28px rgba(70, 104, 184, 0.1);
-  padding-top: 4px;
-  background: rgba(255, 255, 255, 0.96) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  border-top-color: #e4ebf7;
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 22px rgba(47, 78, 153, 0.1);
+  padding-top: 6px;
+  background: rgba(255, 255, 255, 0.98) !important;
 }
 </style>

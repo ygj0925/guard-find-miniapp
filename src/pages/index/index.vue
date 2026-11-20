@@ -360,33 +360,40 @@ onReachBottom(() => {
           <view class="home-heading">
             <view class="brand-block">
               <text class="brand-name">{{ headerScrolled ? '全部房源' : '泊之湾' }}</text>
+              <text v-if="!headerScrolled" class="home-header-slogan">投一处，安心住下。</text>
+            </view>
+          </view>
+          <view class="home-toolbar">
+            <view class="heading-actions">
+              <picker class="city-picker-compat" :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCityCompat" />
+              <button class="city-button app-tap" aria-label="选择城市" @tap="openCityPicker">
+                <view class="i-carbon-location text-5" aria-hidden="true" /><text class="city-label">{{ cityDisplay }}</text><view class="i-carbon-chevron-down text-3" aria-hidden="true" />
+              </button>
+              <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
+                <view class="i-carbon-chat text-7" aria-hidden="true" />
+              </button>
             </view>
           </view>
         </view>
       </view>
     </view>
     <view class="home-content">
-      <view class="home-toolbar">
-        <view class="heading-actions">
-          <picker class="city-picker-compat" :range="cities" :value="Math.max(0, cities.indexOf(draft.city))" @change="selectCityCompat" />
-          <button class="city-button app-tap" aria-label="选择城市" @tap="openCityPicker">
-            <view class="i-carbon-location text-5" /><text class="city-label">{{ cityDisplay }}</text><view class="i-carbon-chevron-down text-3" />
-          </button>
-          <button class="heading-chat app-tap" aria-label="在线咨询公寓管家" @tap="openChat">
-            <view class="i-carbon-chat text-7" />
-          </button>
-        </view>
-      </view>
-      <view class="hero-copy">
-        <text class="hero-title">全部房源</text>
-        <text class="brand-slogan">精选优质房源，省心租好房。</text>
-      </view>
       <view class="search-box">
         <view class="i-carbon-search shrink-0 text-7 text-#6454ff" aria-hidden="true" />
         <input v-model="draft.keyword" class="search-input min-w-0 flex-1" placeholder="搜索小区、地铁、商圈或地址" aria-label="房源关键词" :maxlength="64" confirm-type="search" @confirm="applyFilters">
         <button class="search-button app-tap" :loading="loading" aria-label="搜索房源" @tap="applyFilters">
           <view class="i-carbon-search text-5" aria-hidden="true" /><text class="search-button-label">搜索</text>
         </button>
+      </view>
+      <view class="secondary-home-content">
+        <text class="secondary-title">更多服务</text>
+        <HomeShortcuts @select="shortcut" />
+        <HomeBanners :banners="home.banners" @select="bannerTarget" />
+        <view v-if="homeError" class="home-error">
+          <text>运营信息加载失败，不影响浏览房源</text><button class="retry-button app-tap" @tap="loadHome">
+            重试
+          </button>
+        </view>
       </view>
       <view id="property-results" class="type-tabs">
         <button v-for="tab in TYPE_TABS" :key="tab.key" class="type-tab app-tap" :class="isTypeActive(tab.key) ? 'type-active' : ''" :aria-pressed="isTypeActive(tab.key)" @tap="selectType(tab.key)">
@@ -488,16 +495,6 @@ onReachBottom(() => {
       <button class="home-map-fab app-tap" aria-label="地图找房" @tap="shortcut('map')">
         <view class="i-carbon-location text-6" aria-hidden="true" /><text>地图找房</text>
       </button>
-      <view class="secondary-home-content">
-        <text class="secondary-title">更多服务</text>
-        <HomeShortcuts @select="shortcut" />
-        <HomeBanners :banners="home.banners" @select="bannerTarget" />
-        <view v-if="homeError" class="home-error">
-          <text>运营信息加载失败，不影响浏览房源</text><button class="retry-button app-tap" @tap="loadHome">
-            重试
-          </button>
-        </view>
-      </view>
     </view>
     <CityPickerOverlay
       :open="cityPickerOpen"
@@ -521,34 +518,19 @@ onReachBottom(() => {
   overflow-x: hidden;
   min-height: calc(100vh + env(safe-area-inset-bottom));
   min-height: calc(var(--app-viewport-height, 100vh) + env(safe-area-inset-bottom));
-  color: #162650;
-  background-color: #edf3ff;
-  background-image:
-    radial-gradient(
-      94% 46% at 96% -5%,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(206, 220, 255, 0.74) 56%,
-      rgba(206, 220, 255, 0) 100%
-    ),
-    radial-gradient(
-      92% 52% at -14% 6%,
-      rgba(255, 255, 255, 0.92) 0%,
-      rgba(191, 210, 255, 0.58) 52%,
-      rgba(191, 210, 255, 0) 100%
-    ),
-    radial-gradient(86% 40% at 98% 23%, rgba(178, 199, 255, 0.22), rgba(178, 199, 255, 0) 72%),
-    linear-gradient(180deg, #e8efff 0%, #eef4ff 48%, #f8faff 100%);
+  color: var(--app-ink);
+  background: var(--app-home-hero-background);
 }
 .home-content {
   position: relative;
   z-index: 1;
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 20px calc(126px + env(safe-area-inset-bottom));
+  padding: 0 16px calc(126px + env(safe-area-inset-bottom));
 }
 .home-header-slot {
-  height: calc(env(safe-area-inset-top) + 52px);
-  min-height: 76px;
+  height: calc(env(safe-area-inset-top) + 56px);
+  min-height: 80px;
 }
 .home-sticky-header {
   position: fixed;
@@ -557,9 +539,9 @@ onReachBottom(() => {
   left: 0;
   box-sizing: border-box;
   z-index: 1000;
-  height: calc(env(safe-area-inset-top) + 52px);
-  min-height: 76px;
-  padding: calc(var(--status-bar-height, 20px) + 4px) 20px 0;
+  height: calc(env(safe-area-inset-top) + 56px);
+  min-height: 80px;
+  padding: calc(var(--status-bar-height, 20px) + 4px) 16px 0;
   background: transparent;
   transition:
     background-color 180ms ease,
@@ -567,12 +549,13 @@ onReachBottom(() => {
     backdrop-filter 180ms ease;
 }
 .home-sticky-header.is-scrolled {
-  background: rgba(239, 244, 255, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 6px 18px rgba(90, 113, 177, 0.1);
+  background: rgba(248, 250, 255, 0.98);
+  box-shadow: 0 6px 18px rgba(54, 79, 144, 0.08);
 }
 .home-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   max-width: 720px;
   margin: 0 auto;
 }
@@ -580,35 +563,24 @@ onReachBottom(() => {
   min-width: 0;
 }
 .brand-block {
-  max-width: 52%;
+  max-width: 60%;
 }
 .brand-name {
   display: block;
   overflow: hidden;
-  color: #162650;
-  font-size: 18px;
+  color: var(--app-ink);
+  font-size: 21px;
   font-weight: 800;
-  line-height: 32px;
+  line-height: 28px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hero-copy {
-  padding-top: 12px;
-}
-.hero-title {
+.home-header-slogan {
   display: block;
-  color: #102451;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  line-height: 1.24;
-}
-.brand-slogan {
-  display: block;
-  margin-top: 5px;
-  color: #536484;
-  font-size: 15px;
-  line-height: 1.45;
+  margin-top: 2px;
+  color: var(--app-ink-soft);
+  font-size: 12px;
+  line-height: 18px;
 }
 .heading-actions {
   display: flex;
@@ -621,11 +593,8 @@ onReachBottom(() => {
   display: none;
 }
 .home-toolbar {
-  position: absolute;
-  top: calc(var(--status-bar-height, 20px) + 8px);
-  right: 20px;
-  z-index: 101;
-  display: none;
+  flex-shrink: 0;
+  display: block;
 }
 .city-button {
   display: flex;
@@ -636,7 +605,7 @@ onReachBottom(() => {
   border: 0;
   border-radius: 22px;
   background: transparent;
-  color: #243b6a;
+  color: #223967;
   max-width: 118px;
   font-size: 15px;
 }
@@ -654,24 +623,24 @@ onReachBottom(() => {
   padding: 0;
   background: transparent;
   border-radius: 24px;
-  color: #243b6a;
+  color: #223967;
 }
 .search-box {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 58px;
-  margin-top: 25px;
-  padding: 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 30px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 12px 24px rgba(82, 111, 198, 0.14);
+  height: 56px;
+  margin-top: 22px;
+  padding: 0 15px;
+  border: 1px solid #edf1f8;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(61, 90, 163, 0.1);
 }
 .search-input {
-  height: 54px;
-  color: #25375e;
-  font-size: 16px;
+  height: 52px;
+  color: var(--app-ink);
+  font-size: 15px;
 }
 .search-button {
   display: flex;
@@ -681,7 +650,7 @@ onReachBottom(() => {
   min-height: 42px;
   padding: 0;
   background: transparent;
-  color: #5355ff;
+  color: var(--app-brand-blue);
 }
 .search-button-label {
   position: absolute;
@@ -696,46 +665,45 @@ onReachBottom(() => {
   justify-content: space-between;
   gap: 8px;
   margin-top: 8px;
-  color: #687a9b;
+  color: var(--app-muted);
   font-size: 11px;
 }
 .retry-button {
   min-height: 44px;
   padding: 0 8px;
   background: transparent;
-  color: #5160ed;
+  color: var(--app-brand-blue);
   font-size: 12px;
 }
 .type-tabs {
   display: flex;
-  gap: 10px;
-  margin-top: 28px;
+  gap: 6px;
+  margin-top: 24px;
   scroll-margin-top: 12px;
 }
 .type-tab {
   position: relative;
   flex: 1;
   min-width: 0;
-  min-height: 52px;
+  min-height: 48px;
   padding: 0 4px;
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.74);
-  color: #677695;
-  font-size: 16px;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: #6d7c98;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 52px;
+  line-height: 48px;
 }
 .type-active {
-  border-color: transparent;
-  background: linear-gradient(135deg, #6478ff 0%, #4c4bfa 100%);
-  color: #fff;
-  box-shadow: 0 9px 18px rgba(80, 83, 255, 0.22);
+  background: #e0e7ff;
+  color: var(--app-brand-blue);
+  box-shadow: inset 0 -3px 0 var(--app-brand-blue);
 }
 .filter-row {
   display: flex;
-  gap: 12px;
-  margin: 24px 0 18px;
+  gap: 10px;
+  margin: 14px 0 16px;
 }
 .filter-slot {
   position: relative;
@@ -743,7 +711,7 @@ onReachBottom(() => {
 }
 .filter-slot.is-sticky {
   /* 固定层脱离文档流时保留原筛选行高度，避免滚动位置跳动。 */
-  height: 90px;
+  height: 78px;
 }
 .filter-area {
   position: relative;
@@ -751,18 +719,16 @@ onReachBottom(() => {
 }
 .filter-area.is-sticky {
   position: fixed;
-  top: calc(var(--status-bar-height, 20px) + 52px);
+  top: calc(var(--status-bar-height, 20px) + 56px);
   right: 0;
   left: 0;
   box-sizing: border-box;
   z-index: 90;
   width: 100%;
-  padding: 8px 20px;
-  border-bottom: 1px solid rgba(218, 226, 246, 0.78);
-  background: rgba(239, 244, 255, 0.9);
-  box-shadow: 0 8px 18px rgba(90, 113, 177, 0.08);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  padding: 8px 16px;
+  border-bottom: 1px solid #e4ebf7;
+  background: rgba(248, 250, 255, 0.98);
+  box-shadow: 0 8px 18px rgba(54, 79, 144, 0.08);
 }
 .filter-area.is-sticky .filter-row {
   margin-top: 0;
@@ -780,14 +746,14 @@ onReachBottom(() => {
   min-width: 0;
   width: 100%;
   height: 48px;
-  padding: 0 15px;
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 25px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #23365f;
+  padding: 0 14px;
+  border: 1px solid #e6ecf7;
+  border-radius: 24px;
+  background: #fff;
+  color: #223967;
   font-size: 14px;
   line-height: 1.4;
-  box-shadow: 0 8px 18px rgba(82, 111, 198, 0.08);
+  box-shadow: 0 4px 12px rgba(61, 90, 163, 0.06);
 }
 .filter-city-label {
   overflow: hidden;
@@ -803,8 +769,8 @@ onReachBottom(() => {
   max-height: min(64vh, 480px);
   margin: 0;
   overflow-y: auto;
-  border: 1px solid rgba(220, 227, 244, 0.92);
-  box-shadow: 0 18px 38px rgba(75, 96, 156, 0.16);
+  border: 1px solid var(--app-border);
+  box-shadow: 0 16px 32px rgba(47, 78, 153, 0.14);
 }
 .panel-picker {
   display: flex;
@@ -812,8 +778,9 @@ onReachBottom(() => {
   justify-content: space-between;
   min-height: 42px;
   padding: 0 10px;
-  border-radius: 10px;
-  background: #f1f4fc;
+  border-radius: 12px;
+  background: #f3f6fc;
+  color: var(--app-ink);
   font-size: 13px;
 }
 .panel-input {
@@ -822,15 +789,19 @@ onReachBottom(() => {
   height: 42px;
   margin-top: 6px;
   padding: 0 10px;
-  border-radius: 10px;
-  background: #f1f4fc;
+  border: 1px solid #e4ebf7;
+  border-radius: 12px;
+  background: #f8faff;
+  color: var(--app-ink);
   font-size: 14px;
 }
 .active-filters {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #687a9b;
+  margin-top: 2px;
+  padding: 8px 2px;
+  color: var(--app-muted);
   font-size: 12px;
 }
 .reset-filter-button {
@@ -838,7 +809,7 @@ onReachBottom(() => {
   min-height: 44px;
   padding: 0 8px;
   background: transparent;
-  color: #5160ed;
+  color: var(--app-brand-blue);
   font-size: 12px;
 }
 .result-summary {
@@ -846,11 +817,11 @@ onReachBottom(() => {
   align-items: baseline;
   gap: 4px;
   margin: 6px 2px 10px;
-  color: #687a9b;
+  color: var(--app-muted);
   font-size: 12px;
 }
 .result-count {
-  color: #263f72;
+  color: var(--app-ink);
   font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -858,25 +829,26 @@ onReachBottom(() => {
 .property-list {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 .skeleton-card {
   display: flex;
   gap: 12px;
   padding: 12px;
-  border-radius: 22px;
+  border: 1px solid var(--app-border);
+  border-radius: 24px;
   background: #fff;
 }
 .skeleton-image {
   width: 34%;
   height: 118px;
   border-radius: 13px;
-  background: #e9eef9;
+  background: #e8eefb;
 }
 .skeleton-line {
   height: 15px;
   border-radius: 5px;
-  background: #e9eef9;
+  background: #e8eefb;
 }
 .home-map-fab {
   position: fixed;
@@ -890,39 +862,28 @@ onReachBottom(() => {
   padding: 0 22px;
   border: 0;
   border-radius: 30px;
-  background: linear-gradient(135deg, #7088ff 0%, #4c4bfa 100%);
+  background: #5366f6;
   color: #fff;
   font-size: 16px;
   font-weight: 700;
-  box-shadow: 0 12px 24px rgba(78, 81, 255, 0.28);
+  box-shadow: 0 8px 18px rgba(83, 102, 246, 0.24);
 }
 .secondary-home-content {
-  margin-top: 26px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(222, 230, 248, 0.9);
+  margin-top: 20px;
+  padding-top: 0;
 }
 .secondary-title {
-  display: block;
-  margin-bottom: 4px;
-  color: #536484;
-  font-size: 13px;
-  font-weight: 700;
+  display: none;
 }
 /* 微信胶囊占据右上角，品牌留在左侧，操作按钮放到下一行。 */
 /* #ifdef MP-WEIXIN */
 .home-sticky-header {
-  padding-top: calc(var(--status-bar-height, 20px) + 8px);
+  padding-top: calc(var(--status-bar-height, 20px) + 6px);
 }
 /* #endif */
 @media (min-width: 420px) {
   .search-box {
-    height: 62px;
-  }
-  .hero-title {
-    font-size: 32px;
-  }
-  .brand-slogan {
-    font-size: 16px;
+    height: 58px;
   }
   .filter-button {
     font-size: 15px;

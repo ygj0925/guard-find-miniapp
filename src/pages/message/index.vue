@@ -381,33 +381,31 @@ onPullDownRefresh(() => {
   right: 0;
   left: 0;
   z-index: 1000;
-  background: rgba(237, 243, 255, 0.96);
-  box-shadow: 0 6rpx 18rpx rgba(90, 113, 177, 0.08);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(248, 250, 255, 0.98);
+  box-shadow: 0 6rpx 18rpx rgba(54, 79, 144, 0.08);
 }
 .message-heading {
   display: block;
-  color: #173b92;
-  font-size: 45rpx;
+  color: #142653;
+  font-size: 42rpx;
   font-weight: 700;
   line-height: 60rpx;
 }
 .message-subheading {
   display: block;
   margin-top: 8rpx;
-  color: #58709e;
-  font-size: 25rpx;
+  color: #5d6e90;
+  font-size: 24rpx;
   line-height: 38rpx;
 }
 .message-content {
   padding: 0 38rpx;
 }
 .message-content :deep(.app-panel) {
-  border: 1rpx solid #edf1fa;
-  border-radius: 34rpx;
+  border: 1rpx solid #e4ebf7;
+  border-radius: 28rpx;
   background: white;
-  box-shadow: 0 6rpx 19rpx #c6d2ea33;
+  box-shadow: 0 8rpx 22rpx rgba(47, 78, 153, 0.08);
 }
 .guest-state {
   display: flex;

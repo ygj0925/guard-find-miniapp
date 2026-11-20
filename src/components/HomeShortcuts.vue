@@ -48,13 +48,13 @@ const services = [
 .shortcut-row {
   display: flex;
   justify-content: space-between;
-  gap: 4px;
+  gap: 8px;
 }
 .category-row {
-  margin-top: 22px;
+  margin-top: 16px;
 }
 .service-row {
-  margin-top: 18px;
+  margin-top: 16px;
 }
 .shortcut {
   display: flex;
@@ -62,13 +62,14 @@ const services = [
   min-width: 0;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   padding: 0;
   overflow: visible;
   border-radius: 12px;
   background: transparent;
-  color: #1e3159;
+  color: #172b58;
   font-size: 14px;
+  font-weight: 600;
   line-height: 1.4;
 }
 .shortcut-art {
@@ -76,10 +77,12 @@ const services = [
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 19px;
-  background: linear-gradient(145deg, #ffffffd9, var(--tint));
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 21px;
+  background: var(--tint);
+  box-shadow: 0 7px 14px rgba(57, 84, 155, 0.08);
 }
 .art-icon {
   width: 36px;
@@ -157,12 +160,14 @@ const services = [
   right: 0;
 }
 .service-row .shortcut {
-  font-size: 13px;
+  color: #536381;
+  font-size: 12px;
+  font-weight: 500;
 }
 .service-row .shortcut-art {
-  width: 48px;
-  height: 48px;
-  border-radius: 15px;
+  width: 50px;
+  height: 50px;
+  border-radius: 17px;
 }
 .service-row .art-icon {
   width: 30px;
@@ -171,32 +176,32 @@ const services = [
 .purple {
   --light: #a38aff;
   --deep: #6848ff;
-  --tint: #dad2ff;
+  --tint: #eeeaff;
 }
 .orange {
   --light: #ffa485;
   --deep: #ff744b;
-  --tint: #ffe2dc;
+  --tint: #fff0ec;
 }
 .green {
   --light: #5ae0b7;
   --deep: #21bc8d;
-  --tint: #d1f3ec;
+  --tint: #e4f8f2;
 }
 .blue {
   --light: #6fc5ff;
   --deep: #2989ff;
-  --tint: #d4e9ff;
+  --tint: #e7f2ff;
 }
 .gold {
   --light: #ffd058;
   --deep: #ffa518;
-  --tint: #fff0d7;
+  --tint: #fff5df;
 }
 .red {
   --light: #ff9291;
   --deep: #ff515d;
-  --tint: #ffe1e5;
+  --tint: #ffebee;
 }
 .hot-label {
   position: absolute;

@@ -1,22 +1,22 @@
 .pencil-page {
   box-sizing: border-box;
   min-height: var(--app-viewport-height);
-  background: linear-gradient(180deg, #dce8ff 0, #f7f9ff 356rpx, #f7f9ff 100%);
-  color: #26365e;
+  background: linear-gradient(180deg, #eaf1ff 0, #f5f8ff 360rpx, #fbfcff 100%);
+  color: #142653;
 }
 .pencil-title {
   display: block;
-  color: #173b92;
-  font-size: 45rpx;
+  color: #142653;
+  font-size: 42rpx;
   font-weight: 700;
-  line-height: 60rpx;
+  line-height: 58rpx;
 }
 .pencil-subtitle {
   display: block;
   margin-top: 8rpx;
-  color: #58709e;
-  font-size: 25rpx;
-  line-height: 38rpx;
+  color: #5d6e90;
+  font-size: 24rpx;
+  line-height: 36rpx;
 }
 .pencil-primary {
   box-sizing: border-box;
@@ -49,14 +49,14 @@
 .pencil-page .app-state {
   margin-top: 34rpx;
   padding: 52rpx 28rpx;
-  border-radius: 34rpx;
+  border-radius: 28rpx;
   background: white;
   color: #7b88a4;
   text-align: center;
 }
 .pencil-page .app-secondary-button {
-  border-color: #e7eeff;
-  border-radius: 26rpx;
-  background: #e7eeff;
-  color: #3962c7;
+  border-color: #e2e9f7;
+  border-radius: 22rpx;
+  background: #f1f5fc;
+  color: #5366f6;
 }
