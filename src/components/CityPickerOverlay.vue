@@ -9,16 +9,12 @@ const props = withDefaults(defineProps<{
   open: boolean
   cities: string[]
   currentCity?: string
-  detectedCity?: string
   history?: string[]
   locationLoading?: boolean
-  locationResolved?: boolean
 }>(), {
   currentCity: '',
-  detectedCity: '',
   history: () => [],
   locationLoading: false,
-  locationResolved: false,
 })
 const emit = defineEmits<{
   close: []
@@ -117,7 +113,7 @@ const sections = computed(() => {
   return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, list]) => ({ key, list }))
 })
 const hotCities = computed(() => ['北京市', '上海市', '广州市', '深圳市', '成都市', '杭州市'].filter(city => entries.value.some(item => item.value === city)))
-const selectedLabel = computed(() => normalized(props.currentCity || props.detectedCity || '上海市'))
+const selectedLabel = computed(() => normalized(props.currentCity || '全国'))
 
 onMounted(() => {
   // #ifdef MP-WEIXIN
@@ -160,13 +156,16 @@ function jump(initialLetter: string) {
 
     <view class="city-picker-current">
       <text class="city-current-name">{{ selectedLabel }}</text>
-      <text class="city-current-status" :class="{ 'is-resolved': locationResolved }">{{ locationResolved ? '已定位' : 'GPS定位' }}</text>
+      <text class="city-current-status">当前范围</text>
       <button class="city-picker-locate app-tap" :disabled="locationLoading" @tap="emit('locate')">
-        {{ locationLoading ? '定位中…' : '重新定位' }}
+        {{ locationLoading ? '定位中…' : '使用定位城市' }}
       </button>
     </view>
 
     <scroll-view class="city-picker-scroll" scroll-y :scroll-into-view="scrollTarget" scroll-with-animation>
+      <button v-if="!query" class="city-picker-row app-tap" @tap="selectCity('')">
+        不限城市
+      </button>
       <view v-if="history.length && !query" class="city-picker-section">
         <text class="city-picker-section-title">历史</text>
         <view class="city-picker-grid history-grid">
@@ -283,9 +282,6 @@ function jump(initialLetter: string) {
 .city-current-status {
   color: #8b9099;
   font-size: 14px;
-}
-.city-current-status.is-resolved {
-  color: #4a80d8;
 }
 .city-picker-locate {
   min-height: 40px;

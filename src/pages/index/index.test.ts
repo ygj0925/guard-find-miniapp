@@ -23,7 +23,12 @@ vi.mock('@dcloudio/uni-app', () => ({
   onShareAppMessage: vi.fn(),
   onShareTimeline: vi.fn(),
 }))
-vi.mock('@/api/property', async original => ({ ...await original<typeof import('@/api/property')>(), fetchProperties: state.fetch, fetchRegionTree: vi.fn().mockResolvedValue([]), toggleFavorite: state.favorite }))
+vi.mock('@/api/property', async original => ({
+  ...await original<typeof import('@/api/property')>(),
+  fetchProperties: state.fetch,
+  fetchRegionTree: vi.fn().mockResolvedValue([{ code: 110000, name: '北京市' }, { code: 310000, name: '上海市' }]),
+  toggleFavorite: state.favorite,
+}))
 vi.mock('@/api/propertyHome', () => ({ fetchPropertyHome: state.home }))
 vi.mock('@/store/token', () => ({ useTokenStore: () => ({ updateNowTime: () => ({ hasLogin: !!state.token, validToken: state.token }) }) }))
 vi.mock('@/utils/toLoginPage', () => ({ toLoginPage: vi.fn() }))
@@ -57,6 +62,65 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('首页搜索与分页', () => {
+  it('定位仅由用户发起，坐标无城市时可以手选，迟到的定位不覆盖手选结果', async () => {
+    const getLocation = vi.fn()
+    Object.assign(uni, { getLocation })
+    const wrapper = await render()
+    expect(getLocation).not.toHaveBeenCalled()
+    const selectCity = wrapper.get('.city-button')
+    expect(selectCity.text()).toContain('全国')
+    await selectCity.trigger('tap')
+    await button(wrapper, '使用定位城市').trigger('tap')
+    const first = getLocation.mock.calls[0][0]
+    first.success({ latitude: 39.9, longitude: 116.4 })
+    first.complete()
+    await flushPromises()
+    expect(state.fetch).toHaveBeenCalledTimes(1)
+    expect(uni.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: '未能确定所在城市，请手动选择' }))
+    await button(wrapper, '使用定位城市').trigger('tap')
+    await button(wrapper, '北京').trigger('tap')
+    getLocation.mock.calls[1][0].success({ address: { city: '上海市' } })
+    await flushPromises()
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ city: '北京市' }))
+    expect(selectCity.text()).toContain('北京市')
+    await selectCity.trigger('tap')
+    await button(wrapper, '不限城市').trigger('tap')
+    await flushPromises()
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ city: undefined }))
+    expect(selectCity.text()).toContain('全国')
+    wrapper.unmount()
+  })
+
+  it('定位地址匹配行政区后按同一城市展示并请求房源', async () => {
+    Object.assign(uni, { getLocation: vi.fn(options => options.success({ address: { city: '北京' } })) })
+    const wrapper = await render()
+    await wrapper.get('.city-button').trigger('tap')
+    await button(wrapper, '使用定位城市').trigger('tap')
+    await flushPromises()
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ city: '北京市' }))
+    expect(wrapper.get('.filter-city-label').text()).toBe('北京 · 全市')
+    expect(wrapper.find('.city-picker-overlay').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('排序文案和整套高亮随已提交的查询和重置更新', async () => {
+    const wrapper = await render()
+    const sort = wrapper.get('[aria-label="选择房源排序"]')
+    const whole = button(wrapper, '整套')
+    expect(sort.text()).toContain('最新发布')
+    expect(whole.attributes('aria-pressed')).toBe('false')
+    await whole.trigger('tap')
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ rentalMode: 'whole' }))
+    expect(whole.attributes('aria-pressed')).toBe('true')
+    await wrapper.findAll('.picker-stub')[1].trigger('change', { detail: { value: 1 } })
+    expect(state.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'priceAsc' }))
+    expect(sort.text()).toContain('价格从低到高')
+    await button(wrapper, '重置筛选').trigger('tap')
+    expect(sort.text()).toContain('最新发布')
+    expect(whole.attributes('aria-pressed')).toBe('false')
+    wrapper.unmount()
+  })
+
   it('标题与筛选行滚动后吸顶，返回顶部后恢复透明', async () => {
     const wrapper = await render()
     const header = wrapper.get('.home-sticky-header')

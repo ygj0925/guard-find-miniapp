@@ -38,14 +38,10 @@ const homeError = ref(false)
 const cities = ref<string[]>(['不限城市'])
 const cityPickerOpen = ref(false)
 const cityHistory = ref<string[]>([])
-const detectedCity = ref('')
-const locationResolved = ref(false)
 const locationLoading = ref(false)
-const cityLabel = computed(() => {
-  const city = draft.city || detectedCity.value || '上海市'
-  return `${city.replace(/市$/, '')} · 全市`
-})
-const cityDisplay = computed(() => draft.city || detectedCity.value || '全国')
+let locationRequest = 0
+const cityDisplay = computed(() => applied.value.city || '全国')
+const cityLabel = computed(() => applied.value.city ? `${applied.value.city.replace(/市$/, '')} · 全市` : '不限城市')
 type HomeTypeKey = 'whole' | 'room' | 'short' | 'apartment'
 const TYPE_TABS: { key: HomeTypeKey, label: string }[] = [
   { key: 'whole', label: '整套' },
@@ -66,8 +62,7 @@ const SORT_TABS = [{ key: 'newest' as const, label: '最新发布' }, { key: 'pr
 const priceIndex = computed(() => PRICE_TABS.findIndex(t => t.key === draft.priceType))
 const modeIndex = computed(() => MODE_TABS.findIndex(t => t.key === draft.rentalMode))
 const unitIndex = computed(() => UNIT_TABS.findIndex(t => t.key === draft.priceUnit))
-const sortIndex = computed(() => SORT_TABS.findIndex(t => t.key === draft.sort))
-const sortButtonLabel = computed(() => draft.sort === 'newest' ? '租金从低到高' : SORT_TABS[sortIndex.value].label)
+const sortIndex = computed(() => SORT_TABS.findIndex(t => t.key === applied.value.sort))
 const hasFilters = computed(() => Object.entries(applied.value).some(([key, value]) => key === 'sort' ? value !== 'newest' : value !== undefined))
 
 function readCityHistory() {
@@ -86,22 +81,36 @@ function saveCityHistory(city: string) {
 }
 
 function requestLocation() {
-  if (locationLoading.value || typeof uni === 'undefined' || typeof uni.getLocation !== 'function')
+  if (locationLoading.value)
     return
+  if (typeof uni.getLocation !== 'function') {
+    uni.showToast({ title: '当前设备无法定位，请手动选择城市', icon: 'none' })
+    return
+  }
+  const request = ++locationRequest
   locationLoading.value = true
   uni.getLocation({
     type: 'gcj02',
-    isHighAccuracy: true,
-    success: () => {
-      locationResolved.value = true
-      detectedCity.value = draft.city || '上海市'
-      uni.showToast({ title: '定位成功', icon: 'success' })
+    geocode: true,
+    success: ({ address }) => {
+      if (request !== locationRequest)
+        return
+      const cityName = address?.city || address?.province
+      const city = typeof cityName === 'string' && cities.value.find(name =>
+        name.replace(/市$/, '') === cityName.trim().replace(/市$/, ''),
+      )
+      if (city)
+        chooseCity(city)
+      else
+        uni.showToast({ title: '未能确定所在城市，请手动选择', icon: 'none' })
     },
     fail: () => {
-      locationResolved.value = false
+      if (request === locationRequest)
+        uni.showToast({ title: '定位失败，请手动选择城市', icon: 'none' })
     },
     complete: () => {
-      locationLoading.value = false
+      if (request === locationRequest)
+        locationLoading.value = false
     },
   })
 }
@@ -111,21 +120,22 @@ function openCityPicker() {
 }
 
 function closeCityPicker() {
+  locationRequest++
+  locationLoading.value = false
   cityPickerOpen.value = false
 }
 
 function chooseCity(city: string) {
   draft.city = city
-  detectedCity.value = city
-  locationResolved.value = false
-  saveCityHistory(city)
-  cityPickerOpen.value = false
+  if (city)
+    saveCityHistory(city)
+  closeCityPicker()
   applyFilters()
 }
 
 function selectCityCompat(event: { detail: { value: string | number } }) {
   const city = Number(event.detail.value) === 0 ? '' : cities.value[Number(event.detail.value)]
-  if (city)
+  if (city !== undefined)
     chooseCity(city)
 }
 let generation = 0
@@ -134,6 +144,7 @@ let disposed = false
 let firstShow = true
 onUnload(() => {
   disposed = true
+  locationRequest++
   generation++
   homeVersion++
 })
@@ -204,11 +215,9 @@ function applyFilters() {
   }
 }
 function isTypeActive(key: HomeTypeKey) {
-  if (key === 'whole')
-    return draft.propertyType === 'all' && draft.rentalMode === 'all'
   if (key === 'apartment')
-    return draft.propertyType === 'apartment'
-  return draft.propertyType === 'all' && draft.rentalMode === key
+    return applied.value.propertyType === 'apartment'
+  return !applied.value.propertyType && applied.value.rentalMode === key
 }
 function selectType(key: HomeTypeKey) {
   const city = draft.city
@@ -281,7 +290,7 @@ function phone() {
 }
 function shortcut(key: string) {
   if (key === 'map') {
-    uni.navigateTo({ url: `/pages/property/map?city=${encodeURIComponent(draft.city || '')}` })
+    uni.navigateTo({ url: `/pages/property/map?city=${encodeURIComponent(applied.value.city || '')}` })
     return
   }
   if (key === 'phone') {
@@ -329,7 +338,6 @@ function favoriteChanged(id: Property['id'], favorited: boolean) {
 }
 onLoad(() => {
   readCityHistory()
-  requestLocation()
   void load(1)
   void loadHome()
   void loadCities()
@@ -411,7 +419,7 @@ onReachBottom(() => {
             </button>
             <picker class="min-w-0 flex-1" :range="SORT_TABS" range-key="label" :value="sortIndex" @change="selectSort">
               <view class="filter-button" role="button" aria-label="选择房源排序">
-                <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ sortButtonLabel }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
+                <view class="i-carbon-grid text-5" aria-hidden="true" /><text class="truncate">{{ SORT_TABS[sortIndex].label }}</text><view class="i-carbon-chevron-down ml-auto shrink-0 text-4" />
               </view>
             </picker>
           </view>
@@ -499,11 +507,9 @@ onReachBottom(() => {
     <CityPickerOverlay
       :open="cityPickerOpen"
       :cities="cities"
-      :current-city="draft.city"
-      :detected-city="detectedCity"
+      :current-city="applied.city"
       :history="cityHistory"
       :location-loading="locationLoading"
-      :location-resolved="locationResolved"
       @close="closeCityPicker"
       @select="chooseCity"
       @locate="requestLocation"
